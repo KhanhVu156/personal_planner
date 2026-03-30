@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+    <div class="bg-white p-6 rounded shadow">
+        <h3 class="text-lg font-semibold">Income (This Month)</h3>
+        <p class="text-2xl text-green-600">+{{ "%.2f"|format(income) }}</p>
+    </div>
+    <div class="bg-white p-6 rounded shadow">
+        <h3 class="text-lg font-semibold">Expenses (This Month)</h3>
+        <p class="text-2xl text-red-600">-{{ "%.2f"|format(expenses) }}</p>
+    </div>
+    <div class="bg-white p-6 rounded shadow">
+        <h3 class="text-lg font-semibold">Balance</h3>
+        <p class="text-2xl">{{ "%.2f"|format(balance) }}</p>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+    <div class="bg-white p-6 rounded shadow">
+        <h3 class="text-xl font-semibold mb-4">Spending vs Budget</h3>
+        <canvas id="budgetChart" width="400" height="300"></canvas>
+    </div>
+    <div class="bg-white p-6 rounded shadow">
+        <h3 class="text-xl font-semibold mb-4">Upcoming Tasks</h3>
+        <ul class="space-y-2">
+            {% for task in tasks %}
+            <li class="flex justify-between border-b pb-2">
+                <span>
+                    <strong>{{ task.title }}</strong> <br>
+                    <small class="text-gray-500">Due: {{ task.deadline.strftime('%Y-%m-%d') }}</small>
+                </span>
+                <span class="text-sm">{{ task.progress }}%</span>
+            </li>
+            {% else %}
+            <li>No upcoming tasks</li>
+            {% endfor %}
+        </ul>
+        <a href="{{ url_for('tasks.list_tasks') }}" class="text-blue-500 mt-2 inline-block">View all tasks</a>
+    </div>
+</div>
+
+<script>
+    const catSpending = {{ cat_expenses|tojson }};
+    const budgets = {{ budgets|tojson }};
+    const categories = Object.keys(catSpending);
+    const spendingData = categories.map(c => catSpending[c] || 0);
+    const budgetData = categories.map(c => budgets[c] || 0);
+
+    const ctx = document.getElementById('budgetChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: categories,
+            datasets: [
+                { label: 'Actual Spending', data: spendingData, backgroundColor: 'rgba(255,99,132,0.5)' },
+                { label: 'Budget', data: budgetData, backgroundColor: 'rgba(54,162,235,0.5)' }
+            ]
+        },
+        options: { responsive: true, maintainAspectRatio: true }
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="flex justify-between items-center mb-4">
+    <h2 class="text-2xl font-bold">Transactions</h2>
+    <div>
+        <a href="{{ url_for('transactions.add_transaction') }}" class="bg-blue-600 text-white px-4 py-2 rounded">Add Transaction</a>
+        <form method="POST" action="{{ url_for('transactions.import_csv') }}" enctype="multipart/form-data" class="inline ml-2">
+            <input type="file" name="csv_file" accept=".csv" class="hidden" id="csvInput">
+            <button type="button" onclick="document.getElementById('csvInput').click()" class="bg-green-600 text-white px-4 py-2 rounded">Import CSV</button>
+        </form>
+    </div>
+</div>
+
+<div class="overflow-x-auto">
+    <table class="min-w-full bg-white rounded shadow">
+        <thead>
+            <tr class="bg-gray-200">
+                <th class="py-2 px-4">Date</th>
+                <th class="py-2 px-4">Description</th>
+                <th class="py-2 px-4">Amount</th>
+                <th class="py-2 px-4">Category</th>
+                <th class="py-2 px-4">Type</th>
+                <th class="py-2 px-4">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for trans in transactions.items %}
+            <tr class="border-b">
+                <td class="py-2 px-4">{{ trans.date.strftime('%Y-%m-%d') }}</td>
+                <td class="py-2 px-4">{{ trans.description }}</td>
+                <td class="py-2 px-4">{{ "%.2f"|format(trans.amount) }}</td>
+                <td class="py-2 px-4">{{ trans.category }}</td>
+                <td class="py-2 px-4">{{ trans.type }}</td>
+                <td class="py-2 px-4">
+                    <a href="{{ url_for('transactions.edit_transaction', id=trans.id) }}" class="text-blue-600">Edit</a>
+                    <a href="{{ url_for('transactions.delete_transaction', id=trans.id) }}" class="text-red-600 ml-2" onclick="return confirm('Delete this transaction?')">Delete</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="mt-4 flex justify-between">
+    {% if transactions.has_prev %}
+        <a href="{{ url_for('transactions.list_transactions', page=transactions.prev_num) }}" class="bg-gray-300 px-3 py-1 rounded">Previous</a>
+    {% else %}
+        <span></span>
+    {% endif %}
+    <span>Page {{ transactions.page }} of {{ transactions.pages }}</span>
+    {% if transactions.has_next %}
+        <a href="{{ url_for('transactions.list_transactions', page=transactions.next_num) }}" class="bg-gray-300 px-3 py-1 rounded">Next</a>
+    {% else %}
+        <span></span>
+    {% endif %}
+</div>
+
+<script>
+    document.getElementById('csvInput').addEventListener('change', function(e) {
+        if (e.target.files.length) e.target.form.submit();
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Personal Planner</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="bg-gray-100 text-gray-800">
+    <nav class="bg-white shadow-md">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+            <a href="{{ url_for('dashboard.index') }}" class="text-xl font-bold text-blue-600">Planner</a>
+            {% if current_user.is_authenticated %}
+                <div>
+                    <a href="{{ url_for('dashboard.index') }}" class="px-3">Dashboard</a>
+                    <a href="{{ url_for('transactions.list_transactions') }}" class="px-3">Transactions</a>
+                    <a href="{{ url_for('budgets.list_budgets') }}" class="px-3">Budgets</a>
+                    <a href="{{ url_for('tasks.list_tasks') }}" class="px-3">Tasks</a>
+                    <a href="{{ url_for('auth.logout') }}" class="px-3 text-red-600">Logout</a>
+                </div>
+            {% else %}
+                <div>
+                    <a href="{{ url_for('auth.login') }}" class="px-3">Login</a>
+                    <a href="{{ url_for('auth.register') }}" class="px-3">Register</a>
+                </div>
+            {% endif %}
+        </div>
+    </nav>
+    <main class="max-w-7xl mx-auto px-4 py-8">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="mb-4 p-3 rounded {{ 'bg-green-100 text-green-800' if category=='success' else 'bg-red-100 text-red-800' }}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+    </main>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
