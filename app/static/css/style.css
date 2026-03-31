@@ -1,46 +1,26 @@
-/* ============================================
-   Global Styles & Dark Mode Support (with Tailwind CDN)
-   ============================================ */
-
-/* Light mode (default) – Tailwind đã cung cấp phần lớn, ta chỉ ghi đè những gì cần */
-:root {
-    --bg-primary: #f3f4f6;
-    --text-primary: #1f2937;
-    --card-bg: #ffffff;
-    --border-color: #e5e7eb;
-    --btn-primary: #2563eb;
-}
-
-/* Dark mode – ghi đè các class của Tailwind */
+/* Dark mode overrides – áp dụng khi body có class "dark" */
 body.dark {
-    --bg-primary: #111827;
-    --text-primary: #f9fafb;
-    --card-bg: #1f2937;
-    --border-color: #374151;
-    --btn-primary: #3b82f6;
+    background-color: #111827 !important;
+    color: #f9fafb !important;
 }
 
-/* Ghi đè nền và chữ cho các thành phần chính */
-body.dark {
-    background-color: var(--bg-primary);
-    color: var(--text-primary);
+body.dark nav {
+    background-color: #1f2937 !important;
 }
 
-body.dark .bg-white,
-body.dark .card,
-body.dark nav.bg-white {
-    background-color: var(--card-bg) !important;
+body.dark .bg-white {
+    background-color: #1f2937 !important;
 }
 
 body.dark .text-gray-800,
 body.dark .text-gray-700,
 body.dark .text-gray-600 {
-    color: var(--text-primary) !important;
+    color: #f9fafb !important;
 }
 
 body.dark .border,
 body.dark .border-gray-200 {
-    border-color: var(--border-color) !important;
+    border-color: #374151 !important;
 }
 
 body.dark input,
@@ -52,89 +32,33 @@ body.dark select {
 }
 
 body.dark table {
-    background-color: var(--card-bg);
+    background-color: #1f2937 !important;
 }
 
 body.dark th {
-    background-color: #1f2937;
-    color: #f9fafb;
+    background-color: #111827 !important;
+    color: #f9fafb !important;
 }
 
 body.dark td {
-    border-bottom-color: var(--border-color);
+    border-bottom-color: #374151 !important;
+    color: #e5e7eb !important;
 }
 
-/* Buttons – giữ nguyên style Tailwind nhưng màu có thể điều chỉnh qua biến */
+body.dark a:not(.text-red-600):not(.text-blue-600) {
+    color: #9ca3af !important;
+}
+
 body.dark .btn-primary {
-    background-color: var(--btn-primary);
+    background-color: #3b82f6 !important;
 }
 
-/* Alerts – đảm bảo đủ tương phản */
 body.dark .alert-success {
-    background-color: #064e3b;
-    color: #a7f3d0;
+    background-color: #064e3b !important;
+    color: #a7f3d0 !important;
 }
 
 body.dark .alert-danger {
-    background-color: #7f1d1d;
-    color: #fecaca;
-}
-
-/* Task progress slider */
-.task-progress-slider {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 100%;
-    height: 6px;
-    background: var(--border-color);
-    border-radius: 3px;
-    outline: none;
-    cursor: pointer;
-}
-
-.task-progress-slider::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    background: var(--btn-primary);
-    cursor: pointer;
-}
-
-/* Filter buttons */
-.filter-btns {
-    display: flex;
-    justify-content: center;
-    gap: 0.5rem;
-    margin-bottom: 2rem;
-    flex-wrap: wrap;
-}
-
-.filter-btn {
-    background: transparent;
-    border: 2px solid var(--btn-primary);
-    color: var(--btn-primary);
-    padding: 0.5rem 1rem;
-    border-radius: 2rem;
-    font-weight: bold;
-    transition: all 0.3s;
-    cursor: pointer;
-}
-
-.filter-btn.active,
-.filter-btn:hover {
-    background-color: var(--btn-primary);
-    color: white;
-}
-
-/* Responsive */
-@media (max-width: 768px) {
-    .filter-btns {
-        gap: 0.25rem;
-    }
-    .filter-btn {
-        padding: 0.3rem 0.8rem;
-        font-size: 0.875rem;
-    }
+    background-color: #7f1d1d !important;
+    color: #fecaca !important;
 }
