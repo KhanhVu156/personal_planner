@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% block content %}
+
+<!-- Cards thống kê -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+    <div class="bg-white p-6 rounded shadow">
+        <h3 class="text-lg font-semibold">Income (This Month)</h3>
+        <p class="text-2xl text-green-600">+{{ "%.2f"|format(income) }}</p>
+    </div>
+    <div class="bg-white p-6 rounded shadow">
+        <h3 class="text-lg font-semibold">Expenses (This Month)</h3>
+        <p class="text-2xl text-red-600">-{{ "%.2f"|format(expenses) }}</p>
+    </div>
+    <div class="bg-white p-6 rounded shadow">
+        <h3 class="text-lg font-semibold">Balance</h3>
+        <p class="text-2xl">{{ "%.2f"|format(balance) }}</p>
+    </div>
+</div>
+
+<!-- Biểu đồ và tasks -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+    <div class="bg-white p-6 rounded shadow">
+        <h3 class="text-xl font-semibold mb-4">Spending vs Budget</h3>
+        <canvas id="budgetChart" width="400" height="300"></canvas>
+    </div>
+    <div class="bg-white p-6 rounded shadow">
+        <h3 class="text-xl font-semibold mb-4">Upcoming Tasks</h3>
+        <ul class="space-y-2">
+            {% for task in tasks %}
+            <li class="flex justify-between border-b pb-2">
+                <span>
+                    <strong>{{ task.title }}</strong><br>
+                    <small class="text-gray-500">Due: {{ task.deadline.strftime('%Y-%m-%d') }}</small>
+                </span>
+                <span class="text-sm">{{ task.progress }}%</span>
+            </li>
+            {% else %}
+            <li>No upcoming tasks</li>
+            {% endfor %}
+        </ul>
+        <a href="{{ url_for('tasks.list_tasks') }}" class="text-blue-500 mt-2 inline-block">View all tasks</a>
+    </div>
+</div>
+
+<!-- Dự đoán chi tiêu 7 ngày tới (ML) -->
+<div class="bg-white p-6 rounded shadow mt-8">
+    <h3 class="text-xl font-semibold mb-4">Predicted Expenses (Next 7 Days)</h3>
+    <canvas id="predictionChart" width="400" height="200"></canvas>
+</div>
+
+<!-- Form lập kế hoạch chi tiêu tối ưu -->
+<div class="bg-white p-6 rounded shadow mt-8">
+    <h3 class="text-xl font-semibold mb-4">Optimal Spending Plan</h3>
+    <form id="plan-form" class="space-y-4">
+        <div>
+            <label class="block text-gray-700">Monthly Income (VND)</label>
+            <input type="number" id="monthly_income" class="w-full px-3 py-2 border rounded" required>
+        </div>
+        <div>
+            <label class="block text-gray-700">Savings Percentage (%)</label>
+            <input type="number" id="savings_percent" class="w-full px-3 py-2 border rounded" value="20" step="1">
+        </div>
+        <div>
+            <label class="block text-gray-700">Category Priorities (higher = more allocated)</label>
+            <div class="grid grid-cols-3 gap-2">
+                <div>Food: <input type="number" id="weight_food" class="w-full border rounded" step="0.1" value="1.0"></div>
+                <div>Transport: <input type="number" id="weight_transport" class="w-full border rounded" step="0.1" value="1.0"></div>
+                <div>Other: <input type="number" id="weight_other" class="w-full border rounded" step="0.1" value="1.0"></div>
+            </div>
+        </div>
+        <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Get Plan</button>
+    </form>
+    <div id="plan-result" class="mt-4 hidden">
+        <h4 class="font-semibold">Recommended Budget:</h4>
+        <p>Savings: <span id="savings_amt"></span> VND</p>
+        <ul id="budgets-list" class="list-disc pl-5 mt-2"></ul>
+    </div>
+</div>
+
+<script>
+    // Dữ liệu cho biểu đồ spending vs budget
+    const catSpending = {{ cat_expenses|tojson }};
+    const budgets = {{ budgets|tojson }};
+    const categories = Object.keys(catSpending);
+    const spendingData = categories.map(c => catSpending[c] || 0);
+    const budgetData = categories.map(c => budgets[c] || 0);
+
+    // Biểu đồ 1: Spending vs Budget
+    const ctx = document.getElementById('budgetChart').getContext('2d');
+    window.charts = window.charts || [];
+    const budgetChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: categories,
+            datasets: [
+                { label: 'Actual Spending', data: spendingData, backgroundColor: 'rgba(255,99,132,0.5)' },
+                { label: 'Budget', data: budgetData, backgroundColor: 'rgba(54,162,235,0.5)' }
+            ]
+        },
+        options: { responsive: true, maintainAspectRatio: true }
+    });
+    window.charts.push(budgetChart);
+
+    // Biểu đồ 2: Dự đoán chi tiêu
+    fetch('/api/predict')
+        .then(response => response.json())
+        .then(data => {
+            const labels = ['Day1', 'Day2', 'Day3', 'Day4', 'Day5', 'Day6', 'Day7'];
+            const datasets = [];
+            for (const [category, values] of Object.entries(data)) {
+                datasets.push({
+                    label: category,
+                    data: values,
+                    borderColor: getRandomColor(),
+                    fill: false
+                });
+            }
+            const predCtx = document.getElementById('predictionChart').getContext('2d');
+            const predChart = new Chart(predCtx, {
+                type: 'line',
+                data: { labels, datasets },
+                options: { responsive: true, maintainAspectRatio: true }
+            });
+            window.charts.push(predChart);
+        });
+
+    // Hàm tạo màu ngẫu nhiên
+    function getRandomColor() {
+        const letters = '0123456789ABCDEF';
+        let color = '#';
+        for (let i = 0; i < 6; i++) color += letters[Math.floor(Math.random() * 16)];
+        return color;
+    }
+
+    // Xử lý form kế hoạch tài chính
+    document.getElementById('plan-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const monthly_income = parseFloat(document.getElementById('monthly_income').value);
+        const savings_percent = parseFloat(document.getElementById('savings_percent').value);
+        const weights = {
+            food: parseFloat(document.getElementById('weight_food').value),
+            transport: parseFloat(document.getElementById('weight_transport').value),
+            other: parseFloat(document.getElementById('weight_other').value)
+        };
+        const response = await fetch('/api/financial-plan', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ monthly_income, savings_percent, category_weights: weights })
+        });
+        const data = await response.json();
+        if (response.ok) {
+            document.getElementById('savings_amt').innerText = data.savings.toLocaleString();
+            const budgetsList = document.getElementById('budgets-list');
+            budgetsList.innerHTML = '';
+            for (const [cat, amt] of Object.entries(data.budgets)) {
+                const li = document.createElement('li');
+                li.textContent = `${cat.charAt(0).toUpperCase() + cat.slice(1)}: ${amt.toLocaleString()} VND`;
+                budgetsList.appendChild(li);
+            }
+            document.getElementById('plan-result').classList.remove('hidden');
+        } else {
+            alert('Error: ' + (data.error || 'Unable to generate plan'));
+        }
+    });
+</script>
+{% endblock %}

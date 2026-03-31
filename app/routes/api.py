@@ -1,8 +1,8 @@
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request   # thêm request
 from flask_login import login_required, current_user
 from app import db
 from app.models import Transaction
-from app.ml_model import predict_expense, train_model
+from app.ml_model import predict_expense, train_model, FinancialPlanner   # thêm FinancialPlanner
 from datetime import datetime, timedelta
 
 bp = Blueprint('api', __name__, url_prefix='/api')
@@ -31,4 +31,36 @@ def train():
     if model:
         return jsonify({'status': 'success', 'message': 'Model trained successfully'})
     else:
-        return jsonify({'status': 'error', 'message': 'Insufficient data for training'}), 400
+        return jsonify({'status': 'error', 'message': 'Insufficient data for training'}), 400,
+    # Thêm import
+from app.ml_model import FinancialPlanner
+
+@bp.route('/financial-plan', methods=['POST'])
+@login_required
+def financial_plan():
+    """
+    Nhận yêu cầu từ frontend, trả về kế hoạch chi tiêu tối ưu.
+    Body JSON mẫu:
+    {
+        "monthly_income": 15000000,
+        "savings_percent": 20,
+        "category_weights": {"food": 1.2, "transport": 0.8, "other": 1.0}
+    }
+    """
+    data = request.get_json()
+    monthly_income = data.get('monthly_income')
+    if not monthly_income or monthly_income <= 0:
+        return jsonify({'error': 'Invalid monthly income'}), 400
+
+    savings_percent = data.get('savings_percent')
+    savings_goal = data.get('savings_goal')
+    category_weights = data.get('category_weights')
+
+    planner = FinancialPlanner(current_user.id, db.session)
+    suggestion = planner.suggest_budgets(
+        monthly_income,
+        savings_goal=savings_goal,
+        savings_percent=savings_percent,
+        category_weights=category_weights
+    )
+    return jsonify(suggestion)
