@@ -7,6 +7,7 @@ import time
 from sqlalchemy import func
 
 from app.models import Transaction, Budget, Task
+from app.services.ai_manager import request_prediction, request_training
 
 bp = Blueprint('api', __name__, url_prefix='/api')
 
@@ -19,7 +20,6 @@ def get_dashboard_stats():
     user_id = current_user.id
     now = time.time()
     
-    # 1. Kiểm tra Cache (Nếu có và chưa quá 2 giây)
     if user_id in _api_cache:
         cached_time, cached_data = _api_cache[user_id]
         if now - cached_time < 2.0:
@@ -27,7 +27,6 @@ def get_dashboard_stats():
             response.headers['Cache-Control'] = 'no-store'
             return response
 
-    # 2. Nếu không có Cache, truy vấn Database
     try:
         today = datetime.now()
         month, year = today.month, today.year
@@ -85,10 +84,7 @@ def get_dashboard_stats():
             'year': year
         }
         
-        # 3. Lưu vào Cache
         _api_cache[user_id] = (now, data)
-        
-        # Giới hạn Cache (Nếu có quá nhiều User, xóa bớt để giải phóng RAM)
         if len(_api_cache) > 20:
             _api_cache.clear()
 
@@ -100,23 +96,23 @@ def get_dashboard_stats():
         current_app.logger.error(f"Lỗi API Dashboard: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-# ----- CÁC API CỦA AI -----
 @bp.route('/predict', methods=['GET'])
 @login_required
 def get_predictions():
     try:
-        from app.ml.expense_model import predict_expense, train_model
         user_id = current_user.id
-        train_model(user_id, db.session)
-        categories = ['food', 'transport', 'education', 'entertainment', 'shopping', 'bills', 'other'] # Cập nhật danh mục mới
+        categories = ['food', 'transport', 'education', 'entertainment', 'shopping', 'bills', 'other']
         predictions = {}
+        
         for cat in categories:
             cat_pred = []
             for i in range(1, 8):
                 future_date = datetime.now().date() + timedelta(days=i)
-                pred = predict_expense(user_id, future_date, cat, db.session)
+                # GỌI QUA AI MANAGER
+                pred = request_prediction(user_id, future_date, cat)
                 cat_pred.append(pred if pred is not None else 0)
             predictions[cat] = cat_pred
+            
         return jsonify(predictions)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -125,11 +121,11 @@ def get_predictions():
 @login_required
 def train():
     try:
-        from app.ml.expense_model import train_model
-        model = train_model(current_user.id, db.session)
-        if model:
+        # GỌI QUA AI MANAGER (Để train ở tiến trình ngầm)
+        success = request_training(current_user.id)
+        if success:
             return jsonify({'status': 'success', 'message': 'Model trained successfully'})
-        return jsonify({'status': 'error', 'message': 'Insufficient data for training'}), 400
+        return jsonify({'status': 'error', 'message': 'Insufficient data or AI worker failed'}), 400
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
