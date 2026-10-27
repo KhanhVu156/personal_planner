@@ -1,9 +1,8 @@
 from flask import Blueprint, jsonify, request, current_app
 from flask_login import login_required, current_user
-from app import db
+from app import db, cache # Import thêm cache từ app
 from datetime import datetime, timedelta
 import calendar
-import time
 from sqlalchemy import func
 
 from app.models import Transaction, Budget, Task
@@ -11,23 +10,14 @@ from app.services.ai_manager import request_prediction, request_training
 
 bp = Blueprint('api', __name__, url_prefix='/api')
 
-# Bộ đệm lưu trữ API
-_api_cache = {}
-
 @bp.route('/dashboard-stats', methods=['GET'])
 @login_required
+# SỬ DỤNG UPSTASH REDIS CACHE TẠI ĐÂY
+# Cache kết quả trong 5 giây, tạo key riêng cho từng user
+@cache.cached(timeout=5, key_prefix=lambda: f"user_{current_user.id}_stats")
 def get_dashboard_stats():
-    user_id = current_user.id
-    now = time.time()
-    
-    if user_id in _api_cache:
-        cached_time, cached_data = _api_cache[user_id]
-        if now - cached_time < 2.0:
-            response = jsonify(cached_data)
-            response.headers['Cache-Control'] = 'no-store'
-            return response
-
     try:
+        user_id = current_user.id
         today = datetime.now()
         month, year = today.month, today.year
 
@@ -35,37 +25,61 @@ def get_dashboard_stats():
         last_day = calendar.monthrange(year, month)[1]
         end_date = datetime(year, month, last_day).date()
 
-        has_trans = Transaction.query.filter_by(user_id=current_user.id) \
-            .filter(Transaction.date >= start_date, Transaction.date <= end_date).first()
+        # Tối ưu: Chỉ query ID
+        has_trans = db.session.query(Transaction.id).filter(
+            Transaction.user_id == user_id,
+            Transaction.date >= start_date,
+            Transaction.date <= end_date
+        ).first()
 
         if not has_trans:
-            latest_trans = Transaction.query.filter_by(user_id=current_user.id).order_by(Transaction.date.desc()).first()
+            # Tối ưu: Chỉ query ngày tháng
+            latest_trans = db.session.query(Transaction.date).filter_by(user_id=user_id).order_by(Transaction.date.desc()).first()
             if latest_trans:
                 month, year = latest_trans.date.month, latest_trans.date.year
                 start_date = datetime(year, month, 1).date()
                 last_day = calendar.monthrange(year, month)[1]
                 end_date = datetime(year, month, last_day).date()
 
-        trans_in_month = Transaction.query.filter_by(user_id=current_user.id) \
-            .filter(Transaction.date >= start_date, Transaction.date <= end_date).all()
+        # TỐI ƯU CỐT LÕI: Tính tổng Thu nhập tháng bằng SQL
+        income_month = db.session.query(func.sum(Transaction.amount)).filter(
+            Transaction.user_id == user_id,
+            Transaction.type == 'income',
+            Transaction.date >= start_date,
+            Transaction.date <= end_date
+        ).scalar() or 0.0
 
-        income = sum(float(t.amount) for t in trans_in_month if t.type == 'income')
-        expenses = sum(float(t.amount) for t in trans_in_month if t.type == 'expense')
+        # TỐI ƯU CỐT LÕI: Tính tổng Chi tiêu tháng bằng SQL
+        expense_month = db.session.query(func.sum(Transaction.amount)).filter(
+            Transaction.user_id == user_id,
+            Transaction.type == 'expense',
+            Transaction.date >= start_date,
+            Transaction.date <= end_date
+        ).scalar() or 0.0
 
-        total_trans = Transaction.query.filter_by(user_id=current_user.id).all()
-        total_income = sum(float(t.amount) for t in total_trans if t.type == 'income')
-        total_expense = sum(float(t.amount) for t in total_trans if t.type == 'expense')
-        balance = total_income - total_expense
+        # TỐI ƯU CỐT LÕI: Tính tổng cả đời bằng SQL
+        total_income = db.session.query(func.sum(Transaction.amount)).filter_by(user_id=user_id, type='income').scalar() or 0.0
+        total_expense = db.session.query(func.sum(Transaction.amount)).filter_by(user_id=user_id, type='expense').scalar() or 0.0
+        balance = float(total_income) - float(total_expense)
 
-        budgets = Budget.query.filter_by(user_id=current_user.id, month=month, year=year).all()
+        # Lấy Ngân sách
+        budgets = Budget.query.filter_by(user_id=user_id, month=month, year=year).all()
         budget_dict = {b.category: float(b.amount) for b in budgets}
 
-        cat_exp_dict = {}
-        for t in trans_in_month:
-            if t.type == 'expense':
-                cat_exp_dict[t.category] = cat_exp_dict.get(t.category, 0.0) + float(t.amount)
+        # TỐI ƯU CỐT LÕI: Nhóm và tính tổng chi tiêu theo danh mục bằng SQL
+        cat_expenses = db.session.query(
+            Transaction.category, func.sum(Transaction.amount)
+        ).filter(
+            Transaction.user_id == user_id,
+            Transaction.type == 'expense',
+            Transaction.date >= start_date,
+            Transaction.date <= end_date
+        ).group_by(Transaction.category).all()
+        
+        cat_exp_dict = {c[0]: float(c[1]) for c in cat_expenses if c[1] is not None}
 
-        upcoming_tasks = Task.query.filter_by(user_id=current_user.id) \
+        # Lấy Tasks
+        upcoming_tasks = Task.query.filter_by(user_id=user_id) \
             .filter(Task.status.in_(['pending', 'in_progress'])) \
             .order_by(Task.deadline.asc()).limit(5).all()
             
@@ -74,8 +88,8 @@ def get_dashboard_stats():
         } for t in upcoming_tasks]
 
         data = {
-            'income': income,
-            'expenses': expenses,
+            'income': float(income_month),
+            'expenses': float(expense_month),
             'balance': balance,
             'budgets': budget_dict,
             'cat_expenses': cat_exp_dict,
@@ -84,11 +98,10 @@ def get_dashboard_stats():
             'year': year
         }
         
-        _api_cache[user_id] = (now, data)
-        if len(_api_cache) > 20:
-            _api_cache.clear()
+        # Không cần lưu cache thủ công nữa, @cache.cached đã tự lo việc này!
 
         response = jsonify(data)
+        # Vẫn giữ header này để trình duyệt không lưu cache, đảm bảo frontend luôn lấy dữ liệu mới nhất từ Redis
         response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
         return response
 
@@ -108,7 +121,6 @@ def get_predictions():
             cat_pred = []
             for i in range(1, 8):
                 future_date = datetime.now().date() + timedelta(days=i)
-                # GỌI QUA AI MANAGER
                 pred = request_prediction(user_id, future_date, cat)
                 cat_pred.append(pred if pred is not None else 0)
             predictions[cat] = cat_pred
@@ -121,7 +133,6 @@ def get_predictions():
 @login_required
 def train():
     try:
-        # GỌI QUA AI MANAGER (Để train ở tiến trình ngầm)
         success = request_training(current_user.id)
         if success:
             return jsonify({'status': 'success', 'message': 'Model trained successfully'})

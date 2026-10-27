@@ -1,4 +1,8 @@
 import os
+from gevent import monkey
+# Kích hoạt monkey-patching của Gevent TRƯỚC KHI import bất kỳ thư viện nào khác
+monkey.patch_all()
+
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
 os.environ['TF_NUM_INTEROP_THREADS'] = '1'
 os.environ['TF_NUM_INTRAOP_THREADS'] = '1'
@@ -9,8 +13,7 @@ import multiprocessing
 
 app = create_app()
 
-# CHỈ khởi tạo AI Worker nếu đây là tiến trình chính (Main Process)
-# Điều này ngăn chặn lỗi spawn vô hạn trên Windows
+# Chỉ khởi tạo AI Worker ở tiến trình chính
 if multiprocessing.current_process().name == 'MainProcess':
     init_ai_worker()
 

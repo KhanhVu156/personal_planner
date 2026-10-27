@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template
 from flask_login import login_required, current_user
 from app.models import Transaction, Budget, Task
+from app import db # Bổ sung import db
 from sqlalchemy import func
 from datetime import datetime
 import calendar
@@ -17,18 +18,23 @@ def index():
     last_day = calendar.monthrange(year, month)[1]
     end_date = datetime(year, month, last_day).date()
 
-    has_trans = Transaction.query.filter_by(user_id=current_user.id) \
-        .filter(Transaction.date >= start_date, Transaction.date <= end_date).first()
+    # TỐI ƯU 1: Chỉ query ID thay vì lấy toàn bộ object
+    has_trans = db.session.query(Transaction.id).filter(
+        Transaction.user_id == current_user.id,
+        Transaction.date >= start_date,
+        Transaction.date <= end_date
+    ).first()
 
     if not has_trans:
-        latest_trans = Transaction.query.filter_by(user_id=current_user.id).order_by(Transaction.date.desc()).first()
+        # TỐI ƯU 2: Chỉ lấy ngày tháng của giao dịch mới nhất, không lấy cả object
+        latest_trans = db.session.query(Transaction.date).filter_by(user_id=current_user.id).order_by(Transaction.date.desc()).first()
         if latest_trans:
             month, year = latest_trans.date.month, latest_trans.date.year
             start_date = datetime(year, month, 1).date()
             last_day = calendar.monthrange(year, month)[1]
             end_date = datetime(year, month, last_day).date()
 
-    # Đồng bộ lấy Task để lúc mới load trang nó đã có sẵn
+    # Đồng bộ lấy Task
     upcoming_tasks = Task.query.filter_by(user_id=current_user.id) \
         .filter(Task.status.in_(['pending', 'in_progress'])) \
         .order_by(Task.deadline.asc()).limit(5).all()

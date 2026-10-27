@@ -15,11 +15,13 @@ class Config:
     SQLALCHEMY_DATABASE_URI = db_url or 'sqlite:///' + os.path.join(basedir, 'app.db')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
-    # CẤU HÌNH QUAN TRỌNG CHO RENDER: 
-    # Tránh lỗi "server closed the connection unexpectedly" do Render ngắt kết nối rảnh rỗi
+    # TỐI ƯU HÓA CONNECTION POOLING
     SQLALCHEMY_ENGINE_OPTIONS = {
-        "pool_pre_ping": True,     # Tự động kiểm tra kết nối trước khi dùng
-        "pool_recycle": 280,       # Tự động tạo kết nối mới sau 280 giây
+        "pool_pre_ping": True,      # Tự động kiểm tra kết nối trước khi dùng
+        "pool_recycle": 280,        # Tự động tạo kết nối mới sau 280s
+        "pool_size": 10,            # Duy trì 10 kết nối thường xuyên
+        "max_overflow": 20,         # Cho phép mở thêm 20 kết nối nếu 10 cái kia bận
+        "pool_timeout": 30,         # Thời gian chờ tối đa để lấy kết nối từ pool
     }
     
     # Cấu hình thời gian
