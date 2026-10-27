@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from datetime import timedelta # BỔ SUNG DÒNG NÀY
+from datetime import timedelta
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 load_dotenv(os.path.join(basedir, '.env'))
@@ -15,11 +15,21 @@ class Config:
     SQLALCHEMY_DATABASE_URI = db_url or 'sqlite:///' + os.path.join(basedir, 'app.db')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
+    # CẤU HÌNH QUAN TRỌNG CHO RENDER: 
+    # Tránh lỗi "server closed the connection unexpectedly" do Render ngắt kết nối rảnh rỗi
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        "pool_pre_ping": True,     # Tự động kiểm tra kết nối trước khi dùng
+        "pool_recycle": 280,       # Tự động tạo kết nối mới sau 280 giây
+    }
+    
     # Cấu hình thời gian
-    # Nếu không tick "Ghi nhớ", session tự hủy sau 2 tiếng không thao tác
     PERMANENT_SESSION_LIFETIME = timedelta(hours=2) 
-    # Nếu tick "Ghi nhớ", cookie lưu trên máy 30 ngày
     REMEMBER_COOKIE_DURATION = timedelta(days=30)
+
+    # Cấu hình bảo mật (Bắt buộc cho Production)
+    PREFERRED_URL_SCHEME = 'https'
+    SESSION_COOKIE_SECURE = True
+    SESSION_COOKIE_HTTPONLY = True
 
     MAIL_SERVER = os.environ.get('MAIL_SERVER')
     MAIL_PORT = int(os.environ.get('MAIL_PORT', 587))

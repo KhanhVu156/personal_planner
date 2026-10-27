@@ -4,26 +4,23 @@ import pandas as pd
 from datetime import datetime, timedelta
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.model_selection import train_test_split
-import tensorflow as tf
-import keras
-from keras import layers
 import joblib
 
-# Tắt các cảnh báo rác của TensorFlow để terminal sạch hơn
+# Tắt các cảnh báo rác của TensorFlow và ÉP CHỈ CHẠY 1 LUỒNG CPU (Giảm RAM)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
+os.environ['TF_NUM_INTEROP_THREADS'] = '1'
+os.environ['TF_NUM_INTRAOP_THREADS'] = '1'
 
 # Trỏ đường dẫn lưu model vào thư mục app/static/models
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODEL_DIR = os.path.join(BASE_DIR, 'static', 'models')
 os.makedirs(MODEL_DIR, exist_ok=True)
 
-# Bộ nhớ đệm (Cache) để lưu model đã load, tránh load lại từ ổ cứng nhiều lần
+# Bộ nhớ đệm (Cache) để lưu model đã load
 _model_cache = {}
 
 def _get_paths(user_id):
-    """Tạo đường dẫn riêng biệt cho từng User để không bị ghi đè."""
     return {
-        # ĐÃ SỬA: Đổi đuôi .h5 thành .keras cho tương thích Keras 3
         'model': os.path.join(MODEL_DIR, f'expense_model_{user_id}.keras'), 
         'scaler': os.path.join(MODEL_DIR, f'scaler_{user_id}.pkl'),
         'encoder': os.path.join(MODEL_DIR, f'encoder_{user_id}.pkl')
@@ -51,7 +48,6 @@ def prepare_data(transactions, user_id):
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
     
-    # Lưu scaler và encoder riêng cho từng user
     paths = _get_paths(user_id)
     joblib.dump(scaler, paths['scaler'])
     joblib.dump(le, paths['encoder'])
@@ -59,10 +55,14 @@ def prepare_data(transactions, user_id):
     return X_scaled, y
 
 def build_model(input_dim):
+    # Import muộn (Lazy Import) để tiết kiệm RAM khi không dùng AI
+    import keras
+    from keras import layers
+    
     model = keras.Sequential([
-        layers.Dense(64, activation='relu', input_shape=(input_dim,)),
+        layers.Dense(32, activation='relu', input_shape=(input_dim,)), # Giảm từ 64 -> 32 để nhẹ hơn
         layers.Dropout(0.2),
-        layers.Dense(32, activation='relu'),
+        layers.Dense(16, activation='relu'), # Giảm từ 32 -> 16
         layers.Dense(1)
     ])
     model.compile(optimizer='adam', loss='mse', metrics=['mae'])
@@ -70,10 +70,16 @@ def build_model(input_dim):
 
 def train_model(user_id, db_session):
     from app.models import Transaction
+    
+    # Nếu cache quá lớn (nhiều user cùng dùng), xóa bớt để giải phóng RAM
+    if len(_model_cache) > 5:
+        _model_cache.clear()
+        print("Đã xóa Cache AI để giải phóng RAM.")
+        
     transactions = Transaction.query.filter_by(user_id=user_id).all()
     
     if not transactions or len(transactions) < 10:
-        return None # Cần ít nhất 10 giao dịch để train
+        return None
         
     data = [{'date': t.date, 'amount': float(t.amount), 'category': t.category, 'type': t.type} for t in transactions]
     X, y = prepare_data(data, user_id)
@@ -81,48 +87,54 @@ def train_model(user_id, db_session):
     if X is None:
         return None
         
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-    model = build_model(X.shape[1])
-    model.fit(X_train, y_train, epochs=50, batch_size=16, validation_data=(X_test, y_test), verbose=0)
-    
-    # Lưu model
-    model.save(_get_paths(user_id)['model'])
-    
-    # Cập nhật lại cache
-    _model_cache[user_id] = {
-        'model': model,
-        'scaler': joblib.load(_get_paths(user_id)['scaler']),
-        'encoder': joblib.load(_get_paths(user_id)['encoder'])
-    }
-    return model
+    try:
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+        model = build_model(X.shape[1])
+        # Giảm epochs từ 50 -> 20 để train nhanh và ít tốn RAM hơn
+        model.fit(X_train, y_train, epochs=20, batch_size=16, validation_data=(X_test, y_test), verbose=0)
+        
+        model.save(_get_paths(user_id)['model'])
+        
+        _model_cache[user_id] = {
+            'model': model,
+            'scaler': joblib.load(_get_paths(user_id)['scaler']),
+            'encoder': joblib.load(_get_paths(user_id)['encoder'])
+        }
+        return model
+    except Exception as e:
+        print(f"Lỗi khi train model (Có thể do hết RAM): {e}")
+        return None
 
 def predict_expense(user_id, future_date, category, db_session):
     paths = _get_paths(user_id)
     
-    # 1. Kiểm tra trong Cache trước (Cực nhanh)
+    # Import muộn TensorFlow và Keras
+    import keras
+    
     if user_id in _model_cache:
         model_data = _model_cache[user_id]
         model = model_data['model']
         scaler = model_data['scaler']
         le = model_data['encoder']
     else:
-        # 2. Nếu chưa có trong cache, kiểm tra file trên ổ cứng
         if not os.path.exists(paths['model']):
             train_model(user_id, db_session)
             if not os.path.exists(paths['model']):
-                return 0.0 # Không đủ dữ liệu để dự đoán
+                return 0.0 
                 
-        # Load từ ổ cứng và đưa vào Cache
-        model = keras.models.load_model(paths['model'])
-        scaler = joblib.load(paths['scaler'])
-        le = joblib.load(paths['encoder'])
-        _model_cache[user_id] = {'model': model, 'scaler': scaler, 'encoder': le}
+        try:
+            model = keras.models.load_model(paths['model'])
+            scaler = joblib.load(paths['scaler'])
+            le = joblib.load(paths['encoder'])
+            _model_cache[user_id] = {'model': model, 'scaler': scaler, 'encoder': le}
+        except Exception as e:
+            print(f"Lỗi load model: {e}")
+            return 0.0
 
-    # 3. Tiến hành dự đoán
     try:
         cat_encoded = le.transform([category])[0]
     except ValueError:
-        cat_encoded = 0 # Nếu category lạ chưa từng chi tiêu
+        cat_encoded = 0 
         
     features = np.array([[
         future_date.weekday(),

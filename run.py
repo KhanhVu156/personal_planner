@@ -1,16 +1,19 @@
-from app import create_app
 import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Tắt log rác
+os.environ['TF_NUM_INTEROP_THREADS'] = '1'  # Giảm luồng
+os.environ['TF_NUM_INTRAOP_THREADS'] = '1'
+
+from app import create_app
+import tensorflow as tf
+
+# Cấu hình TensorFlow chỉ dùng 1 luồng
+tf.config.threading.set_inter_op_parallelism_threads(1)
+tf.config.threading.set_intra_op_parallelism_threads(1)
 
 app = create_app()
 
 if __name__ == '__main__':
-    # Mặc định tắt Debug để an toàn khi đưa lên môi trường thực tế (Production)
-    # Khi code ở máy cá nhân, ông chỉ cần thêm FLASK_DEBUG=True vào file .env là được
     debug = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
-    
-    # Mặc định dùng '0.0.0.0' để có thể truy cập từ điện thoại (cùng mạng Wifi)
     host = os.environ.get('FLASK_HOST', '0.0.0.0')
-    
-    port = int(os.environ.get('FLASK_PORT', 5000))
-    
+    port = int(os.environ.get('PORT', 5000))
     app.run(debug=debug, host=host, port=port)
