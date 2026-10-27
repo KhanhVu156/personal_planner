@@ -3,15 +3,31 @@ from flask_login import login_required, current_user
 from app import db
 from datetime import datetime, timedelta
 import calendar
+import time
 from sqlalchemy import func
 
 from app.models import Transaction, Budget, Task
 
 bp = Blueprint('api', __name__, url_prefix='/api')
 
+# Bộ đệm lưu trữ API
+_api_cache = {}
+
 @bp.route('/dashboard-stats', methods=['GET'])
 @login_required
 def get_dashboard_stats():
+    user_id = current_user.id
+    now = time.time()
+    
+    # 1. Kiểm tra Cache (Nếu có và chưa quá 2 giây)
+    if user_id in _api_cache:
+        cached_time, cached_data = _api_cache[user_id]
+        if now - cached_time < 2.0:
+            response = jsonify(cached_data)
+            response.headers['Cache-Control'] = 'no-store'
+            return response
+
+    # 2. Nếu không có Cache, truy vấn Database
     try:
         today = datetime.now()
         month, year = today.month, today.year
@@ -31,7 +47,6 @@ def get_dashboard_stats():
                 last_day = calendar.monthrange(year, month)[1]
                 end_date = datetime(year, month, last_day).date()
 
-        # Lấy toàn bộ giao dịch trong tháng ra tính bằng Python (Tránh lỗi SQLite)
         trans_in_month = Transaction.query.filter_by(user_id=current_user.id) \
             .filter(Transaction.date >= start_date, Transaction.date <= end_date).all()
 
@@ -51,7 +66,6 @@ def get_dashboard_stats():
             if t.type == 'expense':
                 cat_exp_dict[t.category] = cat_exp_dict.get(t.category, 0.0) + float(t.amount)
 
-        # SỬA LỖI: Lấy cả task 'pending' và 'in_progress'
         upcoming_tasks = Task.query.filter_by(user_id=current_user.id) \
             .filter(Task.status.in_(['pending', 'in_progress'])) \
             .order_by(Task.deadline.asc()).limit(5).all()
@@ -60,7 +74,7 @@ def get_dashboard_stats():
             'id': t.id, 'title': t.title, 'deadline': t.deadline.strftime('%d/%m/%Y'), 'progress': t.progress
         } for t in upcoming_tasks]
 
-        response = jsonify({
+        data = {
             'income': income,
             'expenses': expenses,
             'balance': balance,
@@ -69,7 +83,16 @@ def get_dashboard_stats():
             'tasks': tasks_data,
             'month': month, 
             'year': year
-        })
+        }
+        
+        # 3. Lưu vào Cache
+        _api_cache[user_id] = (now, data)
+        
+        # Giới hạn Cache (Nếu có quá nhiều User, xóa bớt để giải phóng RAM)
+        if len(_api_cache) > 20:
+            _api_cache.clear()
+
+        response = jsonify(data)
         response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
         return response
 
@@ -77,7 +100,7 @@ def get_dashboard_stats():
         current_app.logger.error(f"Lỗi API Dashboard: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-# ----- CÁC API CỦA AI (Import bên trong hàm để không làm sập file) -----
+# ----- CÁC API CỦA AI -----
 @bp.route('/predict', methods=['GET'])
 @login_required
 def get_predictions():
@@ -85,7 +108,7 @@ def get_predictions():
         from app.ml.expense_model import predict_expense, train_model
         user_id = current_user.id
         train_model(user_id, db.session)
-        categories = ['food', 'transport', 'other']
+        categories = ['food', 'transport', 'education', 'entertainment', 'shopping', 'bills', 'other'] # Cập nhật danh mục mới
         predictions = {}
         for cat in categories:
             cat_pred = []

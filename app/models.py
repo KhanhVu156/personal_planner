@@ -23,31 +23,31 @@ class User(UserMixin, db.Model):
 
 class Transaction(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    date = db.Column(db.Date, nullable=False, default=datetime.utcnow)
+    # THÊM index=True VÀO ĐÂY
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
+    date = db.Column(db.Date, nullable=False, default=datetime.utcnow, index=True)
     description = db.Column(db.String(200), nullable=False)
-    # Nâng lên 30 chữ số để chứa số tiền siêu lớn
     amount = db.Column(Numeric(30, 2), nullable=False) 
     category = db.Column(db.String(50), nullable=False)
-    type = db.Column(db.String(10), nullable=False)
+    type = db.Column(db.String(10), nullable=False, index=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class Budget(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    # THÊM index=True
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
     category = db.Column(db.String(50), nullable=False)
-    month = db.Column(db.Integer, nullable=False)
-    year = db.Column(db.Integer, nullable=False)
-    # Nâng lên 30 chữ số
+    month = db.Column(db.Integer, nullable=False, index=True)
+    year = db.Column(db.Integer, nullable=False, index=True)
     amount = db.Column(Numeric(30, 2), nullable=False)
 
 class Task(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
     title = db.Column(db.String(100), nullable=False)
     description = db.Column(db.Text)
-    deadline = db.Column(db.DateTime, nullable=False)
-    status = db.Column(db.String(20), default='pending')
+    deadline = db.Column(db.DateTime, nullable=False, index=True)
+    status = db.Column(db.String(20), default='pending', index=True)
     progress = db.Column(db.Integer, default=0)
     milestone = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)

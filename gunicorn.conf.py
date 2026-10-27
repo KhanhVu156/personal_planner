@@ -2,8 +2,8 @@ import multiprocessing
 
 # Chỉ 1 worker để tiết kiệm RAM
 workers = 1
-# Sử dụng 4 luồng để xử lý request
-threads = 4
+# Tăng lên 8 luồng để xử lý request đồng thời mượt hơn
+threads = 8
 worker_class = "gthread"
 # Tăng timeout lên 120s vì model AI load lần đầu khá lâu
 timeout = 120
