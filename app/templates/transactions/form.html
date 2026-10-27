@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-2xl mx-auto bg-white dark:bg-slate-800 p-6 rounded shadow mt-4 transition-colors duration-300">
+    <h2 class="text-2xl font-bold mb-6 text-gray-800 dark:text-slate-100">
+        {% if 'Add' in title %}Thêm Giao dịch{% else %}Sửa Giao dịch{% endif %}
+    </h2>
+    
+    <form method="POST" action="" novalidate>
+        {{ form.hidden_tag() }}
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+                {{ form.date.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
+                {{ form.date(class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white") }}
+                {% for error in form.date.errors %}
+                    <span class="text-red-500 text-sm mt-1 block">{{ error }}</span>
+                {% endfor %}
+            </div>
+            <div>
+                {{ form.type.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
+                {{ form.type(class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white", id="trans-type") }}
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+                {{ form.amount.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
+                <div class="relative">
+                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500 dark:text-slate-400">VND</span>
+                    <!-- Đã bỏ max -->
+                    {{ form.amount(class="w-full pl-12 pr-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white", placeholder="0", step="any") }}
+                </div>
+            </div>
+            <div>
+                {{ form.category.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
+                {{ form.category(class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white", id="trans-category") }}
+            </div>
+        </div>
+
+        <div class="mb-6">
+            {{ form.description.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
+            {{ form.description(class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white", placeholder="Nhập mô tả giao dịch...") }}
+        </div>
+
+        <div class="flex items-center justify-end space-x-4 border-t pt-4">
+            <a href="{{ url_for('transactions.list_transactions') }}" class="bg-gray-200 text-gray-800 dark:bg-slate-600 dark:text-slate-100 py-2 px-6 rounded hover:bg-gray-300 dark:hover:bg-slate-500 transition duration-200 font-semibold">Hủy</a>
+            {{ form.submit(class="bg-blue-600 text-white py-2 px-6 rounded hover:bg-blue-700 transition duration-200 cursor-pointer font-semibold shadow", value="Lưu") }}
+        </div>
+    </form>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const typeSelect = document.getElementById('trans-type');
+        const categorySelect = document.getElementById('trans-category');
+
+        if (typeSelect && categorySelect) {
+            typeSelect.addEventListener('change', function() {
+                if (this.value === 'income') {
+                    categorySelect.value = 'salary';
+                } else if (this.value === 'expense') {
+                    categorySelect.value = 'food';
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}

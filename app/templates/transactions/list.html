@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+    <h2 class="text-2xl font-bold text-gray-800 dark:text-slate-100">Lịch sử Giao dịch</h2>
+    <div class="flex gap-2 w-full md:w-auto">
+        <form method="POST" action="{{ url_for('transactions.import_csv') }}" enctype="multipart/form-data" class="flex-1 md:flex-none">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <input type="file" name="csv_file" accept=".csv" class="hidden" id="csvInput">
+            <button type="button" id="csvSubmitBtn" onclick="document.getElementById('csvInput').click()" class="w-full bg-green-600 text-white px-4 py-2 rounded shadow hover:bg-green-700 transition duration-200 flex items-center justify-center">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                Nhập CSV
+            </button>
+        </form>
+        
+        <a href="{{ url_for('transactions.add_transaction') }}" class="flex-1 md:flex-none bg-blue-600 text-white px-4 py-2 rounded shadow hover:bg-blue-700 transition duration-200 flex items-center justify-center">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+            Thêm mới
+        </a>
+    </div>
+</div>
+
+<div class="overflow-x-auto bg-white dark:bg-slate-800 rounded shadow mb-6 transition-colors duration-300">
+    <table class="min-w-full">
+        <thead>
+            <tr class="bg-gray-50 dark:bg-slate-700 border-b border-gray-200 dark:border-slate-600">
+                <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600 dark:text-slate-300 uppercase tracking-wider">Ngày</th>
+                <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600 dark:text-slate-300 uppercase tracking-wider">Mô tả</th>
+                <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600 dark:text-slate-300 uppercase tracking-wider">Danh mục</th>
+                <th class="py-3 px-4 text-center text-sm font-semibold text-gray-600 dark:text-slate-300 uppercase tracking-wider">Loại</th>
+                <th class="py-3 px-4 text-right text-sm font-semibold text-gray-600 dark:text-slate-300 uppercase tracking-wider">Số tiền</th>
+                <th class="py-3 px-4 text-center text-sm font-semibold text-gray-600 dark:text-slate-300 uppercase tracking-wider">Thao tác</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200 dark:divide-slate-700">
+            {% for trans in transactions.items %}
+            <tr class="hover:bg-gray-50 dark:hover:bg-slate-700 transition duration-150">
+                <td class="py-3 px-4 text-sm text-gray-700 dark:text-slate-300 whitespace-nowrap">{{ trans.date.strftime('%d/%m/%Y') }}</td>
+                <td class="py-3 px-4 text-sm text-gray-800 dark:text-slate-100 font-medium">{{ trans.description }}</td>
+                <td class="py-3 px-4">
+                    <span class="px-2 py-1 bg-gray-100 text-gray-700 dark:bg-slate-600 dark:text-slate-200 text-xs font-semibold rounded-md border border-gray-200 dark:border-slate-500">
+                        {% if trans.category == 'food' %}Ăn uống
+                        {% elif trans.category == 'transport' %}Di chuyển
+                        {% elif trans.category == 'salary' %}Lương
+                        {% else %}Khác{% endif %}
+                    </span>
+                </td>
+                <td class="py-3 px-4 text-center">
+                    {% if trans.type == 'income' %}
+                        <span class="px-2 py-1 bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300 text-xs font-bold rounded-full">THU NHẬP</span>
+                    {% else %}
+                        <span class="px-2 py-1 bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300 text-xs font-bold rounded-full">CHI TIÊU</span>
+                    {% endif %}
+                </td>
+                <td class="py-3 px-4 text-right whitespace-nowrap font-bold {% if trans.type == 'income' %}text-green-600 dark:text-green-400{% else %}text-red-600 dark:text-red-400{% endif %}">
+                    {% if trans.type == 'income' %}+{% else %}-{% endif %}{{ "{:,.0f}".format(trans.amount) }}
+                </td>
+                <td class="py-3 px-4 text-center space-x-3 whitespace-nowrap">
+                    <a href="{{ url_for('transactions.edit_transaction', id=trans.id) }}" class="text-blue-600 dark:text-blue-400 hover:text-blue-800 font-medium text-sm">Sửa</a>
+                    <a href="{{ url_for('transactions.delete_transaction', id=trans.id) }}" class="delete-confirm text-red-600 dark:text-red-400 hover:text-red-800 font-medium text-sm">Xóa</a>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="6" class="py-12 text-center text-gray-500 dark:text-slate-400">
+                    <div class="flex flex-col items-center justify-center">
+                        <p class="text-lg">Chưa có giao dịch nào.</p>
+                        <a href="{{ url_for('transactions.add_transaction') }}" class="text-blue-600 mt-2 hover:underline">Thêm giao dịch đầu tiên</a>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="flex justify-between items-center text-sm text-gray-600 dark:text-slate-400">
+    <div>
+        Trang <span class="font-bold">{{ transactions.page }}</span> / <span class="font-bold">{{ transactions.pages }}</span>
+    </div>
+    <div class="flex space-x-2">
+        {% if transactions.has_prev %}
+            <a href="{{ url_for('transactions.list_transactions', page=transactions.prev_num) }}" class="px-4 py-2 bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-600 rounded-md font-medium hover:bg-gray-50 dark:hover:bg-slate-700 transition duration-150">&larr; Trước</a>
+        {% else %}
+            <span class="px-4 py-2 bg-gray-100 dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 rounded-md font-medium text-gray-400 dark:text-slate-600 cursor-not-allowed">&larr; Trước</span>
+        {% endif %}
+        
+        {% if transactions.has_next %}
+            <a href="{{ url_for('transactions.list_transactions', page=transactions.next_num) }}" class="px-4 py-2 bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-600 rounded-md font-medium hover:bg-gray-50 dark:hover:bg-slate-700 transition duration-150">Sau &rarr;</a>
+        {% else %}
+            <span class="px-4 py-2 bg-gray-100 dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 rounded-md font-medium text-gray-400 dark:text-slate-600 cursor-not-allowed">Sau &rarr;</span>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

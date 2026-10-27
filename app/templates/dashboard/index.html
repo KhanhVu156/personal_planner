@@ -1,0 +1,333 @@
+{% extends "base.html" %}
+{% block content %}
+
+<!-- Cards thống kê -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+    <div class="bg-white dark:bg-slate-800 p-6 rounded shadow border-l-4 border-green-500 transition-colors duration-300">
+        <h3 id="title-income" class="text-sm font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide">Thu nhập (Tháng {{ display_month }}/{{ display_year }})</h3>
+        <p id="val-income" class="text-3xl font-bold text-green-600 dark:text-green-400 mt-2">+0 <span class="text-lg">VND</span></p>
+    </div>
+    <div class="bg-white dark:bg-slate-800 p-6 rounded shadow border-l-4 border-red-500 transition-colors duration-300">
+        <h3 id="title-expense" class="text-sm font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide">Chi tiêu (Tháng {{ display_month }}/{{ display_year }})</h3>
+        <p id="val-expense" class="text-3xl font-bold text-red-600 dark:text-red-400 mt-2">-0 <span class="text-lg">VND</span></p>
+    </div>
+    <div class="bg-white dark:bg-slate-800 p-6 rounded shadow border-l-4 border-blue-500 transition-colors duration-300">
+        <h3 class="text-sm font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide">Tổng số dư</h3>
+        <p id="val-balance" class="text-3xl font-bold text-gray-800 dark:text-slate-100 mt-2">0 <span class="text-lg">VND</span></p>
+    </div>
+</div>
+
+<!-- Biểu đồ và tasks -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+    <div class="bg-white dark:bg-slate-800 p-6 rounded shadow transition-colors duration-300">
+        <h3 class="text-xl font-semibold mb-4 text-gray-800 dark:text-slate-100">Chi tiêu & Ngân sách</h3>
+        <div class="relative h-64 w-full">
+            <canvas id="budgetChart"></canvas>
+        </div>
+    </div>
+    <div class="bg-white dark:bg-slate-800 p-6 rounded shadow flex flex-col transition-colors duration-300">
+        <h3 class="text-xl font-semibold mb-4 text-gray-800 dark:text-slate-100">Công việc sắp tới</h3>
+        <ul id="task-list" class="space-y-3 flex-grow">
+            <li class="text-gray-500 dark:text-slate-400 italic text-center py-4">Hiện chưa có deadline nào sắp tới...</li>
+        </ul>
+        <a href="{{ url_for('tasks.list_tasks') }}" class="text-blue-600 dark:text-blue-400 font-semibold mt-4 inline-block hover:underline">Xem tất cả &rarr;</a>
+    </div>
+</div>
+
+<!-- Dự đoán chi tiêu AI -->
+<div class="bg-white dark:bg-slate-800 p-6 rounded shadow mb-8 transition-colors duration-300">
+    <div class="flex justify-between items-center mb-4">
+        <h3 class="text-xl font-semibold text-gray-800 dark:text-slate-100">Dự đoán chi tiêu AI (7 ngày tới)</h3>
+        <span class="text-xs bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 px-2 py-1 rounded">Machine Learning</span>
+    </div>
+    <div id="ai-chart-container" class="relative h-64 w-full">
+        <canvas id="predictionChart"></canvas>
+    </div>
+</div>
+
+<!-- Form kế hoạch -->
+<div class="bg-white dark:bg-slate-800 p-6 rounded shadow border border-blue-100 dark:border-slate-700 transition-colors duration-300">
+    <h3 class="text-xl font-semibold mb-4 text-gray-800 dark:text-slate-100 flex items-center">
+        <svg class="w-6 h-6 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+        Kế hoạch chi tiêu tối ưu
+    </h3>
+    <form id="plan-form" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+            <label class="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-1">Thu nhập hàng tháng (VND)</label>
+            <!-- Đã bỏ max, thêm step="any" để nhập được số thập phân nếu muốn -->
+            <input type="number" id="monthly_income" class="w-full px-3 py-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white focus:ring-2 focus:ring-blue-500" placeholder="VD: 15000000" step="any" required>
+        </div>
+        <div>
+            <label class="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-1">Tỷ lệ tiết kiệm (%)</label>
+            <input type="number" id="savings_percent" class="w-full px-3 py-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white focus:ring-2 focus:ring-blue-500" value="20" min="0" max="100" step="1">
+        </div>
+        
+        <div class="md:col-span-2">
+            <label class="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-2">Mức độ ưu tiên (Càng cao càng chia nhiều tiền)</label>
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                <div><span class="text-xs text-gray-500 dark:text-slate-400">Ăn uống</span><input type="number" id="weight_food" class="w-full border rounded px-2 py-1 dark:bg-slate-700 dark:border-slate-600 dark:text-white" step="0.1" value="1.0"></div>
+                <div><span class="text-xs text-gray-500 dark:text-slate-400">Di chuyển</span><input type="number" id="weight_transport" class="w-full border rounded px-2 py-1 dark:bg-slate-700 dark:border-slate-600 dark:text-white" step="0.1" value="1.0"></div>
+                <div><span class="text-xs text-gray-500 dark:text-slate-400">Học tập</span><input type="number" id="weight_education" class="w-full border rounded px-2 py-1 dark:bg-slate-700 dark:border-slate-600 dark:text-white" step="0.1" value="1.0"></div>
+                <div><span class="text-xs text-gray-500 dark:text-slate-400">Giải trí</span><input type="number" id="weight_entertainment" class="w-full border rounded px-2 py-1 dark:bg-slate-700 dark:border-slate-600 dark:text-white" step="0.1" value="1.0"></div>
+                <div><span class="text-xs text-gray-500 dark:text-slate-400">Mua sắm</span><input type="number" id="weight_shopping" class="w-full border rounded px-2 py-1 dark:bg-slate-700 dark:border-slate-600 dark:text-white" step="0.1" value="1.0"></div>
+                <div><span class="text-xs text-gray-500 dark:text-slate-400">Hóa đơn</span><input type="number" id="weight_bills" class="w-full border rounded px-2 py-1 dark:bg-slate-700 dark:border-slate-600 dark:text-white" step="0.1" value="1.0"></div>
+                <div><span class="text-xs text-gray-500 dark:text-slate-400">Khác</span><input type="number" id="weight_other" class="w-full border rounded px-2 py-1 dark:bg-slate-700 dark:border-slate-600 dark:text-white" step="0.1" value="1.0"></div>
+            </div>
+        </div>
+        <div class="md:col-span-2 mt-2">
+            <button type="submit" id="plan-btn" class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition duration-200 font-semibold shadow">Lập kế hoạch</button>
+        </div>
+    </form>
+    
+    <div id="plan-result" class="mt-6 p-4 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded hidden">
+        <h4 class="font-bold text-lg text-green-700 dark:text-green-400 mb-2">Ngân sách đề xuất:</h4>
+        <p class="mb-3 text-gray-800 dark:text-slate-200">Mức tiết kiệm: <strong id="savings_amt" class="text-blue-600 dark:text-blue-400 text-xl"></strong> VND</p>
+        <ul id="budgets-list" class="space-y-1 text-gray-700 dark:text-slate-300 list-disc pl-5"></ul>
+    </div>
+</div>
+
+<script>
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    
+    // Hàm format đầy đủ cho thẻ số liệu
+    const formatMoney = (amount) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 }).format(amount || 0);
+    
+    // HÀM MỚI: Tự động viết tắt cho trục Y biểu đồ
+    const formatCompactMoney = (value) => {
+        if (value >= 1000000000000) return (value / 1000000000000) + ' Tỷ'; // Nghìn tỷ
+        if (value >= 1000000000) return (value / 1000000000) + ' Tỷ';      // Tỷ
+        if (value >= 1000000) return (value / 1000000) + ' Tr';            // Triệu
+        if (value >= 1000) return (value / 1000) + ' Ng';                  // Nghìn
+        return value;
+    };
+
+    const categoryMap = { 
+        'food': 'Ăn uống', 'transport': 'Di chuyển', 'education': 'Học tập',
+        'entertainment': 'Giải trí', 'shopping': 'Mua sắm', 'bills': 'Hóa đơn',
+        'other': 'Khác', 'salary': 'Lương' 
+    };
+    
+    let budgetChartInstance = null;
+    let predChartInstance = null;
+
+    async function fetchDashboardStats() {
+        try {
+            const response = await fetch('/api/dashboard-stats?t=' + new Date().getTime());
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.error || "Lỗi Server");
+            }
+            const data = await response.json();
+
+            if (data.month && data.year) {
+                document.getElementById('title-income').innerText = `Thu nhập (Tháng ${data.month}/${data.year})`;
+                document.getElementById('title-expense').innerText = `Chi tiêu (Tháng ${data.month}/${data.year})`;
+            }
+
+            document.getElementById('val-income').innerHTML = `+${formatMoney(data.income)} <span class="text-lg">VND</span>`;
+            document.getElementById('val-expense').innerHTML = `-${formatMoney(data.expenses)} <span class="text-lg">VND</span>`;
+            document.getElementById('val-balance').innerHTML = `${formatMoney(data.balance)} <span class="text-lg">VND</span>`;
+
+            const taskList = document.getElementById('task-list');
+            taskList.innerHTML = '';
+            const tasks = data.tasks || [];
+            if (tasks.length === 0) {
+                taskList.innerHTML = '<li class="text-gray-500 dark:text-slate-400 italic text-center py-4">Hiện chưa có deadline nào sắp tới...</li>';
+            } else {
+                tasks.forEach(task => {
+                    taskList.innerHTML += `
+                        <li class="flex justify-between items-center border-b border-gray-100 dark:border-slate-700 pb-2">
+                            <div>
+                                <strong class="text-gray-800 dark:text-slate-200">${task.title}</strong><br>
+                                <small class="text-red-500 font-medium">Hạn: ${task.deadline}</small>
+                            </div>
+                            <div class="w-1/3">
+                                <div class="flex justify-between text-xs mb-1 dark:text-slate-400">
+                                    <span>Tiến độ</span>
+                                    <span>${task.progress}%</span>
+                                </div>
+                                <div class="w-full bg-gray-200 dark:bg-slate-600 rounded-full h-2.5">
+                                    <div class="bg-blue-600 h-2.5 rounded-full" style="width: ${task.progress}%"></div>
+                                </div>
+                            </div>
+                        </li>
+                    `;
+                });
+            }
+
+            const cat_expenses = data.cat_expenses || {};
+            const budgets = data.budgets || {};
+            const rawCategories = Object.keys(cat_expenses);
+            const categories = rawCategories.map(c => categoryMap[c] || c);
+            const spendingData = rawCategories.map(c => cat_expenses[c] || 0);
+            const budgetData = rawCategories.map(c => budgets[c] || 0);
+
+            const isDark = document.documentElement.classList.contains('dark');
+            const textColor = isDark ? '#cbd5e1' : '#475569';
+            const gridColor = isDark ? '#334155' : '#e2e8f0';
+
+            if (budgetChartInstance) {
+                budgetChartInstance.data.labels = categories;
+                budgetChartInstance.data.datasets[0].data = spendingData;
+                budgetChartInstance.data.datasets[1].data = budgetData;
+                budgetChartInstance.options.scales.y.ticks.color = textColor;
+                budgetChartInstance.options.scales.y.grid.color = gridColor;
+                budgetChartInstance.options.plugins.legend.labels.color = textColor;
+                budgetChartInstance.update();
+            } else {
+                const ctx = document.getElementById('budgetChart').getContext('2d');
+                budgetChartInstance = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: categories,
+                        datasets: [
+                            { label: 'Chi tiêu thực tế', data: spendingData, backgroundColor: '#f87171', borderRadius: 6, maxBarThickness: 50 },
+                            { label: 'Ngân sách', data: budgetData, backgroundColor: '#60a5fa', borderRadius: 6, maxBarThickness: 50 }
+                        ]
+                    },
+                    options: { 
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: { 
+                            legend: { position: 'top', labels: { font: { family: "'Inter', sans-serif", size: 13, weight: '600' }, color: textColor, usePointStyle: true, boxWidth: 8 } },
+                            tooltip: {
+                                backgroundColor: isDark ? '#0f172a' : '#1e293b',
+                                titleFont: { family: "'Inter', sans-serif", size: 14 },
+                                bodyFont: { family: "'Inter', sans-serif", size: 14, weight: 'bold' },
+                                padding: 12, cornerRadius: 8,
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.dataset.label || '';
+                                        if (label) { label += ': '; }
+                                        if (context.parsed.y !== null) {
+                                            label += formatMoney(context.parsed.y) + ' VND';
+                                        }
+                                        return label;
+                                    }
+                                }
+                            }
+                        },
+                        scales: { 
+                            x: { display: false },
+                            y: { 
+                                beginAtZero: true,
+                                ticks: {
+                                    font: { family: "'Inter', sans-serif", size: 13, weight: '600' },
+                                    color: textColor, padding: 10,
+                                    // Dùng hàm viết tắt tự động
+                                    callback: function(value) { return formatCompactMoney(value); }
+                                },
+                                grid: { color: gridColor, drawBorder: false, borderDash: [5, 5] }
+                            }
+                        }
+                    }
+                });
+                window.charts = window.charts || [];
+                window.charts.push(budgetChartInstance);
+            }
+        } catch (error) { 
+            console.error("Lỗi API:", error);
+            document.getElementById('val-income').innerHTML = `<span class="text-red-500 text-base">Lỗi dữ liệu</span>`;
+            document.getElementById('val-expense').innerHTML = `<span class="text-red-500 text-base">Lỗi dữ liệu</span>`;
+            document.getElementById('val-balance').innerHTML = `<span class="text-red-500 text-base">Lỗi dữ liệu</span>`;
+        }
+    }
+
+    async function fetchAIPrediction() {
+        try {
+            const response = await fetch('/api/predict');
+            const data = await response.json();
+            
+            const allZero = Object.values(data).every(arr => arr.every(v => v === 0));
+            if (allZero) {
+                document.getElementById('ai-chart-container').innerHTML = `
+                    <div class="flex flex-col items-center justify-center h-full text-gray-500 dark:text-slate-400">
+                        <svg class="w-12 h-12 mb-2 text-gray-300 dark:text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        <p>Chưa đủ dữ liệu để AI dự đoán.</p>
+                        <p class="text-sm">(Cần ít nhất 10 giao dịch chi tiêu)</p>
+                    </div>`;
+                return;
+            }
+
+            const labels = ['Ngày 1', 'Ngày 2', 'Ngày 3', 'Ngày 4', 'Ngày 5', 'Ngày 6', 'Ngày 7'];
+            const datasets = [];
+            const colors = { food: '#f59e0b', transport: '#10b981', education: '#3b82f6', entertainment: '#ec4899', shopping: '#8b5cf6', bills: '#ef4444', other: '#6366f1' };
+            
+            for (const [category, values] of Object.entries(data)) {
+                datasets.push({
+                    label: categoryMap[category] || category,
+                    data: values, borderColor: colors[category] || '#000', backgroundColor: colors[category] || '#000', tension: 0.3, fill: false
+                });
+            }
+            
+            const predCtx = document.getElementById('predictionChart').getContext('2d');
+            predChartInstance = new Chart(predCtx, { type: 'line', data: { labels, datasets }, options: { responsive: true, maintainAspectRatio: false } });
+            window.charts = window.charts || [];
+            window.charts.push(predChartInstance);
+        } catch(err) { console.error("Lỗi AI:", err); }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        fetchDashboardStats(); 
+        setInterval(fetchDashboardStats, 3000); 
+        fetchAIPrediction();
+
+        document.getElementById('darkModeToggle')?.addEventListener('change', () => {
+            setTimeout(fetchDashboardStats, 100);
+        });
+
+        document.getElementById('plan-form').addEventListener('submit', async (e) => {
+            e.preventDefault(); 
+            
+            const btn = document.getElementById('plan-btn');
+            const originalText = btn.innerText;
+            btn.innerText = 'Đang tính...'; 
+            btn.disabled = true; 
+            btn.classList.add('opacity-70');
+
+            const payload = {
+                monthly_income: parseFloat(document.getElementById('monthly_income').value),
+                savings_percent: parseFloat(document.getElementById('savings_percent').value),
+                category_weights: {
+                    food: parseFloat(document.getElementById('weight_food').value),
+                    transport: parseFloat(document.getElementById('weight_transport').value),
+                    education: parseFloat(document.getElementById('weight_education').value),
+                    entertainment: parseFloat(document.getElementById('weight_entertainment').value),
+                    shopping: parseFloat(document.getElementById('weight_shopping').value),
+                    bills: parseFloat(document.getElementById('weight_bills').value),
+                    other: parseFloat(document.getElementById('weight_other').value)
+                }
+            };
+
+            try {
+                const response = await fetch('/api/financial-plan', {
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken }, 
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json();
+                
+                if (response.ok) {
+                    document.getElementById('savings_amt').innerText = formatMoney(data.savings);
+                    const budgetsList = document.getElementById('budgets-list'); 
+                    budgetsList.innerHTML = '';
+                    
+                    for (const [cat, amt] of Object.entries(data.budgets)) {
+                        const li = document.createElement('li'); 
+                        li.innerHTML = `<strong>${categoryMap[cat] || cat}</strong>: ${formatMoney(amt)} VND`; 
+                        budgetsList.appendChild(li);
+                    }
+                    document.getElementById('plan-result').classList.remove('hidden');
+                } else { 
+                    alert('Lỗi: ' + (data.error || 'Không thể tạo kế hoạch')); 
+                }
+            } catch (error) { 
+                alert('Lỗi kết nối máy chủ!'); 
+            } finally {
+                btn.innerText = originalText; 
+                btn.disabled = false; 
+                btn.classList.remove('opacity-70');
+            }
+        });
+    });
+</script>
+{% endblock %}

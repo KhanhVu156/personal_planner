@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="vi" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personal Planner</title>
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    
+    <!-- SCRIPT CHỐNG NHÁY SÁNG (FOUC): Chạy ngay lập tức trước khi load CSS -->
+    <script>
+        if (localStorage.getItem('darkMode') === 'enabled') {
+            document.documentElement.classList.add('dark');
+        }
+    </script>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>tailwind.config = { darkMode: 'class' }</script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body class="bg-gray-50 text-gray-800 flex flex-col min-h-screen transition-colors duration-300 dark:bg-slate-900 dark:text-slate-200">
+
+    <!-- NAVBAR (Giữ nguyên) -->
+    <nav class="bg-white shadow-md sticky top-0 z-50 transition-colors duration-300 dark:bg-slate-800 dark:border-b dark:border-slate-700">
+        <div class="max-w-7xl mx-auto px-4 py-3">
+            <div class="flex justify-between items-center">
+                <a href="{{ url_for('dashboard.index') }}" class="text-xl font-bold text-blue-600 dark:text-blue-400 flex items-center">
+                    <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+                    Planner
+                </a>
+
+                <div class="hidden md:flex items-center space-x-6 font-medium dark:text-slate-300">
+                    {% if current_user.is_authenticated %}
+                        <a href="{{ url_for('dashboard.index') }}" class="hover:text-blue-600 dark:hover:text-blue-400 transition">Tổng quan</a>
+                        <a href="{{ url_for('transactions.list_transactions') }}" class="hover:text-blue-600 dark:hover:text-blue-400 transition">Giao dịch</a>
+                        <a href="{{ url_for('budgets.list_budgets') }}" class="hover:text-blue-600 dark:hover:text-blue-400 transition">Ngân sách</a>
+                        <a href="{{ url_for('tasks.list_tasks') }}" class="hover:text-blue-600 dark:hover:text-blue-400 transition">Công việc</a>
+                        <a href="{{ url_for('auth.profile') }}" class="hover:text-blue-600 dark:hover:text-blue-400 transition">Cá nhân</a>
+                        <a href="{{ url_for('auth.logout') }}" class="text-red-500 hover:text-red-700 font-semibold transition">Đăng xuất</a>
+                    {% else %}
+                        <a href="{{ url_for('auth.login') }}" class="hover:text-blue-600 transition">Đăng nhập</a>
+                        <a href="{{ url_for('auth.register') }}" class="bg-blue-600 text-white px-4 py-1.5 rounded hover:bg-blue-700 transition">Đăng ký</a>
+                    {% endif %}
+                </div>
+
+                <div class="flex items-center space-x-4">
+                    <div class="flex items-center">
+                        <svg class="w-4 h-4 text-gray-500 dark:text-slate-400 mr-2" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd"></path></svg>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="darkModeToggle" class="sr-only peer">
+                            <div class="w-11 h-6 bg-gray-300 dark:bg-slate-600 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                        </label>
+                        <svg class="w-4 h-4 text-gray-500 dark:text-slate-400 ml-2" fill="currentColor" viewBox="0 0 20 20"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"></path></svg>
+                    </div>
+                    <div class="md:hidden flex items-center">
+                        <button id="mobileMenuBtn" class="p-2 rounded-md hover:bg-gray-100 focus:outline-none dark:hover:bg-slate-700">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="mobileMenu" class="hidden md:hidden bg-white border-t border-gray-100 shadow-lg transition-colors duration-300 dark:bg-slate-800 dark:border-slate-700">
+            <div class="flex flex-col px-4 pt-2 pb-4 space-y-2 dark:text-slate-300">
+                {% if current_user.is_authenticated %}
+                    <a href="{{ url_for('dashboard.index') }}" class="block py-2 hover:text-blue-600">Tổng quan</a>
+                    <a href="{{ url_for('transactions.list_transactions') }}" class="block py-2 hover:text-blue-600">Giao dịch</a>
+                    <a href="{{ url_for('budgets.list_budgets') }}" class="block py-2 hover:text-blue-600">Ngân sách</a>
+                    <a href="{{ url_for('tasks.list_tasks') }}" class="block py-2 hover:text-blue-600">Công việc</a>
+                    <a href="{{ url_for('auth.profile') }}" class="block py-2 hover:text-blue-600">Cá nhân</a>
+                    <a href="{{ url_for('auth.logout') }}" class="block py-2 text-red-500 font-semibold">Đăng xuất</a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 py-8 flex-grow w-full">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="mb-4 p-4 rounded-md flex justify-between items-center shadow-sm flash-message {{ 'bg-green-100 text-green-800 border-l-4 border-green-500 flash-success' if category=='success' else 'bg-red-100 text-red-800 border-l-4 border-red-500 flash-danger' }}">
+                        <span class="font-medium">{{ message }}</span>
+                        <button onclick="this.parentElement.remove()" class="text-gray-500 hover:text-gray-700 focus:outline-none">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        </button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- FOOTER ĐÃ ĐƯỢC CẬP NHẬT THEO GỢI Ý 3 -->
+    <footer class="bg-white border-t border-gray-200 py-4 mt-auto transition-colors duration-300 dark:bg-slate-800 dark:border-slate-700">
+        <div class="max-w-7xl mx-auto px-4 text-center text-sm text-gray-500 dark:text-slate-400">
+            Personal Planner - Hệ thống quản lý tài chính & công việc cá nhân.
+        </div>
+    </footer>
+
+    <!-- CUSTOM MODAL XÓA -->
+    <div id="custom-delete-modal" class="fixed inset-0 z-50 hidden bg-black bg-opacity-50 flex items-center justify-center transition-opacity duration-300">
+        <div class="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-96 p-6 transform scale-95 transition-transform duration-300">
+            <h3 class="text-lg font-bold text-gray-800 dark:text-slate-100 mb-2">Xác nhận xóa</h3>
+            <p class="text-gray-600 dark:text-slate-300 mb-6">Bạn có chắc chắn muốn xóa mục này không? Hành động này không thể hoàn tác.</p>
+            <div class="flex justify-end space-x-3">
+                <button id="modal-cancel-btn" class="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 dark:bg-slate-600 dark:text-white dark:hover:bg-slate-500 transition">Hủy</button>
+                <button id="modal-confirm-btn" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition">Xóa ngay</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const htmlEl = document.documentElement;
+            const darkModeToggle = document.getElementById('darkModeToggle');
+            
+            if (htmlEl.classList.contains('dark') && darkModeToggle) darkModeToggle.checked = true;
+
+            const applyTheme = (isDark) => {
+                if (isDark) {
+                    htmlEl.classList.add('dark');
+                    localStorage.setItem('darkMode', 'enabled');
+                    if (darkModeToggle) darkModeToggle.checked = true;
+                } else {
+                    htmlEl.classList.remove('dark');
+                    localStorage.setItem('darkMode', 'disabled');
+                    if (darkModeToggle) darkModeToggle.checked = false;
+                }
+                if (window.updateChartTheme) window.updateChartTheme(isDark);
+            };
+            
+            if (darkModeToggle) {
+                darkModeToggle.addEventListener('change', (e) => applyTheme(e.target.checked));
+            }
+            
+            const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+            const mobileMenu = document.getElementById('mobileMenu');
+            if (mobileMenuBtn && mobileMenu) {
+                mobileMenuBtn.addEventListener('click', () => mobileMenu.classList.toggle('hidden'));
+            }
+        });
+    </script>
+</body>
+</html>

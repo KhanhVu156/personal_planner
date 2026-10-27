@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="min-h-screen flex items-center justify-center py-8">
+    <div class="bg-white dark:bg-slate-800 p-8 rounded shadow-md w-full max-w-md transition-colors duration-300 border border-gray-100 dark:border-slate-700">
+        <h2 class="text-2xl font-bold mb-6 text-center text-gray-800 dark:text-slate-100">Đăng nhập</h2>
+        <form method="POST" action="">
+            {{ form.hidden_tag() }}
+            <div class="mb-4">
+                {{ form.email.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
+                {{ form.email(class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white") }}
+                {% for error in form.email.errors %}
+                    <span class="text-red-500 text-sm mt-1 block">{{ error }}</span>
+                {% endfor %}
+            </div>
+            <div class="mb-4">
+                {{ form.password.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
+                {{ form.password(class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white") }}
+                {% for error in form.password.errors %}
+                    <span class="text-red-500 text-sm mt-1 block">{{ error }}</span>
+                {% endfor %}
+            </div>
+            
+            <!-- CHECKBOX GHI NHỚ ĐĂNG NHẬP -->
+            <div class="mb-6 flex items-center">
+                {{ form.remember(class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-slate-700 dark:border-slate-600 cursor-pointer") }}
+                {{ form.remember.label(class="ml-2 text-sm font-medium text-gray-700 dark:text-slate-300 cursor-pointer") }}
+            </div>
+
+            {{ form.submit(class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition duration-200 cursor-pointer font-semibold") }}
+        </form>
+        <div class="mt-4 flex justify-between text-sm text-gray-600 dark:text-slate-400">
+            <a href="{{ url_for('auth.forgot_password') }}" class="text-blue-600 dark:text-blue-400 hover:underline">Quên mật khẩu?</a>
+            <p>Chưa có tài khoản? <a href="{{ url_for('auth.register') }}" class="text-blue-600 dark:text-blue-400 hover:underline font-semibold">Đăng ký</a></p>
+        </div>
+    </div>
+</div>
+{% endblock %}

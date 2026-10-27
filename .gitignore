@@ -1,0 +1,32 @@
+# Môi trường ảo
+venv/
+env/
+.venv/
+
+# File cấu hình bảo mật (Chứa mật khẩu email)
+.env
+
+# Database SQLite
+app.db
+*.sqlite
+
+# File model AI (Rất nặng, không nên push lên)
+*.h5
+*.pkl
+app/static/models/
+
+# File rác của Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+instance/
+
+# File cấu hình của IDE (VS Code)
+.vscode/
+.idea/
+
+# Hệ điều hành
+.DS_Store
+Thumbs.db
