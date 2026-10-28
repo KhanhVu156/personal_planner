@@ -13,7 +13,7 @@ def _extract_request_id(task):
 def start_ai_worker(input_queue, output_queue):
     print("[AI Worker] Đã khởi động và đang chờ yêu cầu...")
 
-    from app.ml.expense_model import predict_expense, train_model
+    from app.ml.expense_model import predict_expense, train_model, _get_paths
     from app import create_app, db
 
     app = create_app()
@@ -61,6 +61,16 @@ def start_ai_worker(input_queue, output_queue):
                 except Exception as e:
                     print(f"[AI Worker] PREDICT_BATCH lỗi bên trong: {e}")
                     output_queue.put((request_id, [0.0] * len(items)))
+                    
+                    # ✅ TỰ PHỤC HỒI: Nếu dự đoán lỗi do file model hỏng, xóa đi để train lại
+                    paths = _get_paths(user_id)
+                    for p in paths.values():
+                        if os.path.exists(p):
+                            try:
+                                os.remove(p)
+                                print(f"[AI Worker] Đã xóa file lỗi {p} để chuẩn bị train lại.")
+                            except:
+                                pass
 
             else:
                 print(f"[AI Worker] Hành động không hợp lệ: {action!r}")
@@ -72,8 +82,14 @@ def start_ai_worker(input_queue, output_queue):
                     output_queue.put((request_id, None))
                 except Exception:
                     pass
+        finally:
+            # ✅ QUAN TRỌNG: Đóng kết nối DB ngay sau khi xử lý xong để tránh rò rỉ
+            try:
+                with app.app_context():
+                    db.session.remove()
+            except Exception:
+                pass
 
-        else:
-            elapsed_ms = int((time.time() - t0) * 1000)
-            if elapsed_ms > 500: 
-                print(f"[AI Worker] {action} mất {elapsed_ms}ms (request_id={request_id})")
+        elapsed_ms = int((time.time() - t0) * 1000)
+        if elapsed_ms > 500: 
+            print(f"[AI Worker] {action} mất {elapsed_ms}ms (request_id={request_id})")

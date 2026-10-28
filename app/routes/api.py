@@ -5,9 +5,9 @@ from datetime import datetime, timedelta
 import calendar
 import os
 from sqlalchemy import func
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.models import Transaction, Budget, Task
-# ✅ Import thêm trigger_training_async và _get_paths
 from app.services.ai_manager import request_prediction, request_training, request_prediction_batch, trigger_training_async
 from app.ml.expense_model import _get_paths
 
@@ -82,6 +82,10 @@ def get_dashboard_stats():
         response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
         return response
 
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        current_app.logger.error(f"Lỗi Database API Dashboard: {str(e)}")
+        return jsonify({'income':0,'expenses':0,'balance':0,'budgets':{},'cat_expenses':{},'tasks':[],'month':month,'year':year}), 200
     except Exception as e:
         current_app.logger.error(f"Lỗi API Dashboard: {str(e)}")
         return jsonify({'error': str(e)}), 500
@@ -91,13 +95,15 @@ def get_dashboard_stats():
 def get_predictions():
     try:
         user_id = current_user.id
-        # ✅ TỐI ƯU: Chỉ dự đoán cho 'food' vì giao diện chỉ vẽ 'food'
         target_category = 'food'
         
         paths = _get_paths(user_id)
+        # Kiểm tra xem đã có đủ 4 file model chưa
         has_model = all(os.path.exists(p) for p in paths.values())
         
-        # ✅ FIX: Nếu chưa có model, kích hoạt train ngầm và trả về 0 NGAY LẬP TỨC
+        # ✅ CƠ CHẾ BẤT ĐỒNG BỘ: 
+        # - Nếu chưa có model -> Báo AI train ngầm, trả về 0 ngay lập tức (không bắt trình duyệt chờ)
+        # - Nếu có model rồi -> Gọi AI dự đoán
         if not has_model:
             trigger_training_async(user_id)
             return jsonify({target_category: [0]*7})
@@ -107,7 +113,7 @@ def get_predictions():
             future_date = datetime.now().date() + timedelta(days=i)
             items.append((future_date, target_category))
         
-        # ✅ TỐI ƯU: Giảm timeout xuống 10s thay vì 60s để không treo web
+        # Timeout 10s: Nếu AI có model rồi, dự đoán chỉ mất < 1s. Nếu quá 10s tức là AI worker đang bận, ta cũng trả về 0 để web không bị treo.
         results = request_prediction_batch(user_id, items, timeout=10.0)
         
         if results is None:
@@ -117,7 +123,7 @@ def get_predictions():
         return jsonify(predictions)
     except Exception as e:
         current_app.logger.error(f"Lỗi API Predict: {str(e)}")
-        return jsonify({'food': [0]*7}), 200 # Trả về 200 thay vì 500 để frontend không báo lỗi đỏ
+        return jsonify({'food': [0]*7}), 200
 
 @bp.route('/train', methods=['POST'])
 @login_required
