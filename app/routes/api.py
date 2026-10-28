@@ -15,15 +15,10 @@ VN_TZ = ZoneInfo('Asia/Ho_Chi_Minh')
 
 @bp.route('/dashboard-stats', methods=['GET'])
 @login_required
-@cache.cached(timeout=120, query_string=True) # ✅ CACHE: Lưu kết quả 2 phút. query_string=True đảm bảo cache riêng cho từng tháng/năm.
+@cache.cached(timeout=120, query_string=True)
 def get_dashboard_stats():
     """
     API lấy toàn bộ dữ liệu cho Dashboard.
-    
-    TƯ DUY TỐI ƯU (Performance):
-    1. Sử dụng Range Query (start_date, end_date) thay vì extract() để tận dụng DB Index.
-    2. Cache kết quả trong 2 phút (timeout=120) để tránh query liên tục khi user F5.
-    3. Dùng thuật toán Weekday Moving Average cho dự báo chi tiêu.
     """
     try:
         user_id = current_user.id
@@ -37,11 +32,11 @@ def get_dashboard_stats():
         end_date = datetime(year, month, last_day).date()
 
         # ==================== 1. TỔNG THU/CHI TOÀN THỜI GIAN & THÁNG ====================
-        # Tối ưu: Gom 2 query (tổng all time và tổng theo tháng) lại để xử lý gọn hơn
         totals = db.session.query(
             Transaction.type, func.coalesce(func.sum(Transaction.amount), 0)
         ).filter(Transaction.user_id == user_id).group_by(Transaction.type).all()
         
+        # ✅ FIX: Ép kiểu float() để tránh lỗi Decimal - float trên Turso
         total_income = next((float(t[1]) for t in totals if t[0] == 'income'), 0.0)
         total_expense = next((float(t[1]) for t in totals if t[0] == 'expense'), 0.0)
         balance = total_income - total_expense
@@ -88,7 +83,7 @@ def get_dashboard_stats():
             top_amt = cat_exp_dict[top_cat]
             insights.append(f"Danh mục '{cat_names.get(top_cat, top_cat)}' chiếm nhiều nhất ({top_amt:,.0f} VNĐ).")
 
-        # So sánh tháng trước (Dùng Range Query tối ưu Index)
+        # So sánh tháng trước
         prev_month = month - 1 if month > 1 else 12
         prev_year = year if month > 1 else year - 1
         
@@ -96,12 +91,14 @@ def get_dashboard_stats():
         prev_last_day = calendar.monthrange(prev_year, prev_month)[1]
         prev_end_date = datetime(prev_year, prev_month, prev_last_day).date()
 
-        prev_expense = db.session.query(func.coalesce(func.sum(Transaction.amount), 0)).filter(
+        # ✅ FIX: Ép kiểu float() cho prev_expense
+        prev_expense_raw = db.session.query(func.coalesce(func.sum(Transaction.amount), 0)).filter(
             Transaction.user_id == user_id,
             Transaction.type == 'expense',
             Transaction.date >= prev_start_date,
             Transaction.date <= prev_end_date,
         ).scalar()
+        prev_expense = float(prev_expense_raw or 0.0)
         
         if prev_expense > 0:
             diff_pct = ((expense_month - prev_expense) / prev_expense) * 100
@@ -128,12 +125,8 @@ def get_dashboard_stats():
         }
 
         # ==================== 6. DỰ BÁO 7 NGÀY TỚI (Weekday Moving Average) ====================
-        # TƯ DUY: Loại bỏ hardcode 'food'. Dự báo tổng chi tiêu.
-        # Giải thuật: Lấy dữ liệu 30 ngày qua, tính trung bình chi tiêu cho từng Thứ (0=Thứ 2, 6=CN).
-        # Dự báo 7 ngày tới dựa trên thứ của ngày đó. Cách này học được thói quen chi tiêu (VD: cuối tuần chi nhiều).
         start_30 = today_vn.date() - timedelta(days=30)
         
-        # Lấy tất cả giao dịch 30 ngày qua
         trans_30d = db.session.query(Transaction.date, Transaction.amount).filter(
             Transaction.user_id == user_id,
             Transaction.type == 'expense',
@@ -145,13 +138,11 @@ def get_dashboard_stats():
         total_30d = 0.0
 
         for t_date, t_amount in trans_30d:
-            # t_date.weekday(): 0 là Thứ 2, 6 là Chủ Nhật
             wd = t_date.weekday()
-            weekday_sums[wd] += float(t_amount)
+            weekday_sums[wd] += float(t_amount) # ✅ Đảm bảo an toàn
             weekday_counts[wd] += 1
             total_30d += float(t_amount)
 
-        # Fallback: Nếu không có dữ liệu, dự báo = 0
         avg_daily = total_30d / 30.0 if total_30d > 0 else 0.0
         
         forecast_data = []
@@ -160,10 +151,8 @@ def get_dashboard_stats():
             wd = future_date.weekday()
             
             if weekday_counts[wd] > 0:
-                # Có dữ liệu của thứ này -> Lấy trung bình của thứ đó
                 pred_val = weekday_sums[wd] / weekday_counts[wd]
             else:
-                # Chưa đủ dữ liệu -> Fallback về trung bình ngày
                 pred_val = avg_daily
                 
             forecast_data.append(pred_val)
