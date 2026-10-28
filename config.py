@@ -14,17 +14,29 @@ class Config:
 
     if turso_url and turso_token:
         # Trên Render (Linux): dùng Turso
-        db_url = turso_url.replace('libsql://', '')
-        SQLALCHEMY_DATABASE_URI = f"sqlite+libsql://{db_url}/?authToken={turso_token}&secure=true"
+        # Lấy host từ URL (loại bỏ libsql:// và các dấu / thừa nếu có)
+        host = turso_url.replace('libsql://', '').replace('http://', '').replace('https://', '').rstrip('/')
+        
+        # Định dạng URI chuẩn cho sqlalchemy-libsql
+        SQLALCHEMY_DATABASE_URI = f"sqlite+libsql://{host}?secure=true"
+        
+        # Truyền token qua connect_args (Cách chuẩn của libsql)
+        SQLALCHEMY_ENGINE_OPTIONS = {
+            "connect_args": {
+                "auth_token": turso_token
+            },
+            "pool_pre_ping": True,
+            "pool_recycle": 280,
+        }
     else:
         # Dưới Windows (local): dùng SQLite file
         SQLALCHEMY_DATABASE_URI = 'sqlite:///' + os.path.join(basedir, 'app.db')
+        SQLALCHEMY_ENGINE_OPTIONS = {
+            "pool_pre_ping": True,
+            "pool_recycle": 280,
+        }
 
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    SQLALCHEMY_ENGINE_OPTIONS = {
-        "pool_pre_ping": True,
-        "pool_recycle": 280,
-    }
     # ------------------------------------------------
 
     PERMANENT_SESSION_LIFETIME = timedelta(hours=2)
