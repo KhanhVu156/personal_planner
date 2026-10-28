@@ -1,16 +1,18 @@
 {% extends "base.html" %}
 {% block content %}
 
-<!-- Thanh chọn tháng/năm -->
+<!-- =========================================================================
+     PHẦN 1: HEADER & BỘ LỌC THÁNG/NĂM (FINTECH STYLE)
+     ========================================================================= -->
 <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 bg-white dark:bg-slate-800 p-4 rounded-lg shadow transition-colors duration-300 gap-4">
     <h2 class="text-xl font-bold text-gray-800 dark:text-slate-100">Tổng quan tháng {{ display_month }}/{{ display_year }}</h2>
     
     <form method="GET" action="{{ url_for('dashboard.index') }}" class="flex items-center w-full md:w-auto">
         <div class="flex items-center bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl shadow-sm overflow-hidden h-12 w-full md:w-auto">
+            <!-- Ô chọn Tháng -->
             <div class="relative flex items-center h-full flex-1 md:flex-none">
                 <select name="month" aria-label="Chọn tháng" class="appearance-none bg-transparent pl-5 pr-10 h-full text-sm md:text-base font-semibold text-gray-700 dark:text-slate-200 focus:outline-none cursor-pointer">
                     {% for m in range(1, 13) %}
-                        <!-- FIX: Nền tối cho option trong Dark Mode -->
                         <option value="{{ m }}" class="bg-white text-gray-800 dark:bg-slate-800 dark:text-slate-200" {% if m == display_month %}selected{% endif %}>
                             Tháng {{ m }}
                         </option>
@@ -21,8 +23,12 @@
                 </div>
             </div>
             <div class="w-px h-6 bg-gray-300 dark:bg-slate-700"></div>
+            
+            <!-- Ô nhập Năm -->
             <input type="number" name="year" aria-label="Nhập năm" value="{{ display_year }}" min="2000" max="2100" required class="bg-transparent w-28 px-3 h-full text-sm md:text-base font-semibold text-center text-gray-700 dark:text-slate-200 focus:outline-none" placeholder="Năm">
             <div class="w-px h-6 bg-gray-300 dark:bg-slate-700"></div>
+            
+            <!-- Nút Xem -->
             <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-6 md:px-8 h-full text-sm md:text-base font-bold transition-all duration-200 whitespace-nowrap">
                 Xem
             </button>
@@ -30,48 +36,65 @@
     </form>
 </div>
 
-<!-- Cards thống kê -->
+<!-- =========================================================================
+     PHẦN 2: THỐNG KÊ TỔNG QUAN (CARDS)
+     ========================================================================= -->
 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-    <div class="bg-white dark:bg-slate-800 p-6 rounded shadow border-l-4 border-green-500">
+    <div class="bg-white dark:bg-slate-800 p-6 rounded shadow border-l-4 border-green-500 transition-colors duration-300">
         <h3 id="title-income" class="text-sm font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide">Thu nhập</h3>
-        <p id="val-income" class="text-3xl font-bold text-green-600 dark:text-green-400 mt-2"><span class="inline-block animate-pulse bg-gray-300 dark:bg-slate-600 rounded h-8 w-32"></span></p>
+        <p id="val-income" class="text-3xl font-bold text-green-600 dark:text-green-400 mt-2">
+            <span class="inline-block animate-pulse bg-gray-300 dark:bg-slate-600 rounded h-8 w-32"></span>
+        </p>
     </div>
-    <div class="bg-white dark:bg-slate-800 p-6 rounded shadow border-l-4 border-red-500">
+    <div class="bg-white dark:bg-slate-800 p-6 rounded shadow border-l-4 border-red-500 transition-colors duration-300">
         <h3 id="title-expense" class="text-sm font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide">Chi tiêu</h3>
-        <p id="val-expense" class="text-3xl font-bold text-red-600 dark:text-red-400 mt-2"><span class="inline-block animate-pulse bg-gray-300 dark:bg-slate-600 rounded h-8 w-32"></span></p>
+        <p id="val-expense" class="text-3xl font-bold text-red-600 dark:text-red-400 mt-2">
+            <span class="inline-block animate-pulse bg-gray-300 dark:bg-slate-600 rounded h-8 w-32"></span>
+        </p>
     </div>
-    <div class="bg-white dark:bg-slate-800 p-6 rounded shadow border-l-4 border-blue-500">
+    <div class="bg-white dark:bg-slate-800 p-6 rounded shadow border-l-4 border-blue-500 transition-colors duration-300">
         <h3 class="text-sm font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide">Tổng số dư</h3>
-        <p id="val-balance" class="text-3xl font-bold text-gray-800 dark:text-slate-100 mt-2"><span class="inline-block animate-pulse bg-gray-300 dark:bg-slate-600 rounded h-8 w-32"></span></p>
+        <p id="val-balance" class="text-3xl font-bold text-gray-800 dark:text-slate-100 mt-2">
+            <span class="inline-block animate-pulse bg-gray-300 dark:bg-slate-600 rounded h-8 w-32"></span>
+        </p>
     </div>
 </div>
 
-<!-- Dòng 2: Burn Rate và Insights -->
+<!-- =========================================================================
+     PHẦN 3: BURN RATE & INSIGHTS (SQL SMART ANALYTICS)
+     ========================================================================= -->
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+    <!-- Burn Rate Card -->
     <div class="bg-white dark:bg-slate-800 p-6 rounded shadow transition-colors duration-300 border border-orange-100 dark:border-slate-700">
         <h3 class="text-lg font-semibold mb-4 text-gray-800 dark:text-slate-100 flex items-center">
             <svg class="w-5 h-5 mr-2 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
             Tốc độ chi tiêu
         </h3>
         <div id="burn-rate-content" class="space-y-4">
+            <!-- Skeleton Loading -->
             <div class="h-4 bg-gray-200 dark:bg-slate-700 rounded w-3/4 animate-pulse"></div>
             <div class="h-4 bg-gray-200 dark:bg-slate-700 rounded w-1/2 animate-pulse"></div>
         </div>
     </div>
 
+    <!-- Insights Card -->
     <div class="bg-white dark:bg-slate-800 p-6 rounded shadow transition-colors duration-300 border border-purple-100 dark:border-slate-700">
         <h3 class="text-lg font-semibold mb-4 text-gray-800 dark:text-slate-100 flex items-center">
             <svg class="w-5 h-5 mr-2 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>
             Thông tin chi tiêu
         </h3>
         <ul id="insights-list" class="space-y-3 text-sm text-gray-700 dark:text-slate-300">
+            <!-- Skeleton Loading -->
             <li class="animate-pulse h-4 bg-gray-200 dark:bg-slate-700 rounded w-full"></li>
         </ul>
     </div>
 </div>
 
-<!-- Dòng 3: Biểu đồ chi tiêu & Tasks -->
+<!-- =========================================================================
+     PHẦN 4: BIỂU ĐỒ & CÔNG VIỆC
+     ========================================================================= -->
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+    <!-- Budget Chart -->
     <div class="bg-white dark:bg-slate-800 p-6 rounded shadow transition-colors duration-300">
         <h3 class="text-xl font-semibold mb-4 text-gray-800 dark:text-slate-100">Chi tiêu & Ngân sách</h3>
         <div class="relative h-64 w-full">
@@ -79,9 +102,12 @@
             <div id="chart-empty" class="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 dark:bg-slate-800 rounded-lg hidden z-10">
                 <p class="text-gray-500 dark:text-slate-400 font-medium">Chưa có dữ liệu chi tiêu</p>
             </div>
+            <!-- Canvas: Ẩn mặc định để tạo hiệu ứng fade-in, JS sẽ gỡ opacity-0 -->
             <canvas id="budgetChart" class="relative z-10 opacity-0 transition-opacity duration-500"></canvas>
         </div>
     </div>
+    
+    <!-- Upcoming Tasks -->
     <div class="bg-white dark:bg-slate-800 p-6 rounded shadow flex flex-col transition-colors duration-300">
         <h3 class="text-xl font-semibold mb-4 text-gray-800 dark:text-slate-100">Công việc sắp tới</h3>
         <ul id="task-list" class="space-y-3 flex-grow"></ul>
@@ -89,7 +115,9 @@
     </div>
 </div>
 
-<!-- Dự báo chi tiêu -->
+<!-- =========================================================================
+     PHẦN 5: DỰ BÁO CHI TIÊU (SMART FORECAST - THAY THẾ AI)
+     ========================================================================= -->
 <div class="bg-white dark:bg-slate-800 p-6 rounded shadow mb-8 transition-colors duration-300">
     <div class="flex justify-between items-center mb-4">
         <h3 class="text-xl font-semibold text-gray-800 dark:text-slate-100">Dự báo chi tiêu (7 ngày tới)</h3>
@@ -103,7 +131,9 @@
     </div>
 </div>
 
-<!-- Form kế hoạch -->
+<!-- =========================================================================
+     PHẦN 6: FORM LẬP KẾ HOẠCH TÀI CHÍNH
+     ========================================================================= -->
 <div class="bg-white dark:bg-slate-800 p-6 rounded shadow border border-blue-100 dark:border-slate-700 transition-colors duration-300">
     <h3 class="text-xl font-semibold mb-4 text-gray-800 dark:text-slate-100 flex items-center">
         <svg class="w-6 h-6 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
@@ -112,17 +142,19 @@
     <form id="plan-form" class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
             <label class="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-1">Thu nhập hàng tháng (VND)</label>
-            <input type="number" id="monthly_income" class="w-full px-3 py-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white" required>
+            <input type="number" id="monthly_income" class="w-full px-3 py-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white focus:ring-2 focus:ring-blue-500" placeholder="VD: 15000000" required>
         </div>
         <div>
             <label class="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-1">Tỷ lệ tiết kiệm (%)</label>
-            <input type="number" id="savings_percent" class="w-full px-3 py-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white" value="20">
+            <input type="number" id="savings_percent" class="w-full px-3 py-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white focus:ring-2 focus:ring-blue-500" value="20" min="0" max="100">
         </div>
         <div class="md:col-span-2">
-            <button type="button" id="plan-btn" class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition font-semibold disabled:opacity-50 disabled:cursor-not-allowed">Lập kế hoạch</button>
+            <button type="submit" id="plan-btn" class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition font-semibold disabled:opacity-50 disabled:cursor-not-allowed">Lập kế hoạch</button>
         </div>
     </form>
-    <div id="plan-result" class="mt-6 p-4 bg-gray-50 dark:bg-slate-700 rounded hidden border border-gray-200 dark:border-slate-600">
+    
+    <!-- Vùng hiển thị kết quả -->
+    <div id="plan-result" class="mt-6 p-4 bg-gray-50 dark:bg-slate-700 rounded hidden border border-gray-200 dark:border-slate-600 animate-fade-in">
         <h4 class="font-bold text-lg text-green-700 dark:text-green-400">Ngân sách đề xuất:</h4>
         <ul id="budgets-list" class="list-disc pl-5 mt-2 space-y-1 text-gray-700 dark:text-slate-300"></ul>
     </div>
@@ -132,28 +164,65 @@
 
 {% block scripts %}
 <script>
+    /**
+     * =========================================================================
+     * TƯ DUY THIẾT KẾ (ARCHITECTURE PHILOSOPHY):
+     * 1. Orchestration Pattern: Hàm `fetchDashboardStats` đóng vai trò nhạc trưởng,
+     *    gọi API một lần và phân phối dữ liệu cho các hàm `render*` độc lập.
+     * 2. Component-based Rendering: Chia nhỏ giao diện thành các hàm render riêng biệt
+     *    (renderSummary, renderBurnRate, renderBudgetChart...) giúp code dễ đọc, dễ bảo trì.
+     * 3. Fail-Safe UI: Các trạng thái Loading (Skeleton), Empty (Trống) và Error (Lỗi)
+     *    được xử lý triệt để ở mọi component.
+     * =========================================================================
+     */
     (function () {
         'use strict';
         
-        const currentMonth = {{ display_month }};
-        const currentYear = {{ display_year }};
+        // --- BIẾN TOÀN CỤC CỤC BỘ (STATE) ---
+        const CURRENT_MONTH = {{ display_month }};
+        const CURRENT_YEAR = {{ display_year }};
         const TODAY = new Date();
         
-        const formatMoney = (amount) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 }).format(amount || 0);
-        const categoryMap = {'food': 'Ăn uống', 'transport': 'Di chuyển', 'education': 'Học tập', 'entertainment': 'Giải trí', 'shopping': 'Mua sắm', 'bills': 'Hóa đơn', 'other': 'Khác', 'salary': 'Lương'};
-        
+        // --- CACHE DOM ELEMENTS ---
+        const elements = {
+            titleIncome: document.getElementById('title-income'),
+            valIncome: document.getElementById('val-income'),
+            titleExpense: document.getElementById('title-expense'),
+            valExpense: document.getElementById('val-expense'),
+            valBalance: document.getElementById('val-balance'),
+            burnRateContent: document.getElementById('burn-rate-content'),
+            insightsList: document.getElementById('insights-list'),
+            taskList: document.getElementById('task-list'),
+            planForm: document.getElementById('plan-form'),
+            planBtn: document.getElementById('plan-btn'),
+            planResult: document.getElementById('plan-result'),
+            budgetsList: document.getElementById('budgets-list'),
+            canvasBudget: document.getElementById('budgetChart'),
+            canvasForecast: document.getElementById('forecastChart')
+        };
+
         let budgetChartInstance = null;
         let forecastChartInstance = null;
 
-        // ========================================================
-        // 1. HÀM ĐIỀU PHỐI CHÍNH (Orchestrator)
-        // ========================================================
-        async function fetchDashboardStats() {
-            try {
-                const response = await fetch(`/api/dashboard-stats?month=${currentMonth}&year=${currentYear}&t=` + new Date().getTime());
-                if (!response.ok) throw new Error('Network response was not ok');
-                const data = await response.json();
+        // --- HELPERS ---
+        const formatMoney = (amount) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 }).format(amount || 0);
+        const categoryMap = {
+            'food': 'Ăn uống', 'transport': 'Di chuyển', 'education': 'Học tập', 
+            'entertainment': 'Giải trí', 'shopping': 'Mua sắm', 'bills': 'Hóa đơn', 
+            'other': 'Khác', 'salary': 'Lương'
+        };
 
+        // =====================================================================
+        // 1. KHỞI TẠO & ĐIỀU PHỐI (ORCHESTRATOR)
+        // =====================================================================
+        async function initDashboard() {
+            try {
+                // Gọi API lấy toàn bộ dữ liệu trong 1 request
+                const res = await fetch(`/api/dashboard-stats?month=${CURRENT_MONTH}&year=${CURRENT_YEAR}&t=${Date.now()}`);
+                if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+                const data = await res.json();
+
+                // Giao việc cho các hàm con
                 renderSummary(data);
                 renderBurnRate(data.burn_rate);
                 renderInsights(data.insights);
@@ -162,75 +231,80 @@
                 renderTasks(data.tasks);
                 
             } catch (err) {
-                console.error('Lỗi khi tải dữ liệu Dashboard:', err);
-                document.getElementById('insights-list').innerHTML = '<li class="text-red-500">Không thể tải dữ liệu. Vui lòng thử lại sau.</li>';
-                ['income', 'expense', 'balance'].forEach(id => {
-                    const el = document.getElementById(`val-${id}`);
-                    if (el) el.innerHTML = '<span class="text-gray-400">--</span>';
-                });
+                console.error('[Dashboard Error]', err);
+                renderErrorState();
             }
         }
 
-        // ========================================================
-        // 2. CÁC HÀM RENDER THÀNH PHẦN (Component Renderers)
-        // ========================================================
+        // =====================================================================
+        // 2. CÁC HÀM RENDER GIAO DIỆN (COMPONENT RENDERERS)
+        // =====================================================================
 
         function renderSummary(data) {
-            document.getElementById('title-income').innerText = `Thu nhập (T${data.month}/${data.year})`;
-            document.getElementById('title-expense').innerText = `Chi tiêu (T${data.month}/${data.year})`;
-            document.getElementById('val-income').innerHTML = `+${formatMoney(data.income)} <span class="text-lg">VND</span>`;
-            document.getElementById('val-expense').innerHTML = `-${formatMoney(data.expenses)} <span class="text-lg">VND</span>`;
+            elements.titleIncome.innerText = `Thu nhập (T${data.month}/${data.year})`;
+            elements.titleExpense.innerText = `Chi tiêu (T${data.month}/${data.year})`;
             
-            const balanceEl = document.getElementById('val-balance');
-            balanceEl.innerHTML = `${formatMoney(data.balance)} <span class="text-lg">VND</span>`;
-            balanceEl.className = `text-3xl font-bold mt-2 ${data.balance < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-800 dark:text-slate-100'}`;
+            elements.valIncome.innerHTML = `+${formatMoney(data.income)} <span class="text-lg">VND</span>`;
+            elements.valExpense.innerHTML = `-${formatMoney(data.expenses)} <span class="text-lg">VND</span>`;
+            
+            // Đổi màu số dư nếu âm
+            const isNegative = data.balance < 0;
+            elements.valBalance.innerHTML = `${formatMoney(data.balance)} <span class="text-lg">VND</span>`;
+            elements.valBalance.className = `text-3xl font-bold mt-2 ${isNegative ? 'text-red-600 dark:text-red-400' : 'text-gray-800 dark:text-slate-100'}`;
         }
 
         function renderBurnRate(burn) {
-            const isCurrent = (currentMonth === TODAY.getMonth() + 1) && (currentYear === TODAY.getFullYear());
-            const monthText = isCurrent ? 'tháng này' : 'tháng đã chọn';
+            // Thuật toán: Dựa vào ngày hiện tại để tính trung bình ngày. 
+            // Nếu xem tháng tương lai/quá khứ, dùng tổng số ngày của tháng đó.
+            const isCurrentMonth = (CURRENT_MONTH === TODAY.getMonth() + 1) && (CURRENT_YEAR === TODAY.getFullYear());
+            const monthText = isCurrentMonth ? 'tháng này' : 'tháng đã chọn';
 
-            document.getElementById('burn-rate-content').innerHTML = `
-                <div class="flex justify-between items-center bg-orange-50 dark:bg-slate-700 p-3 rounded">
+            elements.burnRateContent.innerHTML = `
+                <div class="flex justify-between items-center bg-orange-50 dark:bg-slate-700 p-3 rounded transition-colors">
                     <span class="text-gray-600 dark:text-slate-300">Trung bình mỗi ngày:</span>
                     <strong class="text-orange-600 dark:text-orange-400">${formatMoney(burn.daily_avg)} VND</strong>
                 </div>
-                <div class="flex justify-between items-center bg-red-50 dark:bg-slate-700 p-3 rounded">
+                <div class="flex justify-between items-center bg-red-50 dark:bg-slate-700 p-3 rounded mt-3 transition-colors">
                     <span class="text-gray-600 dark:text-slate-300">Dự báo cả tháng:</span>
                     <strong class="text-red-600 dark:text-red-400">${formatMoney(burn.projected)} VND</strong>
                 </div>
-                <p class="text-xs text-gray-500 mt-2 italic">* Dựa trên tốc độ chi tiêu trong ${monthText}.</p>
+                <p class="text-xs text-gray-500 dark:text-slate-400 mt-3 italic">
+                    * Số liệu dựa trên tốc độ chi tiêu trong ${monthText}.
+                </p>
             `;
         }
 
         function renderInsights(insights) {
-            const insightsList = document.getElementById('insights-list');
             if (!insights || insights.length === 0) {
-                insightsList.innerHTML = '<li class="italic text-gray-500">Chưa có đủ dữ liệu để phân tích.</li>';
+                elements.insightsList.innerHTML = '<li class="italic text-gray-500 dark:text-slate-400">Chưa có đủ dữ liệu để phân tích.</li>';
                 return;
             }
-            insightsList.innerHTML = insights.map(text => 
-                `<li class="flex items-start"><span class="mr-2 text-purple-500">•</span> ${text}</li>`
-            ).join('');
+            elements.insightsList.innerHTML = insights.map(text => `
+                <li class="flex items-start">
+                    <span class="mr-2 text-purple-500 flex-shrink-0">•</span> 
+                    <span>${text}</span>
+                </li>
+            `).join('');
         }
 
         function renderForecastChart(forecastData) {
-            const fsSkeleton = document.getElementById('forecast-skeleton');
-            if (fsSkeleton) fsSkeleton.style.display = 'none';
+            const skeleton = document.getElementById('forecast-skeleton');
+            if (skeleton) skeleton.style.display = 'none';
             if (!window.Chart) return;
 
-            const ctx = document.getElementById('forecastChart').getContext('2d');
             if (forecastChartInstance) forecastChartInstance.destroy();
+            const ctx = elements.canvasForecast.getContext('2d');
             
             const isDark = document.documentElement.classList.contains('dark');
             const textColor = isDark ? '#94a3b8' : '#64748b';
+            const gridColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
 
-            const labels = [];
-            for (let i = 1; i <= 7; i++) {
-                const d = new Date();
-                d.setDate(d.getDate() + i);
-                labels.push(`${d.getDate()}/${d.getMonth() + 1}`);
-            }
+            // Tạo nhãn ngày tháng động cho 7 ngày tới
+            const labels = Array.from({length: 7}, (_, i) => {
+                const d = new Date(TODAY);
+                d.setDate(d.getDate() + i + 1);
+                return `${d.getDate()} Th${d.getMonth() + 1}`;
+            });
 
             forecastChartInstance = new Chart(ctx, {
                 type: 'line',
@@ -249,10 +323,20 @@
                     }]
                 },
                 options: {
-                    responsive: true, maintainAspectRatio: false,
-                    plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => ` ${formatMoney(c.parsed.y)} VND` } } },
+                    responsive: true, 
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: { 
+                        legend: { display: false }, 
+                        tooltip: { 
+                            backgroundColor: isDark ? 'rgba(15, 23, 42, 0.9)' : 'rgba(255, 255, 255, 0.95)',
+                            titleColor: isDark ? '#f8fafc' : '#0f172a',
+                            bodyColor: isDark ? '#cbd5e1' : '#334155',
+                            callbacks: { label: (c) => ` Dự báo: ${formatMoney(c.parsed.y)} VND` } 
+                        } 
+                    },
                     scales: {
-                        y: { beginAtZero: true, ticks: { color: textColor }, grid: { color: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' } },
+                        y: { beginAtZero: true, ticks: { color: textColor }, grid: { color: gridColor } },
                         x: { ticks: { color: textColor }, grid: { display: false } }
                     }
                 }
@@ -260,49 +344,79 @@
         }
 
         function renderBudgetChart(budgets, catExp) {
-            const chartCanvas = document.getElementById('budgetChart');
             const chartEmpty = document.getElementById('chart-empty');
             const chartSkeleton = document.getElementById('chart-skeleton');
-            
             if (chartSkeleton) chartSkeleton.style.display = 'none';
 
+            // Lấy hợp (Union) của cả danh mục có ngân sách và có chi tiêu thực tế
             const allKeys = Array.from(new Set([...Object.keys(budgets), ...Object.keys(catExp)]));
+            
+            // Lọc bỏ các danh mục không có dữ liệu (cả ngân sách và thực tế đều bằng 0)
             let filteredData = allKeys.map(key => ({ 
                 label: categoryMap[key] || key, 
                 budget: budgets[key] || 0, 
                 actual: catExp[key] || 0 
             })).filter(i => i.budget > 0 || i.actual > 0);
             
+            // Nếu không có dữ liệu -> Hiện màn hình trống
             if (filteredData.length === 0) {
-                chartCanvas.style.display = 'none';
+                elements.canvasBudget.style.display = 'none';
                 chartEmpty.style.display = 'flex';
                 if (budgetChartInstance) { budgetChartInstance.destroy(); budgetChartInstance = null; }
                 return;
             }
             
+            // Nếu có dữ liệu -> Ẩn màn hình trống, hiện Canvas
             chartEmpty.style.display = 'none';
-            chartCanvas.style.display = 'block';
+            elements.canvasBudget.style.display = 'block';
+            
+            // ✅ FIX LỖI TÀNG HÌNH: Gỡ bỏ opacity-0 để hiển thị biểu đồ
+            elements.canvasBudget.classList.remove('opacity-0');
+            elements.canvasBudget.classList.add('opacity-100');
             
             if (window.Chart) {
                 const isDark = document.documentElement.classList.contains('dark');
                 const textColor = isDark ? '#94a3b8' : '#64748b';
+                const gridColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
+                
                 if (budgetChartInstance) budgetChartInstance.destroy();
-                const ctx = chartCanvas.getContext('2d');
+                const ctx = elements.canvasBudget.getContext('2d');
                 
                 budgetChartInstance = new Chart(ctx, {
-                    type: 'bar', indexAxis: 'y',
+                    type: 'bar', 
+                    indexAxis: 'y', // Biểu đồ thanh ngang
                     data: {
                         labels: filteredData.map(d => d.label),
                         datasets: [
-                            { label: 'Ngân sách', data: filteredData.map(d => d.budget), backgroundColor: 'rgba(59, 130, 246, 0.7)', borderRadius: 4 },
-                            { label: 'Thực tế', data: filteredData.map(d => d.actual), backgroundColor: 'rgba(239, 68, 68, 0.7)', borderRadius: 4 }
+                            { 
+                                label: 'Ngân sách', 
+                                data: filteredData.map(d => d.budget), 
+                                backgroundColor: 'rgba(59, 130, 246, 0.7)', 
+                                borderRadius: 4 
+                            },
+                            { 
+                                label: 'Thực tế', 
+                                data: filteredData.map(d => d.actual), 
+                                backgroundColor: 'rgba(239, 68, 68, 0.7)', 
+                                borderRadius: 4 
+                            }
                         ]
                     },
                     options: {
-                        responsive: true, maintainAspectRatio: false,
-                        plugins: { legend: { position: 'top', align: 'end', labels: { usePointStyle: true, boxWidth: 8 } } },
+                        responsive: true, 
+                        maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
+                        plugins: { 
+                            legend: { position: 'top', align: 'end', labels: { usePointStyle: true, boxWidth: 8, color: textColor } },
+                            tooltip: {
+                                backgroundColor: isDark ? 'rgba(15, 23, 42, 0.9)' : 'rgba(255, 255, 255, 0.95)',
+                                titleColor: isDark ? '#f8fafc' : '#0f172a',
+                                bodyColor: isDark ? '#cbd5e1' : '#334155',
+                                callbacks: { label: (c) => ` ${c.dataset.label}: ${formatMoney(c.parsed.x)} VND` }
+                            }
+                        },
                         scales: {
-                            x: { beginAtZero: true, ticks: { color: textColor }, grid: { color: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' } },
+                            x: { beginAtZero: true, ticks: { color: textColor, callback: (val) => formatMoney(val) }, grid: { color: gridColor } },
                             y: { ticks: { color: textColor }, grid: { display: false } }
                         }
                     }
@@ -311,107 +425,128 @@
         }
 
         function renderTasks(tasks) {
-            const taskList = document.getElementById('task-list');
             if (!tasks || tasks.length === 0) {
-                taskList.innerHTML = '<li class="text-gray-500 italic text-center py-4">Chưa có deadline nào sắp tới...</li>';
+                elements.taskList.innerHTML = '<li class="text-gray-500 dark:text-slate-400 italic text-center py-4">Chưa có deadline nào sắp tới...</li>';
                 return;
             }
             
-            taskList.innerHTML = tasks.map(task => `
+            // Thuật toán render: Dùng template literal kết hợp .map() để tối ưu hiệu năng (chỉ chèn DOM 1 lần)
+            elements.taskList.innerHTML = tasks.map(task => {
+                const safeProgress = Math.max(0, Math.min(100, task.progress || 0));
+                return `
                 <li class="flex justify-between items-center border-b border-gray-100 dark:border-slate-700 pb-2">
                     <div class="flex-1 pr-4 truncate">
                         <strong class="text-gray-800 dark:text-slate-200 block truncate" title="${task.title}">${task.title}</strong>
-                        <small class="text-red-500">Hạn: ${task.deadline}</small>
+                        <small class="text-red-500 font-medium">Hạn: ${task.deadline}</small>
                     </div>
                     <div class="w-1/3 flex-shrink-0">
-                        <div class="flex justify-between text-xs mb-1">
+                        <div class="flex justify-between text-xs mb-1 dark:text-slate-400">
                             <span>Tiến độ</span>
-                            <span class="font-bold">${task.progress}%</span>
+                            <span class="font-bold">${safeProgress}%</span>
                         </div>
                         <div class="w-full bg-gray-200 dark:bg-slate-600 rounded-full h-2">
-                            <div class="bg-blue-600 h-2 rounded-full" style="width: ${task.progress}%"></div>
+                            <div class="bg-blue-600 h-2 rounded-full transition-all duration-500" style="width: ${safeProgress}%"></div>
                         </div>
                     </div>
                 </li>
-            `).join('');
+            `}).join('');
         }
 
-        // ========================================================
-        // 3. XỬ LÝ FORM LẬP KẾ HOẠCH (BỔ SUNG LẠI)
-        // ========================================================
-        async function handleFinancialPlan() {
-            const incomeInput = document.getElementById('monthly_income');
-            const savingsInput = document.getElementById('savings_percent');
-            const btn = document.getElementById('plan-btn');
-            const resultBox = document.getElementById('plan-result');
-            const list = document.getElementById('budgets-list');
+        function renderErrorState() {
+            // Fallback UI khi API sập
+            const errorMsg = '<li class="text-red-500 font-medium">Không thể kết nối tới máy chủ.</li>';
+            elements.insightsList.innerHTML = errorMsg;
+            elements.burnRateContent.innerHTML = `<p class="text-red-500">${errorMsg}</p>`;
+            elements.taskList.innerHTML = `<li class="text-red-500 text-center py-4">Lỗi tải dữ liệu.</li>`;
+            
+            // Ẩn Skeleton, hiện lỗi
+            ['chart-skeleton', 'forecast-skeleton'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.style.display = 'none';
+            });
+            ['val-income', 'val-expense', 'val-balance'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.innerHTML = '<span class="text-gray-400">---</span>';
+            });
+        }
 
-            const income = parseFloat(incomeInput.value);
-            const percent = parseFloat(savingsInput.value) || 0;
+        // =====================================================================
+        // 3. XỬ LÝ FORM LẬP KẾ HOẠCH TÀI CHÍNH
+        // =====================================================================
+        async function handleFinancialPlan(e) {
+            e.preventDefault(); // Chặn form reload trang
 
-            if (!income || income <= 0) {
+            const incomeVal = parseFloat(document.getElementById('monthly_income').value);
+            const percentVal = parseFloat(document.getElementById('savings_percent').value) || 0;
+
+            // Validate dữ liệu đầu vào
+            if (!incomeVal || incomeVal <= 0) {
                 alert('Vui lòng nhập thu nhập hợp lệ (lớn hơn 0).');
-                incomeInput.focus();
+                document.getElementById('monthly_income').focus();
                 return;
             }
 
-            // UI Loading state
-            const originalText = btn.innerText;
-            btn.innerText = 'Đang tính toán...';
-            btn.disabled = true;
+            // UI Loading State
+            const originalText = elements.planBtn.innerText;
+            elements.planBtn.innerText = 'Đang tính toán...';
+            elements.planBtn.disabled = true;
 
             try {
                 const res = await fetch('/api/financial-plan', {
                     method: 'POST',
                     headers: { 
                         'Content-Type': 'application/json',
-                        // Lấy CSRF token từ thẻ meta (đã có sẵn trong base.html)
                         'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content 
                     },
                     body: JSON.stringify({
-                        monthly_income: income,
-                        savings_percent: percent
+                        monthly_income: incomeVal,
+                        savings_percent: percentVal
                     })
                 });
 
-                if (!res.ok) throw new Error('Lỗi khi gọi API');
+                if (!res.ok) throw new Error('Lỗi gọi API lập kế hoạch');
                 const data = await res.json();
 
-                // Hiển thị kết quả
-                resultBox.classList.remove('hidden');
-                list.innerHTML = ''; // Xóa kết quả cũ
+                // Render kết quả
+                elements.planResult.classList.remove('hidden');
+                elements.budgetsList.innerHTML = '';
                 
-                // Render danh sách ngân sách đề xuất
+                // Duyệt và render danh sách ngân sách đề xuất
                 for (const [cat, amount] of Object.entries(data.budgets)) {
                     if (amount > 0) {
                         const catName = categoryMap[cat] || cat;
-                        list.innerHTML += `<li class="flex justify-between items-center py-1 border-b border-gray-200 dark:border-slate-600 last:border-0">
-                            <span>${catName}</span>
-                            <strong class="text-blue-600 dark:text-blue-400">${formatMoney(amount)} VND</strong>
-                        </li>`;
+                        elements.budgetsList.innerHTML += `
+                            <li class="flex justify-between items-center py-1 border-b border-gray-200 dark:border-slate-600 last:border-0">
+                                <span>${catName}</span>
+                                <strong class="text-blue-600 dark:text-blue-400">${formatMoney(amount)} VND</strong>
+                            </li>`;
                     }
                 }
                 
-                // Hiển thị thêm mục tiêu tiết kiệm
-                list.innerHTML += `<li class="flex justify-between items-center py-2 mt-2 bg-green-50 dark:bg-green-900/30 px-2 rounded font-semibold text-green-700 dark:text-green-400">
-                    <span>Mục tiêu tiết kiệm:</span>
-                    <span>${formatMoney(data.savings)} VND</span>
-                </li>`;
+                // Hiển thị mục tiêu tiết kiệm nổi bật
+                elements.budgetsList.innerHTML += `
+                    <li class="flex justify-between items-center py-2 mt-2 bg-green-50 dark:bg-green-900/30 px-3 rounded font-semibold text-green-700 dark:text-green-400">
+                        <span>Mục tiêu tiết kiệm:</span>
+                        <span>${formatMoney(data.savings)} VND</span>
+                    </li>`;
 
             } catch (err) {
                 console.error(err);
-                alert('Có lỗi xảy ra khi tính toán. Vui lòng thử lại.');
+                alert('Có lỗi xảy ra khi tính toán. Vui lòng thử lại sau.');
             } finally {
-                btn.innerText = originalText;
-                btn.disabled = false;
+                // Khôi phục trạng thái nút
+                elements.planBtn.innerText = originalText;
+                elements.planBtn.disabled = false;
             }
         }
 
-        // Gắn sự kiện click cho nút Lập kế hoạch
-        document.getElementById('plan-btn').addEventListener('click', handleFinancialPlan);
+        // Gắn sự kiện cho form (Dùng addEventListener thay vì inline onclick)
+        if (elements.planForm) {
+            elements.planForm.addEventListener('submit', handleFinancialPlan);
+        }
 
-        // Khởi chạy tải dữ liệu dashboard
-        fetchDashboardStats();
+        // KÍCH HOẠT DASHBOARD KHI TRANG LOAD XONG
+        initDashboard();
     })();
 </script>
 {% endblock %}
