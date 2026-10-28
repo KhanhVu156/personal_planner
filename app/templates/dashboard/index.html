@@ -10,7 +10,14 @@
             <div class="relative flex items-center h-full flex-1 md:flex-none">
                 <select name="month" aria-label="Chọn tháng" class="appearance-none bg-transparent pl-5 pr-10 h-full text-sm md:text-base font-semibold text-gray-700 dark:text-slate-200 focus:outline-none cursor-pointer">
                     {% for m in range(1, 13) %}
-                        <option value="{{ m }}" {% if m == display_month %}selected{% endif %}>Tháng {{ m }}</option>
+                        <!-- 
+                            ✅ FIX DARK MODE DROPDOWN: 
+                            Thêm class nền trắng/chữ đen cho Light Mode và nền xám đậm/chữ trắng cho Dark Mode.
+                            Điều này ép trình duyệt phải render màu cho từng dòng bên trong danh sách xổ xuống.
+                        -->
+                        <option value="{{ m }}" class="bg-white text-gray-800 dark:bg-slate-800 dark:text-slate-200" {% if m == display_month %}selected{% endif %}>
+                            Tháng {{ m }}
+                        </option>
                     {% endfor %}
                 </select>
                 <div class="pointer-events-none absolute right-3 text-gray-400 dark:text-slate-500">
