@@ -7,6 +7,23 @@ from datetime import datetime
 
 bp = Blueprint('budgets', __name__)
 
+def parse_vnd_amount(amount_val):
+    """
+    TƯ DUY XỬ LÝ DỮ LIỆU:
+    - Frontend gửi lên chuỗi đã format (VD: "1.000.000").
+    - Hàm này lọc bỏ mọi ký tự không phải là số, sau đó ép sang float để lưu vào DB.
+    - Tránh lỗi SQLAlchemy không thể lưu chuỗi có dấu chấm vào cột kiểu Float.
+    """
+    if not amount_val:
+        return 0.0
+    try:
+        # Chuyển về string, lọc chỉ giữ lại các chữ số
+        cleaned_str = ''.join(filter(str.isdigit, str(amount_val)))
+        return float(cleaned_str) if cleaned_str else 0.0
+    except Exception as e:
+        current_app.logger.error(f"Lỗi parse tiền tệ: {e}")
+        return 0.0
+
 @bp.route('/budgets')
 @login_required
 def list_budgets():
@@ -23,7 +40,6 @@ def list_budgets():
         try:
             query = query.filter_by(month=int(month_str), year=int(year_str))
         except ValueError:
-            # Phòng trường hợp user sửa URL thành /budgets?month=abc
             flash('Tham số lọc không hợp lệ.', 'warning')
             return redirect(url_for('budgets.list_budgets'))
         
@@ -38,11 +54,6 @@ def list_budgets():
 def add_budget():
     """
     Thiết lập hoặc Cập nhật ngân sách (Upsert).
-    
-    TƯ DUY THIẾT KẾ:
-    - Vì mỗi category/tháng/năm chỉ có 1 ngân sách, nên nếu đã tồn tại -> Cập nhật (Update).
-    - Nếu chưa tồn tại -> Thêm mới (Insert).
-    - Hỗ trợ nút "Sửa" từ trang danh sách: Truyền params qua URL (GET) -> Tự động fill vào form.
     """
     form = BudgetForm()
     
@@ -53,12 +64,10 @@ def add_budget():
         req_cat = request.args.get('category')
         
         if req_month and req_year and req_cat:
-            # Điền dữ liệu vào form
             form.month.data = str(req_month)
             form.year.data = int(req_year)
             form.category.data = req_cat
             
-            # Lấy số tiền cũ nếu đã có ngân sách
             existing = Budget.query.filter_by(
                 user_id=current_user.id,
                 category=req_cat,
@@ -73,8 +82,10 @@ def add_budget():
     if form.validate_on_submit():
         month_val = int(form.month.data)
         year_val = int(form.year.data)
+        
+        # ✅ FIX: Bắt buộc phải parse số tiền từ chuỗi "1.000.000" thành Float trước khi lưu
+        amount_val = parse_vnd_amount(form.amount.data)
 
-        # Tìm xem ngân sách này đã tồn tại chưa để quyết định Update hay Insert
         existing = Budget.query.filter_by(
             user_id=current_user.id,
             category=form.category.data,
@@ -84,7 +95,7 @@ def add_budget():
         
         try:
             if existing:
-                existing.amount = form.amount.data
+                existing.amount = amount_val
                 flash(f'Đã cập nhật ngân sách Tháng {month_val}/{year_val} thành công!', 'success')
             else:
                 budget = Budget(
@@ -92,7 +103,7 @@ def add_budget():
                     category=form.category.data,
                     month=month_val,
                     year=year_val,
-                    amount=form.amount.data
+                    amount=amount_val
                 )
                 db.session.add(budget)
                 flash(f'Đã thêm ngân sách Tháng {month_val}/{year_val} thành công!', 'success')
@@ -116,13 +127,9 @@ def add_budget():
 def delete_budget(id):
     """
     Xóa ngân sách.
-    Chuyển sang POST để bảo vệ dữ liệu.
-    TƯ DUY UX: Phải lấy lại tham số filter (tháng/năm) từ URL trước khi xóa, 
-    để khi redirect về trang danh sách, bộ lọc của user không bị mất.
     """
     budget = Budget.query.get_or_404(id)
     
-    # Lấy params filter hiện tại
     req_month = request.args.get('month')
     req_year = request.args.get('year')
     

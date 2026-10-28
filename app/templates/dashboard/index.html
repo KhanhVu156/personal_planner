@@ -2,7 +2,7 @@
 {% block content %}
 
 <!-- =========================================================================
-     PHẦN 1: HEADER & BỘ LỌC THÁNG/NĂM (FINTECH STYLE)
+     PHẦN 1: HEADER & BỘ LỌC THÁNG/NĂM
      ========================================================================= -->
 <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 bg-white dark:bg-slate-800 p-4 rounded-lg shadow transition-colors duration-300 gap-4">
     <h2 class="text-xl font-bold text-gray-800 dark:text-slate-100">Tổng quan tháng {{ display_month }}/{{ display_year }}</h2>
@@ -56,30 +56,26 @@
 </div>
 
 <!-- =========================================================================
-     PHẦN 3: BURN RATE & INSIGHTS (SQL SMART ANALYTICS)
+     PHẦN 3: BURN RATE & INSIGHTS
      ========================================================================= -->
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-    <!-- Burn Rate Card -->
     <div class="bg-white dark:bg-slate-800 p-6 rounded shadow transition-colors duration-300 border border-orange-100 dark:border-slate-700">
         <h3 class="text-lg font-semibold mb-4 text-gray-800 dark:text-slate-100 flex items-center">
             <svg class="w-5 h-5 mr-2 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
             Tốc độ chi tiêu
         </h3>
         <div id="burn-rate-content" class="space-y-4">
-            <!-- Skeleton Loading -->
             <div class="h-4 bg-gray-200 dark:bg-slate-700 rounded w-3/4 animate-pulse"></div>
             <div class="h-4 bg-gray-200 dark:bg-slate-700 rounded w-1/2 animate-pulse"></div>
         </div>
     </div>
 
-    <!-- Insights Card -->
     <div class="bg-white dark:bg-slate-800 p-6 rounded shadow transition-colors duration-300 border border-purple-100 dark:border-slate-700">
         <h3 class="text-lg font-semibold mb-4 text-gray-800 dark:text-slate-100 flex items-center">
             <svg class="w-5 h-5 mr-2 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>
             Thông tin chi tiêu
         </h3>
         <ul id="insights-list" class="space-y-3 text-sm text-gray-700 dark:text-slate-300">
-            <!-- Skeleton Loading -->
             <li class="animate-pulse h-4 bg-gray-200 dark:bg-slate-700 rounded w-full"></li>
         </ul>
     </div>
@@ -92,13 +88,16 @@
     <!-- Budget Chart -->
     <div class="bg-white dark:bg-slate-800 p-6 rounded shadow transition-colors duration-300">
         <h3 class="text-xl font-semibold mb-4 text-gray-800 dark:text-slate-100">Chi tiêu & Ngân sách</h3>
-        <div class="relative h-72 w-full"> <!-- Tăng chiều cao lên 72 để chứa thanh ngang -->
+        <div class="relative h-72 w-full">
             <div id="chart-skeleton" class="absolute inset-0 flex items-center justify-center animate-pulse bg-gray-100 dark:bg-slate-700 rounded-lg z-10"></div>
             <div id="chart-empty" class="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 dark:bg-slate-800 rounded-lg hidden z-10">
                 <p class="text-gray-500 dark:text-slate-400 font-medium">Chưa có dữ liệu chi tiêu</p>
             </div>
             <canvas id="budgetChart" class="relative z-10 opacity-0 transition-opacity duration-500"></canvas>
         </div>
+        <p id="no-budget-warning" class="text-xs text-orange-500 mt-2 hidden italic">
+            * Bạn chưa thiết lập ngân sách cho tháng này. <a href="{{ url_for('budgets.add_budget') }}" class="underline font-semibold">Thiết lập ngay</a>
+        </p>
     </div>
     
     <!-- Upcoming Tasks -->
@@ -110,7 +109,7 @@
 </div>
 
 <!-- =========================================================================
-     PHẦN 5: DỰ BÁO CHI TIÊU (SMART FORECAST)
+     PHẦN 5: DỰ BÁO CHI TIÊU
      ========================================================================= -->
 <div class="bg-white dark:bg-slate-800 p-6 rounded shadow mb-8 transition-colors duration-300">
     <div class="flex justify-between items-center mb-4">
@@ -178,13 +177,13 @@
             planResult: document.getElementById('plan-result'),
             budgetsList: document.getElementById('budgets-list'),
             canvasBudget: document.getElementById('budgetChart'),
-            canvasForecast: document.getElementById('forecastChart')
+            canvasForecast: document.getElementById('forecastChart'),
+            noBudgetWarning: document.getElementById('no-budget-warning')
         };
 
         let budgetChartInstance = null;
         let forecastChartInstance = null;
         
-        // State lưu trữ dữ liệu để vẽ lại khi đổi theme
         let chartDataState = {
             budgets: {},
             catExp: {},
@@ -192,6 +191,7 @@
         };
 
         const formatMoney = (amount) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 }).format(amount || 0);
+        
         const categoryMap = {
             'food': 'Ăn uống', 'transport': 'Di chuyển', 'education': 'Học tập', 
             'entertainment': 'Giải trí', 'shopping': 'Mua sắm', 'bills': 'Hóa đơn', 
@@ -209,12 +209,10 @@
                 renderInsights(data.insights);
                 renderTasks(data.tasks);
                 
-                // Lưu data vào state để dùng cho việc vẽ lại khi đổi theme
                 chartDataState.budgets = data.budgets;
                 chartDataState.catExp = data.cat_expenses;
                 chartDataState.forecast = data.forecast;
                 
-                // Render Charts
                 renderForecastChart(data.forecast);
                 renderBudgetChart(data.budgets, data.cat_expenses);
                 
@@ -224,7 +222,6 @@
             }
         }
 
-        // --- CÁC HÀM RENDER TEXT ---
         function renderSummary(data) {
             elements.titleIncome.innerText = `Thu nhập (T${data.month}/${data.year})`;
             elements.titleExpense.innerText = `Chi tiêu (T${data.month}/${data.year})`;
@@ -296,16 +293,13 @@
             `}).join('');
         }
 
-        // --- CÁC HÀM RENDER BIỂU ĐỒ (CHART.JS) ---
-        
-        // Hàm lấy cấu hình màu sắc chuẩn xác cho cả 2 theme
         function getChartTheme() {
             const isDark = document.documentElement.classList.contains('dark');
             return {
                 isDark: isDark,
-                textColor: isDark ? '#f8fafc' : '#334155', // Trắng sáng cho Dark, Xám đậm cho Light
+                textColor: isDark ? '#f8fafc' : '#334155',
                 gridColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
-                font: { family: "'Inter', system-ui, sans-serif", size: 13, weight: '600' }
+                font: { family: "'Inter', system-ui, sans-serif", size: 12, weight: '500' }
             };
         }
 
@@ -330,7 +324,7 @@
                     labels: labels,
                     datasets: [{
                         label: 'Dự báo (VND)',
-                        data: forecastData,
+                        data: forecastData.map(Number),
                         borderColor: '#10b981',
                         backgroundColor: 'rgba(16, 185, 129, 0.1)',
                         borderWidth: 3,
@@ -357,7 +351,7 @@
                     scales: {
                         y: { 
                             beginAtZero: true, 
-                            ticks: { color: theme.textColor, font: theme.font },
+                            ticks: { color: theme.textColor, font: theme.font, callback: (val) => formatMoney(val) },
                             grid: { color: theme.gridColor } 
                         },
                         x: { 
@@ -374,20 +368,21 @@
             const chartSkeleton = document.getElementById('chart-skeleton');
             if (chartSkeleton) chartSkeleton.style.display = 'none';
 
-            // 1. Lấy tất cả các key có trong budgets và catExp
+            const hasBudgets = Object.values(budgets).some(val => Number(val) > 0);
+            elements.noBudgetWarning.classList.toggle('hidden', hasBudgets);
+
             const allKeys = Array.from(new Set([...Object.keys(budgets), ...Object.keys(catExp)]));
             
-            // 2. Map sang dữ liệu biểu đồ
             let filteredData = allKeys.map(key => {
+                const bVal = Number(budgets[key]) || 0;
+                const aVal = Number(catExp[key]) || 0;
                 return {
-                    // Lấy tên Tiếng Việt từ categoryMap, nếu không có thì lấy key gốc
-                    label: categoryMap[key] || key, 
-                    budget: budgets[key] || 0, 
-                    actual: catExp[key] || 0 
+                    label: String(categoryMap[key] || key),
+                    budget: bVal, 
+                    actual: aVal 
                 };
-            }).filter(item => item.budget > 0 || item.actual > 0); // 3. Lọc bỏ các item bằng 0
+            }).filter(item => item.budget > 0 || item.actual > 0);
             
-            // Xử lý khi không có dữ liệu
             if (filteredData.length === 0) {
                 elements.canvasBudget.style.display = 'none';
                 chartEmpty.style.display = 'flex';
@@ -395,7 +390,6 @@
                 return;
             }
             
-            // Hiển thị biểu đồ
             chartEmpty.style.display = 'none';
             elements.canvasBudget.style.display = 'block';
             elements.canvasBudget.classList.remove('opacity-0');
@@ -407,26 +401,34 @@
                 if (budgetChartInstance) budgetChartInstance.destroy();
                 const ctx = elements.canvasBudget.getContext('2d');
                 
-                // Mảng chứa tên danh mục để gán vào nhãn trục X
                 const chartLabels = filteredData.map(d => d.label);
+                const dataBudget = filteredData.map(d => d.budget);
+                const dataActual = filteredData.map(d => d.actual);
                 
                 budgetChartInstance = new Chart(ctx, {
                     type: 'bar', 
-                    indexAxis: 'y', // Biểu đồ thanh ngang (dễ đọc tên danh mục)
                     data: {
-                        labels: chartLabels, // Gán đúng nhãn tên danh mục
+                        labels: chartLabels,
                         datasets: [
                             { 
                                 label: 'Ngân sách', 
-                                data: filteredData.map(d => d.budget), 
-                                backgroundColor: 'rgba(59, 130, 246, 0.8)', 
-                                borderRadius: 4 
+                                data: dataBudget, 
+                                backgroundColor: 'rgba(59, 130, 246, 0.8)', // Xanh dương
+                                borderRadius: 4,
+                                barPercentage: 0.8,
+                                categoryPercentage: 0.8,
+                                // ✅ YÊU CẦU 1: Bắt buộc hiển thị tối thiểu 6px
+                                minBarLength: 6 
                             },
                             { 
                                 label: 'Thực tế', 
-                                data: filteredData.map(d => d.actual), 
-                                backgroundColor: 'rgba(239, 68, 68, 0.8)', 
-                                borderRadius: 4 
+                                data: dataActual, 
+                                backgroundColor: 'rgba(239, 68, 68, 0.8)', // Đỏ
+                                borderRadius: 4,
+                                barPercentage: 0.8,
+                                categoryPercentage: 0.8,
+                                // ✅ YÊU CẦU 1: Bắt buộc hiển thị tối thiểu 6px kể cả khi tiền rất nhỏ
+                                minBarLength: 6 
                             }
                         ]
                     },
@@ -438,12 +440,7 @@
                             legend: { 
                                 position: 'top', 
                                 align: 'end', 
-                                labels: { 
-                                    usePointStyle: true, 
-                                    boxWidth: 8, 
-                                    color: theme.textColor, 
-                                    font: theme.font 
-                                } 
+                                labels: { usePointStyle: true, boxWidth: 8, color: theme.textColor, font: theme.font } 
                             },
                             tooltip: {
                                 backgroundColor: theme.isDark ? 'rgba(15, 23, 42, 0.95)' : 'rgba(255, 255, 255, 0.95)',
@@ -451,25 +448,43 @@
                                 bodyColor: theme.isDark ? '#e2e8f0' : '#334155',
                                 borderColor: theme.isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
                                 borderWidth: 1,
-                                callbacks: { label: (c) => ` ${c.dataset.label}: ${formatMoney(c.parsed.x)} VND` }
+                                callbacks: { 
+                                    // ✅ YÊU CẦU 2 & 3: Xử lý Tooltip thông minh
+                                    label: (c) => {
+                                        const val = c.parsed.y;
+                                        const label = c.dataset.label;
+
+                                        // Nếu là Ngân sách và giá trị bằng 0 -> Hiển thị "Chưa thiết lập"
+                                        if (label === 'Ngân sách' && val === 0) {
+                                            return ` ${label}: Chưa thiết lập`;
+                                        }
+                                        
+                                        // Nếu là Thực tế và giá trị bằng 0 -> Ẩn dòng này đi để đỡ rối
+                                        if (label === 'Thực tế' && val === 0) {
+                                            return null;
+                                        }
+
+                                        return ` ${label}: ${formatMoney(val)} VND`;
+                                    }
+                                }
                             }
                         },
                         scales: {
                             x: { 
-                                beginAtZero: true, 
                                 ticks: { 
                                     color: theme.textColor, 
-                                    font: theme.font, 
-                                    callback: (val) => formatMoney(val) 
-                                }, 
-                                grid: { color: theme.gridColor } 
-                            },
-                            y: { 
-                                ticks: { 
-                                    color: theme.textColor, 
-                                    font: theme.font // Màu chữ của TÊN DANH MỤC (Trục Y)
+                                    font: theme.font,
+                                    // ✅ YÊU CẦU 2: Tự động xoay nhãn 45 độ nếu chữ dài, tránh bị đè
+                                    maxRotation: 45, 
+                                    minRotation: 0,
+                                    autoSkip: false // Đảm bảo hiển thị đầy đủ tất cả các danh mục
                                 }, 
                                 grid: { display: false } 
+                            },
+                            y: { 
+                                beginAtZero: true, 
+                                ticks: { color: theme.textColor, font: theme.font, callback: (val) => formatMoney(val) }, 
+                                grid: { color: theme.gridColor } 
                             }
                         }
                     }
@@ -493,10 +508,8 @@
             });
         }
 
-        // --- XỬ LÝ FORM LẬP KẾ HOẠCH ---
         async function handleFinancialPlan(e) {
             e.preventDefault();
-
             const incomeVal = parseFloat(document.getElementById('monthly_income').value);
             const percentVal = parseFloat(document.getElementById('savings_percent').value) || 0;
 
@@ -517,10 +530,7 @@
                         'Content-Type': 'application/json',
                         'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content 
                     },
-                    body: JSON.stringify({
-                        monthly_income: incomeVal,
-                        savings_percent: percentVal
-                    })
+                    body: JSON.stringify({ monthly_income: incomeVal, savings_percent: percentVal })
                 });
 
                 if (!res.ok) throw new Error('Lỗi gọi API lập kế hoạch');
@@ -559,12 +569,9 @@
             elements.planForm.addEventListener('submit', handleFinancialPlan);
         }
 
-        // ✅ TỐI ƯU TRẢI NGHIỆM: Lắng nghe sự thay đổi của class 'dark' trên thẻ <html>
-        // Mỗi khi user gạt công tắc Dark/Light mode, tự động vẽ lại biểu đồ với màu mới
         const observer = new MutationObserver((mutations) => {
             mutations.forEach((mutation) => {
                 if (mutation.attributeName === 'class') {
-                    // Chỉ vẽ lại nếu đã có dữ liệu
                     if (Object.keys(chartDataState.budgets).length > 0) {
                         renderForecastChart(chartDataState.forecast);
                         renderBudgetChart(chartDataState.budgets, chartDataState.catExp);
@@ -574,7 +581,6 @@
         });
         observer.observe(document.documentElement, { attributes: true });
 
-        // KÍCH HOẠT DASHBOARD KHI TRANG LOAD XONG
         initDashboard();
     })();
 </script>
