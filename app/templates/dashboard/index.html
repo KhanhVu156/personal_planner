@@ -71,7 +71,6 @@
         <svg class="w-6 h-6 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
         Kế hoạch chi tiêu tối ưu
     </h3>
-    <!-- ✅ FIX: Thêm onsubmit="return false;" để chặn form tải lại trang -->
     <form id="plan-form" onsubmit="return false;" class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
             <label class="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-1">Thu nhập hàng tháng (VND)</label>
@@ -206,12 +205,12 @@
                     combinedData.sort((a, b) => b.actual - a.actual); 
                 }
 
-                const labels = combinedData.map(d => d.label);
-                const budgetData = combinedData.map(d => d.budget);
-                const actualData = combinedData.map(d => d.actual);
+                // ✅ FIX: Xử lý trường hợp không có dữ liệu để biểu đồ không bị trống
+                const displayLabels = combinedData.length > 0 ? combinedData.map(d => d.label) : ['Chưa có dữ liệu'];
+                const displayBudget = combinedData.length > 0 ? combinedData.map(d => d.budget) : [0];
+                const displayActual = combinedData.length > 0 ? combinedData.map(d => d.actual) : [0];
 
-                // Chỉ vẽ nếu có dữ liệu thực tế
-                if (window.Chart && labels.length > 0) {
+                if (window.Chart) {
                     const isDark = document.documentElement.classList.contains('dark');
                     const textColor = isDark ? '#94a3b8' : '#64748b';
                     const gridColor = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
@@ -231,11 +230,11 @@
                     budgetChartInstance = new Chart(ctx, {
                         type: 'bar',
                         data: {
-                            labels: labels,
+                            labels: displayLabels,
                             datasets: [
                                 { 
                                     label: 'Ngân sách', 
-                                    data: budgetData, 
+                                    data: displayBudget, 
                                     backgroundColor: gradientBlue, 
                                     borderRadius: { topRight: 6, bottomRight: 6 },
                                     borderSkipped: 'left',
@@ -244,7 +243,7 @@
                                 },
                                 { 
                                     label: 'Thực tế', 
-                                    data: actualData, 
+                                    data: displayActual, 
                                     backgroundColor: gradientRed, 
                                     borderRadius: { topRight: 6, bottomRight: 6 },
                                     borderSkipped: 'left',
