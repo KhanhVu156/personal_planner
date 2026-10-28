@@ -8,17 +8,14 @@ from wtforms.validators import (
     NumberRange, InputRequired, Optional,
 )
 from app.models import User
-import re # ✅ Thêm thư viện re để xử lý Regex
+import re
 
 def _norm_email(value):
-    """Chuẩn hoá email: trim + lowercase."""
     return value.strip().lower() if isinstance(value, str) else value
 
 def _norm_username(value):
-    """Chuẩn hoá username: trim (giữ nguyên case)."""
     return value.strip() if isinstance(value, str) else value
 
-# ✅ Hàm lọc số tiền: Xóa dấu chấm, phẩy để chuyển "10.000.000" thành 10000000.0
 def parse_vnd_amount(value):
     if not value:
         return None
@@ -103,8 +100,8 @@ class TransactionForm(FlaskForm):
         Length(max=200, message='Mô tả không được vượt quá 200 ký tự.')
     ])
     
-    # ✅ FIX GIỚI HẠN SỐ TIỀN: Thêm max=10 tỷ để chặn lỗi nhập số ảo
-    amount = FloatField(
+    # ✅ FIX: Đổi FloatField thành StringField
+    amount = StringField(
         'Số tiền',
         validators=[
             DataRequired(message='Vui lòng nhập số tiền.'), 
@@ -131,7 +128,7 @@ class TransactionForm(FlaskForm):
                     'Thu nhập chỉ có thể là "Lương" hoặc "Khác". '
                     'Vui lòng chọn lại danh mục.'
                 )
-        else:  # expense
+        else:
             if cat not in EXPENSE_CATEGORIES:
                 raise ValidationError(
                     'Danh mục "Lương" không áp dụng cho chi tiêu. '
@@ -162,8 +159,8 @@ class BudgetForm(FlaskForm):
         ],
     )
     
-    # ✅ FIX GIỚI HẠN SỐ TIỀN: Thêm max=10 tỷ để chặn lỗi nhập số ảo
-    amount = FloatField(
+    # ✅ FIX: Đổi FloatField thành StringField
+    amount = StringField(
         'Số tiền ngân sách',
         validators=[
             DataRequired(message='Vui lòng nhập số tiền ngân sách.'), 

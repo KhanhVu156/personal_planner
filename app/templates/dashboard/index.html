@@ -2,20 +2,19 @@
 {% block content %}
 
 <!-- ✅ THÊM MỚI: Thanh chọn tháng/năm -->
-<div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 bg-white dark:bg-slate-800 p-4 rounded shadow transition-colors duration-300 gap-4">
+<div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 bg-white dark:bg-slate-800 p-4 rounded-lg shadow transition-colors duration-300 gap-4">
     <h2 class="text-xl font-bold text-gray-800 dark:text-slate-100">Tổng quan tháng {{ display_month }}/{{ display_year }}</h2>
-    <form method="GET" action="{{ url_for('dashboard.index') }}" class="flex items-center space-x-2 w-full md:w-auto">
-        <select name="month" class="px-3 py-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+    <form method="GET" action="{{ url_for('dashboard.index') }}" class="flex items-center space-x-3 w-full md:w-auto">
+        <select name="month" class="px-3 py-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
             {% for m in range(1, 13) %}
                 <option value="{{ m }}" {% if m == display_month %}selected{% endif %}>Tháng {{ m }}</option>
             {% endfor %}
         </select>
-        <select name="year" class="px-3 py-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-            {% for y in range(2024, 2031) %}
-                <option value="{{ y }}" {% if y == display_year %}selected{% endif %}>Năm {{ y }}</option>
-            {% endfor %}
-        </select>
-        <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition font-semibold">Xem</button>
+        
+        <input type="number" name="year" value="{{ display_year }}" min="2000" max="2100" required
+               class="w-28 px-3 py-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Năm">
+        
+        <button type="submit" class="bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 transition font-semibold shadow-sm">Xem</button>
     </form>
 </div>
 
@@ -51,7 +50,6 @@
                 <div class="h-4 bg-gray-300 dark:bg-slate-600 rounded w-24"></div>
             </div>
             
-            <!-- Khung thông báo khi không có dữ liệu -->
             <div id="chart-empty" class="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 dark:bg-slate-800 rounded-lg hidden z-10">
                 <svg class="w-12 h-12 text-gray-300 dark:text-slate-500 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg>
                 <p class="text-gray-500 dark:text-slate-400 font-medium">Chưa có dữ liệu chi tiêu</p>
@@ -151,7 +149,6 @@
         let predChartInstance = null;
         let isCalculating = false;
 
-        // ✅ FIX: Lấy tháng/năm hiện tại từ server render ra để truyền vào API
         const currentMonth = {{ display_month }};
         const currentYear = {{ display_year }};
 
@@ -161,7 +158,6 @@
 
             isCalculating = true;
             try {
-                // ✅ Gọi API với tháng/năm được chọn
                 const response = await fetch(`/api/dashboard-stats?month=${currentMonth}&year=${currentYear}&t=` + new Date().getTime());
                 if (!response.ok) throw new Error('Lỗi Server');
                 const data = await response.json();
@@ -356,87 +352,111 @@
             }
         }
 
+        // ✅ TỐI ƯU FRONTEND: Hàm vẽ biểu đồ AI riêng biệt (tái sử dụng)
+        function renderAIPredictionChart(foodData) {
+            const canvas = document.getElementById('predictionChart');
+            if (!canvas || !window.Chart) return;
+
+            const isDark = document.documentElement.classList.contains('dark');
+            const textColor = isDark ? '#94a3b8' : '#64748b';
+            const gridColor = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
+
+            if (predChartInstance) predChartInstance.destroy();
+            const ctx = canvas.getContext('2d');
+
+            const gradientPurple = ctx.createLinearGradient(0, 0, 0, 300);
+            gradientPurple.addColorStop(0, 'rgba(168, 85, 247, 0.4)');
+            gradientPurple.addColorStop(1, 'rgba(168, 85, 247, 0.0)');
+            
+            predChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['Ngày 1', 'Ngày 2', 'Ngày 3', 'Ngày 4', 'Ngày 5', 'Ngày 6', 'Ngày 7'],
+                    datasets: [{
+                        label: 'Dự đoán chi tiêu (Ăn uống)',
+                        data: foodData,
+                        borderColor: '#a855f7',
+                        backgroundColor: gradientPurple,
+                        borderWidth: 3,
+                        pointBackgroundColor: '#a855f7',
+                        pointBorderColor: isDark ? '#1e293b' : '#fff',
+                        pointBorderWidth: 2,
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        fill: true,
+                        tension: 0.4 
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: { 
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: isDark ? 'rgba(15, 23, 42, 0.9)' : 'rgba(255, 255, 255, 0.95)',
+                            titleColor: isDark ? '#f8fafc' : '#0f172a',
+                            bodyColor: isDark ? '#cbd5e1' : '#334155',
+                            borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+                            borderWidth: 1,
+                            padding: 12,
+                            callbacks: {
+                                label: function(context) {
+                                    return ` Dự đoán: ${formatMoney(context.parsed.y)} VND`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: { 
+                            beginAtZero: true,
+                            ticks: { color: textColor }, 
+                            grid: { color: gridColor, drawBorder: false, borderDash: [5, 5] } 
+                        },
+                        x: { 
+                            ticks: { color: textColor }, 
+                            grid: { display: false, drawBorder: false } 
+                        }
+                    }
+                }
+            });
+        }
+
+        // ✅ TỐI ƯU FRONTEND: Sử dụng sessionStorage để lưu cache biểu đồ AI
         async function fetchAIPredictions() {
             const aiSkeleton = document.getElementById('ai-skeleton');
-            const canvas = document.getElementById('predictionChart');
-            if (!canvas) return;
+            
+            // 1. Ưu tiên lấy dữ liệu từ Cache (nếu có) để vẽ ngay lập tức
+            const cachedData = sessionStorage.getItem('ai_predict_data');
+            if (cachedData) {
+                try {
+                    const parsed = JSON.parse(cachedData);
+                    if (aiSkeleton) aiSkeleton.style.display = 'none';
+                    renderAIPredictionChart(parsed);
+                } catch (e) {
+                    console.error('Lỗi parse cache AI', e);
+                }
+            }
 
+            // 2. Gọi API ngầm để lấy dữ liệu mới nhất
             try {
                 const response = await fetch('/api/predict');
                 if (!response.ok) throw new Error('Lỗi AI');
                 const data = await response.json();
+                const foodData = data['food'] || [0,0,0,0,0,0,0];
 
+                // Lưu vào Cache cho lần chuyển trang sau
+                sessionStorage.setItem('ai_predict_data', JSON.stringify(foodData));
+
+                // Vẽ lại biểu đồ với dữ liệu mới (nếu có sự thay đổi)
                 if (aiSkeleton) aiSkeleton.style.display = 'none';
-
-                if (window.Chart) {
-                    const isDark = document.documentElement.classList.contains('dark');
-                    const textColor = isDark ? '#94a3b8' : '#64748b';
-                    const gridColor = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
-
-                    if (predChartInstance) predChartInstance.destroy();
-                    const ctx = canvas.getContext('2d');
-
-                    const gradientPurple = ctx.createLinearGradient(0, 0, 0, 300);
-                    gradientPurple.addColorStop(0, 'rgba(168, 85, 247, 0.4)');
-                    gradientPurple.addColorStop(1, 'rgba(168, 85, 247, 0.0)');
-                    
-                    const foodData = data['food'] || [0,0,0,0,0,0,0];
-                    
-                    predChartInstance = new Chart(ctx, {
-                        type: 'line',
-                        data: {
-                            labels: ['Ngày 1', 'Ngày 2', 'Ngày 3', 'Ngày 4', 'Ngày 5', 'Ngày 6', 'Ngày 7'],
-                            datasets: [{
-                                label: 'Dự đoán chi tiêu (Ăn uống)',
-                                data: foodData,
-                                borderColor: '#a855f7',
-                                backgroundColor: gradientPurple,
-                                borderWidth: 3,
-                                pointBackgroundColor: '#a855f7',
-                                pointBorderColor: isDark ? '#1e293b' : '#fff',
-                                pointBorderWidth: 2,
-                                pointRadius: 4,
-                                pointHoverRadius: 6,
-                                fill: true,
-                                tension: 0.4 
-                            }]
-                        },
-                        options: {
-                            responsive: true, maintainAspectRatio: false,
-                            interaction: { mode: 'index', intersect: false },
-                            plugins: { 
-                                legend: { display: false },
-                                tooltip: {
-                                    backgroundColor: isDark ? 'rgba(15, 23, 42, 0.9)' : 'rgba(255, 255, 255, 0.95)',
-                                    titleColor: isDark ? '#f8fafc' : '#0f172a',
-                                    bodyColor: isDark ? '#cbd5e1' : '#334155',
-                                    borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
-                                    borderWidth: 1,
-                                    padding: 12,
-                                    callbacks: {
-                                        label: function(context) {
-                                            return ` Dự đoán: ${formatMoney(context.parsed.y)} VND`;
-                                        }
-                                    }
-                                }
-                            },
-                            scales: {
-                                y: { 
-                                    beginAtZero: true,
-                                    ticks: { color: textColor }, 
-                                    grid: { color: gridColor, drawBorder: false, borderDash: [5, 5] } 
-                                },
-                                x: { 
-                                    ticks: { color: textColor }, 
-                                    grid: { display: false, drawBorder: false } 
-                                }
-                            }
-                        }
-                    });
-                }
+                renderAIPredictionChart(foodData);
+                
             } catch (err) {
                 console.error('[AI Predict]', err);
-                if (aiSkeleton) aiSkeleton.innerHTML = '<span class="text-red-500 text-sm">Không thể tải dự đoán AI</span>';
+                // Nếu API lỗi mà cũng không có cache -> hiện thông báo
+                if (!cachedData && aiSkeleton) {
+                    aiSkeleton.innerHTML = '<span class="text-red-500 text-sm">Không thể tải dự đoán AI</span>';
+                }
             }
         }
 
