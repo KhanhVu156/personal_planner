@@ -15,21 +15,16 @@ bp = Blueprint('api', __name__, url_prefix='/api')
 def get_dashboard_stats():
     try:
         user_id = current_user.id
-        
-        # 1. Lấy giao dịch (Sử dụng order_by để tối ưu, không cần load hết nếu chỉ cần tìm tháng gần nhất)
         all_trans = Transaction.query.filter_by(user_id=user_id).order_by(Transaction.date.desc()).all()
         
         today = datetime.now()
         month, year = today.month, today.year
         
-        # 2. Tìm tháng gần nhất có phát sinh giao dịch
         if not any(t.date.month == month and t.date.year == year for t in all_trans):
             if all_trans:
-                # Lấy giao dịch đầu tiên (vì đã sắp xếp desc, nó là mới nhất)
                 latest_date = all_trans[0].date
                 month, year = latest_date.month, latest_date.year
 
-        # 3. Tính toán bằng Python (An toàn tuyệt đối với mọi loại Database)
         income_month = 0.0
         expense_month = 0.0
         cat_exp_dict = {}
@@ -37,13 +32,11 @@ def get_dashboard_stats():
         total_expense = 0.0
 
         for t in all_trans:
-            # Tính tổng cả đời
             if t.type == 'income':
                 total_income += float(t.amount)
             else:
                 total_expense += float(t.amount)
 
-            # Tính toán cho tháng được chọn
             if t.date.month == month and t.date.year == year:
                 if t.type == 'income':
                     income_month += float(t.amount)
@@ -53,11 +46,9 @@ def get_dashboard_stats():
 
         balance = total_income - total_expense
 
-        # 4. Lấy Ngân sách
         budgets = Budget.query.filter_by(user_id=user_id, month=month, year=year).all()
         budget_dict = {b.category: float(b.amount) for b in budgets}
 
-        # 5. Lấy Tasks
         upcoming_tasks = Task.query.filter_by(user_id=user_id) \
             .filter(Task.status.in_(['pending', 'in_progress'])) \
             .order_by(Task.deadline.asc()).limit(5).all()
@@ -85,4 +76,58 @@ def get_dashboard_stats():
         current_app.logger.error(f"Lỗi API Dashboard: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-# ... (Giữ nguyên các API /predict, /train, /financial-plan)
+@bp.route('/predict', methods=['GET'])
+@login_required
+def get_predictions():
+    try:
+        user_id = current_user.id
+        categories = ['food', 'transport', 'education', 'entertainment', 'shopping', 'bills', 'other']
+        predictions = {}
+        
+        for cat in categories:
+            cat_pred = []
+            for i in range(1, 8):
+                future_date = datetime.now().date() + timedelta(days=i)
+                pred = request_prediction(user_id, future_date, cat)
+                cat_pred.append(pred if pred is not None else 0)
+            predictions[cat] = cat_pred
+            
+        return jsonify(predictions)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@bp.route('/train', methods=['POST'])
+@login_required
+def train():
+    try:
+        success = request_training(current_user.id)
+        if success:
+            return jsonify({'status': 'success', 'message': 'Model trained successfully'})
+        return jsonify({'status': 'error', 'message': 'Insufficient data or AI worker failed'}), 400
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@bp.route('/financial-plan', methods=['POST'])
+@login_required
+def financial_plan():
+    try:
+        from app.services.financial_planner import FinancialPlanner
+        data = request.get_json()
+        if not data: 
+            return jsonify({'error': 'Dữ liệu gửi lên bị trống'}), 400
+            
+        monthly_income = data.get('monthly_income')
+        if not monthly_income or monthly_income <= 0: 
+            return jsonify({'error': 'Thu nhập không hợp lệ'}), 400
+
+        planner = FinancialPlanner(current_user.id, db.session)
+        suggestion = planner.suggest_budgets(
+            monthly_income, 
+            savings_goal=data.get('savings_goal'),
+            savings_percent=data.get('savings_percent'), 
+            category_weights=data.get('category_weights')
+        )
+        return jsonify(suggestion)
+    except Exception as e:
+        current_app.logger.error(f"Lỗi API Financial Plan: {str(e)}")
+        return jsonify({'error': f"Lỗi máy chủ: {str(e)}"}), 500

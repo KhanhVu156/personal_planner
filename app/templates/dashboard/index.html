@@ -5,21 +5,18 @@
 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
     <div class="bg-white dark:bg-slate-800 p-6 rounded shadow border-l-4 border-green-500 transition-colors duration-300">
         <h3 id="title-income" class="text-sm font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide">Thu nhập (Tháng {{ display_month }}/{{ display_year }})</h3>
-        <!-- Skeleton cho Income -->
         <p id="val-income" class="text-3xl font-bold text-green-600 dark:text-green-400 mt-2 flex items-center">
             <span class="inline-block animate-pulse bg-gray-300 dark:bg-slate-600 rounded h-8 w-32"></span>
         </p>
     </div>
     <div class="bg-white dark:bg-slate-800 p-6 rounded shadow border-l-4 border-red-500 transition-colors duration-300">
         <h3 id="title-expense" class="text-sm font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide">Chi tiêu (Tháng {{ display_month }}/{{ display_year }})</h3>
-        <!-- Skeleton cho Expense -->
         <p id="val-expense" class="text-3xl font-bold text-red-600 dark:text-red-400 mt-2 flex items-center">
             <span class="inline-block animate-pulse bg-gray-300 dark:bg-slate-600 rounded h-8 w-32"></span>
         </p>
     </div>
     <div class="bg-white dark:bg-slate-800 p-6 rounded shadow border-l-4 border-blue-500 transition-colors duration-300">
         <h3 class="text-sm font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide">Tổng số dư</h3>
-        <!-- Skeleton cho Balance -->
         <p id="val-balance" class="text-3xl font-bold text-gray-800 dark:text-slate-100 mt-2 flex items-center">
             <span class="inline-block animate-pulse bg-gray-300 dark:bg-slate-600 rounded h-8 w-32"></span>
         </p>
@@ -31,7 +28,6 @@
     <div class="bg-white dark:bg-slate-800 p-6 rounded shadow transition-colors duration-300">
         <h3 class="text-xl font-semibold mb-4 text-gray-800 dark:text-slate-100">Chi tiêu & Ngân sách</h3>
         <div class="relative h-64 w-full">
-            <!-- Skeleton cho Biểu đồ -->
             <div id="chart-skeleton" class="absolute inset-0 flex flex-col items-center justify-center animate-pulse bg-gray-100 dark:bg-slate-700 rounded-lg">
                 <svg class="w-12 h-12 text-gray-300 dark:text-slate-500 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
                 <div class="h-4 bg-gray-300 dark:bg-slate-600 rounded w-24"></div>
@@ -42,7 +38,6 @@
     <div class="bg-white dark:bg-slate-800 p-6 rounded shadow flex flex-col transition-colors duration-300">
         <h3 class="text-xl font-semibold mb-4 text-gray-800 dark:text-slate-100">Công việc sắp tới</h3>
         <ul id="task-list" class="space-y-3 flex-grow">
-            <!-- Skeleton cho Tasks -->
             <li class="animate-pulse flex justify-between items-center border-b border-gray-100 dark:border-slate-700 pb-2">
                 <div class="space-y-2 w-full pr-4">
                     <div class="h-4 bg-gray-300 dark:bg-slate-600 rounded w-3/4"></div>
@@ -73,7 +68,6 @@
         <span class="text-xs bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 px-2 py-1 rounded">Machine Learning</span>
     </div>
     <div id="ai-chart-container" class="relative h-64 w-full">
-        <!-- Skeleton cho AI Chart -->
         <div id="ai-skeleton" class="absolute inset-0 flex flex-col items-center justify-center animate-pulse bg-gray-100 dark:bg-slate-700 rounded-lg z-10">
             <svg class="w-12 h-12 text-gray-300 dark:text-slate-500 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
             <div class="h-4 bg-gray-300 dark:bg-slate-600 rounded w-32"></div>
@@ -135,6 +129,32 @@
     let budgetChartInstance = null;
     let predChartInstance = null;
 
+    // HÀM HIỂN THỊ TOAST THAY VÌ ALERT
+    function showToast(message, type = 'success') {
+        const toast = document.createElement('div');
+        toast.className = `fixed top-5 right-5 z-[100] px-6 py-4 rounded-lg shadow-2xl text-white font-semibold transition-all duration-300 transform translate-x-full flex items-center gap-3 ${
+            type === 'success' ? 'bg-green-600' : 'bg-red-600'
+        }`;
+        
+        const icon = type === 'success' 
+            ? '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>'
+            : '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>';
+        
+        toast.innerHTML = `${icon} <span>${message}</span>`;
+        document.body.appendChild(toast);
+
+        setTimeout(() => {
+            toast.classList.remove('translate-x-full');
+            toast.classList.add('translate-x-0');
+        }, 10);
+
+        setTimeout(() => {
+            toast.classList.remove('translate-x-0');
+            toast.classList.add('translate-x-full');
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+    }
+
     async function fetchDashboardStats() {
         try {
             const response = await fetch('/api/dashboard-stats?t=' + new Date().getTime());
@@ -146,7 +166,6 @@
                 document.getElementById('title-expense').innerText = `Chi tiêu (Tháng ${data.month}/${data.year})`;
             }
 
-            // Xóa Skeleton và hiện dữ liệu thật
             document.getElementById('val-income').innerHTML = `+${formatMoney(data.income)} <span class="text-lg">VND</span>`;
             document.getElementById('val-expense').innerHTML = `-${formatMoney(data.expenses)} <span class="text-lg">VND</span>`;
             document.getElementById('val-balance').innerHTML = `${formatMoney(data.balance)} <span class="text-lg">VND</span>`;
@@ -246,7 +265,6 @@
                 window.charts = window.charts || [];
                 window.charts.push(budgetChartInstance);
                 
-                // Ẩn Skeleton biểu đồ chính
                 document.getElementById('chart-skeleton').style.display = 'none';
                 document.getElementById('budgetChart').classList.remove('opacity-0');
             }
@@ -291,7 +309,6 @@
             window.charts = window.charts || [];
             window.charts.push(predChartInstance);
 
-            // Ẩn Skeleton biểu đồ AI
             document.getElementById('ai-skeleton').style.display = 'none';
         } catch(err) { console.error("Lỗi AI:", err); }
     }
@@ -333,7 +350,14 @@
                     headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken }, 
                     body: JSON.stringify(payload)
                 });
-                const data = await response.json();
+                
+                let data;
+                const contentType = response.headers.get("content-type");
+                if (contentType && contentType.indexOf("application/json") !== -1) {
+                    data = await response.json();
+                } else {
+                    data = { error: "Máy chủ trả về dữ liệu không hợp lệ" };
+                }
                 
                 if (response.ok) {
                     document.getElementById('savings_amt').innerText = formatMoney(data.savings);
@@ -347,11 +371,17 @@
                         budgetsList.appendChild(li);
                     }
                     document.getElementById('plan-result').classList.remove('hidden');
+                    
+                    // HIỂN THỊ TOAST THÀNH CÔNG
+                    showToast('Lập kế hoạch thành công!', 'success');
                 } else { 
-                    alert('Lỗi: ' + (data.error || 'Không thể tạo kế hoạch')); 
+                    // HIỂN THỊ TOAST LỖI
+                    showToast('Lỗi: ' + (data.error || 'Không thể tạo kế hoạch'), 'error'); 
                 }
             } catch (error) { 
-                alert('Lỗi kết nối máy chủ!'); 
+                console.error(error);
+                // HIỂN THỊ TOAST LỖI KẾT NỐI
+                showToast('Lỗi kết nối máy chủ hoặc dữ liệu không hợp lệ!', 'error'); 
             } finally {
                 btn.innerText = originalText; 
                 btn.disabled = false; 
