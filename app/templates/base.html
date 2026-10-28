@@ -13,9 +13,8 @@
         }
     </script>
 
-    <!-- LEVEL 4: Tải CSS Bất đồng bộ (Critical CSS / Async CSS) -->
-    <link rel="preload" href="{{ url_for('static', filename='css/style.css') }}" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}"></noscript>
+    <!-- TẢI CSS TRỰC TIẾP (Đã bỏ mẹo Async gây lỗi) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body class="bg-gray-50 text-gray-800 flex flex-col min-h-screen transition-colors duration-300 dark:bg-slate-900 dark:text-slate-200">
 
@@ -96,7 +95,7 @@
         </div>
     </footer>
 
-    <!-- CUSTOM MODAL XÓA (SỬA bg-opacity-50 THÀNH bg-black/50) -->
+    <!-- CUSTOM MODAL XÓA -->
     <div id="custom-delete-modal" class="fixed inset-0 z-50 hidden bg-black/50 flex items-center justify-center transition-opacity duration-300">
         <div class="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-96 p-6 transform scale-95 transition-transform duration-300">
             <h3 class="text-lg font-bold text-gray-800 dark:text-slate-100 mb-2">Xác nhận xóa</h3>
@@ -108,7 +107,7 @@
         </div>
     </div>
 
-    <!-- LEVEL 4: Tối ưu JS (Defer) -->
+    <!-- Tối ưu JS (Defer) -->
     <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>
     
     <!-- Khối Script dành riêng cho các trang con (như Dashboard) chèn thêm JS -->
@@ -132,7 +131,6 @@
                     localStorage.setItem('darkMode', 'disabled');
                     if (darkModeToggle) darkModeToggle.checked = false;
                 }
-                // Cập nhật lại màu biểu đồ nếu có
                 if (window.updateChartTheme) window.updateChartTheme(isDark);
             };
             
