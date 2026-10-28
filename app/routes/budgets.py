@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request
+from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app
 from flask_login import login_required, current_user
 from app import db
 from app.forms import BudgetForm
@@ -10,40 +10,55 @@ bp = Blueprint('budgets', __name__)
 @bp.route('/budgets')
 @login_required
 def list_budgets():
-    # ✅ FIX: Lấy tham số từ URL (nếu có)
+    """
+    Hiển thị danh sách ngân sách, hỗ trợ lọc theo tháng/năm.
+    """
     month_str = request.args.get('month')
     year_str = request.args.get('year')
     
-    # Khởi tạo query cơ bản
     query = Budget.query.filter_by(user_id=current_user.id)
     
-    # Nếu người dùng có nhập cả tháng và năm thì mới lọc
+    # Tư duy: Chỉ lọc khi user truyền CẢ HAI tham số tháng và năm
     if month_str and year_str:
-        query = query.filter_by(month=int(month_str), year=int(year_str))
+        try:
+            query = query.filter_by(month=int(month_str), year=int(year_str))
+        except ValueError:
+            # Phòng trường hợp user sửa URL thành /budgets?month=abc
+            flash('Tham số lọc không hợp lệ.', 'warning')
+            return redirect(url_for('budgets.list_budgets'))
         
-    # Sắp xếp: Năm mới nhất lên đầu, tháng mới nhất lên đầu, sau đó xếp theo danh mục
+    # Sắp xếp thông minh: Năm mới nhất, tháng mới nhất lên đầu
     budgets = query.order_by(Budget.year.desc(), Budget.month.desc(), Budget.category).all()
     
-    # Trả về template cùng với tháng/năm đã chọn (để hiển thị lại trên form)
     return render_template('budgets/list.html', budgets=budgets, month=month_str, year=year_str)
+
 
 @bp.route('/budgets/add', methods=['GET', 'POST'])
 @login_required
 def add_budget():
+    """
+    Thiết lập hoặc Cập nhật ngân sách (Upsert).
+    
+    TƯ DUY THIẾT KẾ:
+    - Vì mỗi category/tháng/năm chỉ có 1 ngân sách, nên nếu đã tồn tại -> Cập nhật (Update).
+    - Nếu chưa tồn tại -> Thêm mới (Insert).
+    - Hỗ trợ nút "Sửa" từ trang danh sách: Truyền params qua URL (GET) -> Tự động fill vào form.
+    """
     form = BudgetForm()
     
-    # ✅ FIX: Nếu là GET (bấm nút Sửa), tự động lấy dữ liệu cũ điền vào form
+    # --- XỬ LÝ LÚC LOAD TRANG (GET) ---
     if request.method == 'GET':
         req_month = request.args.get('month')
         req_year = request.args.get('year')
         req_cat = request.args.get('category')
         
         if req_month and req_year and req_cat:
+            # Điền dữ liệu vào form
             form.month.data = str(req_month)
             form.year.data = int(req_year)
             form.category.data = req_cat
             
-            # Tìm ngân sách hiện tại để điền số tiền cũ
+            # Lấy số tiền cũ nếu đã có ngân sách
             existing = Budget.query.filter_by(
                 user_id=current_user.id,
                 category=req_cat,
@@ -51,12 +66,15 @@ def add_budget():
                 year=int(req_year)
             ).first()
             if existing:
-                form.amount.data = existing.amount
+                # Format lại số tiền cho dễ nhìn (VD: 1000000 -> 1.000.000)
+                form.amount.data = f"{int(existing.amount):,}".replace(',', '.')
 
+    # --- XỬ LÝ KHI SUBMIT FORM (POST) ---
     if form.validate_on_submit():
         month_val = int(form.month.data)
         year_val = int(form.year.data)
 
+        # Tìm xem ngân sách này đã tồn tại chưa để quyết định Update hay Insert
         existing = Budget.query.filter_by(
             user_id=current_user.id,
             category=form.category.data,
@@ -78,27 +96,47 @@ def add_budget():
                 )
                 db.session.add(budget)
                 flash(f'Đã thêm ngân sách Tháng {month_val}/{year_val} thành công!', 'success')
+                
             db.session.commit()
             return redirect(url_for('budgets.list_budgets', month=month_val, year=year_val))
+            
         except Exception as e:
             db.session.rollback()
-            flash(f"Lỗi lưu DB: {str(e)}", 'danger')
-            print(f"LỖI DATABASE KHI LƯU NGÂN SÁCH: {e}")
+            current_app.logger.error(f"Lỗi lưu ngân sách: {str(e)}")
+            flash(f"Lỗi lưu DB. Vui lòng thử lại.", 'danger')
     else:
         if form.errors:
-            print("LỖI FORM NGÂN SÁCH:", form.errors)
+            current_app.logger.warning(f"Form ngân sách lỗi: {form.errors}")
 
     return render_template('budgets/form.html', form=form)
 
-@bp.route('/budgets/delete/<int:id>')
+
+@bp.route('/budgets/delete/<int:id>', methods=['POST'])
 @login_required
 def delete_budget(id):
+    """
+    Xóa ngân sách.
+    Chuyển sang POST để bảo vệ dữ liệu.
+    TƯ DUY UX: Phải lấy lại tham số filter (tháng/năm) từ URL trước khi xóa, 
+    để khi redirect về trang danh sách, bộ lọc của user không bị mất.
+    """
     budget = Budget.query.get_or_404(id)
-    if budget.user_id == current_user.id:
+    
+    # Lấy params filter hiện tại
+    req_month = request.args.get('month')
+    req_year = request.args.get('year')
+    
+    if budget.user_id != current_user.id:
+        flash('Bạn không có quyền thực hiện hành động này.', 'danger')
+        return redirect(url_for('budgets.list_budgets', month=req_month, year=req_year))
+        
+    try:
         db.session.delete(budget)
         db.session.commit()
         flash('Đã xóa ngân sách.', 'success')
-    else:
-        flash('Bạn không có quyền thực hiện hành động này.', 'danger')
-    # Quay lại trang danh sách, giữ nguyên bộ lọc hiện tại (nếu có)
-    return redirect(url_for('budgets.list_budgets', month=request.args.get('month'), year=request.args.get('year')))
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Lỗi xóa ngân sách ID {id}: {str(e)}")
+        flash('Có lỗi xảy ra khi xóa. Vui lòng thử lại sau.', 'danger')
+        
+    return redirect(url_for('budgets.list_budgets', month=req_month, year=req_year))

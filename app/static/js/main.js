@@ -1,10 +1,10 @@
 /**
  * main.js — Single source of truth cho toàn bộ interactive behavior.
  *
- * Triết lý:
- *  - Event delegation ở document.body (sống qua mọi HTMX swap)
- *  - initApp() chạy cả lần đầu (DOMContentLoaded) và sau swap (htmx:afterSwap)
- *  - Không bind trực tiếp vào element, không dùng DOMContentLoaded cho element-level
+ * TƯ DUY THIẾT KẾ (Design Thinking):
+ * - Event Delegation: Gắn sự kiện vào document.body thay vì từng element. 
+ *   Giúp code hoạt động bình thường ngay cả khi DOM bị thay thế (HTMX swap).
+ * - IIFE (Hàm tự thực thi): Tránh ô nhiễm không gian tên toàn cục (Global Namespace).
  */
 (function () {
     'use strict';
@@ -16,24 +16,22 @@
         return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
     }
 
-    function escapeHtml(str) {
-        return String(str ?? '').replace(/[&<>"']/g, function (c) {
-            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
-        });
-    }
-
     // ============================================================
-    // 1. DELETE MODAL (delegation)
+    // 1. DELETE MODAL (Xử lý xóa an toàn qua POST Form)
     // ============================================================
-    let pendingDeleteUrl = '';
+    let pendingDeleteForm = null; // Lưu trữ Form cần submit thay vì URL
 
-    function openDeleteModal(url) {
+    function openDeleteModal(formElement) {
         const modal = document.getElementById('custom-delete-modal');
         if (!modal) {
-            if (confirm('Bạn có chắc chắn muốn xóa mục này?')) window.location.href = url;
+            // Fallback cho trình duyệt cũ
+            if (confirm('Bạn có chắc chắn muốn xóa mục này không?')) {
+                formElement.submit();
+            }
             return;
         }
-        pendingDeleteUrl = url;
+        
+        pendingDeleteForm = formElement;
         modal.classList.remove('hidden');
         const inner = modal.querySelector('div');
         if (inner) {
@@ -51,34 +49,51 @@
             inner.classList.remove('scale-100');
             inner.classList.add('scale-95');
         }
-        pendingDeleteUrl = '';
+        pendingDeleteForm = null;
     }
 
     document.addEventListener('click', function (e) {
+        // 1.1. Khi bấm vào nút Xóa (class .delete-confirm)
         const delBtn = e.target.closest('.delete-confirm');
         if (delBtn) {
             e.preventDefault();
             e.stopPropagation();
-            openDeleteModal(delBtn.getAttribute('href') || '');
+            
+            // ✅ FIX CRITICAL: Tìm form POST chứa nút xóa này (thay vì lấy href)
+            const form = delBtn.closest('form.delete-form');
+            if (form) {
+                openDeleteModal(form);
+            } else {
+                console.error('[Delete Modal] Không tìm thấy form chứa nút xóa.');
+            }
             return;
         }
+        
+        // 1.2. Nút Hủy trên Modal
         if (e.target.id === 'modal-cancel-btn') {
             e.preventDefault();
             closeDeleteModal();
             return;
         }
+        
+        // 1.3. Nút Xóa ngay trên Modal
         if (e.target.id === 'modal-confirm-btn') {
             e.preventDefault();
-            if (pendingDeleteUrl) window.location.href = pendingDeleteUrl;
+            if (pendingDeleteForm) {
+                // ✅ FIX: Submit form (gửi POST) thay vì chuyển hướng URL (GET)
+                pendingDeleteForm.submit();
+            }
             return;
         }
+        
+        // 1.4. Click vùng nền đen để đóng modal
         if (e.target.id === 'custom-delete-modal') {
             closeDeleteModal();
         }
     });
 
     // ============================================================
-    // 2. SLIDER TIẾN ĐỘ TASK (delegation)
+    // 2. SLIDER TIẾN ĐỘ TASK (AJAX)
     // ============================================================
     document.addEventListener('change', async function (e) {
         const slider = e.target.closest('.task-progress-slider');
@@ -88,7 +103,7 @@
         const progress = parseInt(slider.value, 10);
         if (!taskId || isNaN(progress)) return;
 
-        // Guard: tránh spam nếu kéo liên tục (HTMX/JS đôi khi trigger change 2 lần)
+        // Guard: Tránh gửi nhiều request liên tục nếu user kéo thả nhanh
         if (slider.dataset.updating === '1') return;
         slider.dataset.updating = '1';
 
@@ -105,17 +120,19 @@
             const data = await res.json();
             if (!data.success) return;
 
+            // Cập nhật UI Text
             const progressSpan = document.querySelector('#task-progress-' + taskId);
             if (progressSpan) progressSpan.textContent = progress + '%';
 
+            // Cập nhật UI Trạng thái (Badge)
             const statusSpan = document.querySelector('#task-status-' + taskId);
             if (statusSpan) {
                 if (progress === 100) {
-                    statusSpan.innerHTML = '<span class="px-2 py-1 bg-green-100 text-green-800 text-xs font-semibold rounded-full">Đã xong</span>';
+                    statusSpan.innerHTML = '<span class="px-2 py-1 bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300 text-xs font-semibold rounded-full">Đã xong</span>';
                 } else if (progress > 0) {
-                    statusSpan.innerHTML = '<span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded-full">Đang làm</span>';
+                    statusSpan.innerHTML = '<span class="px-2 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 text-xs font-semibold rounded-full">Đang làm</span>';
                 } else {
-                    statusSpan.innerHTML = '<span class="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs font-semibold rounded-full">Chờ xử lý</span>';
+                    statusSpan.innerHTML = '<span class="px-2 py-1 bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300 text-xs font-semibold rounded-full">Chờ xử lý</span>';
                 }
             }
         } catch (err) {
@@ -126,7 +143,7 @@
     });
 
     // ============================================================
-    // 3. CSV AUTO-SUBMIT (delegation)
+    // 3. CSV AUTO-SUBMIT
     // ============================================================
     document.addEventListener('change', function (e) {
         if (e.target.id !== 'csvInput') return;
@@ -134,14 +151,14 @@
 
         const submitBtn = document.getElementById('csvSubmitBtn');
         if (submitBtn) {
-            submitBtn.textContent = 'Đang tải...';
+            submitBtn.innerHTML = '<span class="animate-pulse">Đang tải...</span>';
             submitBtn.disabled = true;
         }
         if (e.target.form) e.target.form.submit();
     });
 
     // ============================================================
-    // 4. DỊCH LỖI HTML5 (capture phase)
+    // 4. DỊCH LỖI HTML5 (Tùy chỉnh thông báo mặc định của trình duyệt)
     // ============================================================
     document.addEventListener('invalid', function (e) {
         if (e.target && e.target.setCustomValidity) {
@@ -162,7 +179,7 @@
         document.querySelectorAll('.flash-message:not([data-auto-hide])').forEach(function (msg) {
             msg.setAttribute('data-auto-hide', '1');
             setTimeout(function () {
-                msg.style.transition = 'opacity 0.5s';
+                msg.style.transition = 'opacity 0.5s ease-out';
                 msg.style.opacity = '0';
                 setTimeout(function () { msg.remove(); }, 500);
             }, 3000);
@@ -170,12 +187,12 @@
     }
 
     // ============================================================
-    // 6. CHART THEME HOOK
+    // 6. CHART THEME HOOK (Dark Mode)
     // ============================================================
     window.updateChartTheme = function (isDark) {
         if (typeof Chart === 'undefined') return;
-        Chart.defaults.color = isDark ? '#f9fafb' : '#374151';
-        Chart.defaults.borderColor = isDark ? '#374151' : '#e5e7eb';
+        Chart.defaults.color = isDark ? '#94a3b8' : '#64748b'; // slate-400 : slate-500
+        Chart.defaults.borderColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
         if (window.charts) {
             window.charts.forEach(function (c) {
                 try { c.update(); } catch (_) {}
@@ -184,7 +201,7 @@
     };
 
     // ============================================================
-    // 7. initApp — dark mode toggle + mobile menu (rebind sau swap)
+    // 7. initApp — Khởi tạo các thành phần tương tác (Dark mode, Menu)
     // ============================================================
     function initApp() {
         const htmlEl = document.documentElement;
@@ -192,11 +209,12 @@
         // --- Dark mode toggle ---
         const oldToggle = document.getElementById('darkModeToggle');
         if (oldToggle) {
-            // Reset về đúng state hiện tại
             if (htmlEl.classList.contains('dark')) oldToggle.checked = true;
-            // Clone để xoá hết listener cũ (tránh bind đôi sau swap)
+            
+            // Clone Node để xóa bỏ các Event Listener cũ (chống bind trùng)
             const newToggle = oldToggle.cloneNode(true);
             oldToggle.replaceWith(newToggle);
+            
             newToggle.addEventListener('change', function (e) {
                 const isDark = e.target.checked;
                 if (isDark) {
@@ -225,25 +243,17 @@
     }
 
     // ============================================================
-    // 8. HOOKS — DOMContentLoaded + htmx:afterSwap
+    // 8. HOOKS — DOMContentLoaded + HTMX
     // ============================================================
     document.addEventListener('DOMContentLoaded', initApp);
 
     document.addEventListener('htmx:afterSwap', function () {
         initApp();
-        // Refresh CSRF token trong hx-headers sau khi swap
-        // (login/register xoay session → token trong meta đổi)
+        // Refresh CSRF token trong hx-headers (đề phòng session bị xoay)
         const metaToken = getCsrfToken();
         if (metaToken) {
             document.body.setAttribute('hx-headers', JSON.stringify({ 'X-CSRFToken': metaToken }));
         }
     });
 
-    // ============================================================
-    // 9. Export helpers cho template
-    // ============================================================
-    window.appHelpers = {
-        escapeHtml: escapeHtml,
-        getCsrfToken: getCsrfToken
-    };
 })();

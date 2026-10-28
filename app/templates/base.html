@@ -5,22 +5,41 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Personal Planner</title>
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    
+    <!-- Tối ưu hóa SEO cơ bản -->
+    <meta name="description" content="Hệ thống quản lý tài chính cá nhân và công việc thông minh.">
 
-    <!-- Đọc dark mode từ localStorage TRƯỚC khi render để không bị flash -->
+    <!-- 
+        TƯ DUY CHỐNG FLASH (FOUC - Flash of Unstyled Content):
+        Script này chạy đồng bộ (không defer/async) TRƯỚC KHI trình duyệt render giao diện.
+        Nó kiểm tra localStorage và gắn class 'dark' vào thẻ <html> ngay lập tức.
+        Nhờ vậy, người dùng không bị hiện tượng "nháy trắng" khi tải trang ở chế độ tối.
+    -->
     <script>
         if (localStorage.getItem('darkMode') === 'enabled') {
             document.documentElement.classList.add('dark');
         }
     </script>
 
-    <!-- CSS chính (Tailwind build) -->
+    <!-- 
+        TỐI ƯU HÓA CSS: 
+        Chỉ tải DUY NHẤT 1 file style.css. 
+        (File custom.css đã được gộp vào input.css và build chung vào style.css).
+    -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <!-- CSS bổ sung các class chưa được build -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}">
     
+    <!-- 
+        TƯ DUY TẢI SCRIPT:
+        - Chart.js: Dùng 'defer' để không chặn render HTML.
+        - HTMX: Tải ngay lập tức (không defer) để kịp quét các thẻ hx-* trên DOM khi trang vừa parse xong.
+    -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
     <script src="https://unpkg.com/htmx.org@1.9.12"></script>
 
+    <!-- 
+        PREFETCH: Yêu cầu trình duyệt tải ngầm trước các trang chính.
+        Giúp việc chuyển tab (Tổng quan, Giao dịch, ...) diễn ra tức thì.
+    -->
     <link rel="prefetch" href="{{ url_for('dashboard.index') }}">
     <link rel="prefetch" href="{{ url_for('transactions.list_transactions') }}">
     <link rel="prefetch" href="{{ url_for('budgets.list_budgets') }}">
@@ -28,63 +47,72 @@
 </head>
 <body hx-headers='{"X-CSRFToken": "{{ csrf_token() }}"}' class="bg-gray-50 text-gray-800 flex flex-col min-h-screen transition-colors duration-300 dark:bg-slate-900 dark:text-slate-200">
 
-    <!-- NAVBAR -->
+    <!-- ============================================================ -->
+    <!-- NAVBAR                                                       -->
+    <!-- ============================================================ -->
     <nav class="bg-white shadow-md sticky top-0 z-50 transition-colors duration-300 dark:bg-slate-800 dark:border-b dark:border-slate-700">
         <div class="max-w-7xl mx-auto px-4 py-3">
             <div class="flex justify-between items-center">
-                <a href="{{ url_for('dashboard.index') }}" class="text-xl font-bold text-blue-600 dark:text-blue-400 flex items-center">
-                    <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+                <!-- Logo -->
+                <a href="{{ url_for('dashboard.index') }}" class="text-xl font-bold text-blue-600 dark:text-blue-400 flex items-center" aria-label="Trang chủ Personal Planner">
+                    <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
                     Planner
                 </a>
+
+                <!-- Menu Desktop -->
                 <div class="hidden md:flex items-center space-x-6 font-medium dark:text-slate-300">
                     {% if current_user.is_authenticated %}
-                        <a href="{{ url_for('dashboard.index') }}" class="hover:text-blue-600 dark:hover:text-blue-400 transition">Tổng quan</a>
-                        <a href="{{ url_for('transactions.list_transactions') }}" class="hover:text-blue-600 dark:hover:text-blue-400 transition">Giao dịch</a>
-                        <a href="{{ url_for('budgets.list_budgets') }}" class="hover:text-blue-600 dark:hover:text-blue-400 transition">Ngân sách</a>
-                        <a href="{{ url_for('tasks.list_tasks') }}" class="hover:text-blue-600 dark:hover:text-blue-400 transition">Công việc</a>
-                        <a href="{{ url_for('auth.profile') }}" class="hover:text-blue-600 dark:hover:text-blue-400 transition">Cá nhân</a>
-                        <a href="{{ url_for('auth.logout') }}" hx-boost="false" class="text-red-500 hover:text-red-700 font-semibold transition">Đăng xuất</a>
+                        <a href="{{ url_for('dashboard.index') }}" class="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Tổng quan</a>
+                        <a href="{{ url_for('transactions.list_transactions') }}" class="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Giao dịch</a>
+                        <a href="{{ url_for('budgets.list_budgets') }}" class="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Ngân sách</a>
+                        <a href="{{ url_for('tasks.list_tasks') }}" class="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Công việc</a>
+                        <a href="{{ url_for('auth.profile') }}" class="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Cá nhân</a>
+                        <!-- Link Đăng xuất dùng full page reload để dọn sạch session -->
+                        <a href="{{ url_for('auth.logout') }}" class="text-red-500 hover:text-red-700 font-semibold transition-colors">Đăng xuất</a>
                     {% else %}
-                        <!-- ✅ FIX: Tự động chuyển hộp màu xanh dựa vào Endpoint -->
                         {% set login_active = 'bg-blue-600 text-white shadow-sm' if request.endpoint == 'auth.login' else 'hover:text-blue-600 dark:hover:text-blue-400' %}
                         {% set register_active = 'bg-blue-600 text-white shadow-sm' if request.endpoint == 'auth.register' else 'hover:text-blue-600 dark:hover:text-blue-400' %}
                         
-                        <a href="{{ url_for('auth.login') }}" class="{{ login_active }} px-4 py-1.5 rounded transition">Đăng nhập</a>
-                        <a href="{{ url_for('auth.register') }}" class="{{ register_active }} px-4 py-1.5 rounded transition">Đăng ký</a>
+                        <a href="{{ url_for('auth.login') }}" class="{{ login_active }} px-4 py-1.5 rounded transition-colors">Đăng nhập</a>
+                        <a href="{{ url_for('auth.register') }}" class="{{ register_active }} px-4 py-1.5 rounded transition-colors">Đăng ký</a>
                     {% endif %}
                 </div>
 
+                <!-- Cụm công cụ (Dark Mode + Mobile Menu) -->
                 <div class="flex items-center space-x-4">
+                    <!-- Dark Mode Toggle -->
                     <div class="flex items-center">
-                        <svg class="w-4 h-4 text-gray-500 dark:text-slate-400 mr-2" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd"></path></svg>
-                        <label class="relative inline-flex items-center cursor-pointer">
+                        <svg class="w-4 h-4 text-gray-500 dark:text-slate-400 mr-2" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd"></path></svg>
+                        <label class="relative inline-flex items-center cursor-pointer" aria-label="Bật tắt chế độ tối">
                             <input type="checkbox" id="darkModeToggle" class="sr-only peer">
                             <div class="w-11 h-6 bg-gray-300 dark:bg-slate-600 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                         </label>
-                        <svg class="w-4 h-4 text-gray-500 dark:text-slate-400 ml-2" fill="currentColor" viewBox="0 0 20 20"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"></path></svg>
+                        <svg class="w-4 h-4 text-gray-500 dark:text-slate-400 ml-2" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"></path></svg>
                     </div>
+                    
+                    <!-- Nút Mobile Menu -->
                     <div class="md:hidden flex items-center">
-                        <button id="mobileMenuBtn" class="p-2 rounded-md hover:bg-gray-100 focus:outline-none dark:hover:bg-slate-700">
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                        <button id="mobileMenuBtn" class="p-2 rounded-md hover:bg-gray-100 focus:outline-none dark:hover:bg-slate-700 transition-colors" aria-label="Mở menu di động">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
                         </button>
                     </div>
                 </div>
             </div>
         </div>
-        <!-- Mobile Menu -->
+        
+        <!-- Menu Mobile (Hiển thị khi bấm nút Hamburger) -->
         <div id="mobileMenu" class="hidden md:hidden bg-white border-t border-gray-100 shadow-lg transition-colors duration-300 dark:bg-slate-800 dark:border-slate-700">
             <div class="flex flex-col px-4 pt-2 pb-4 space-y-2 dark:text-slate-300">
                 {% if current_user.is_authenticated %}
-                    <a href="{{ url_for('dashboard.index') }}" class="block py-2 hover:text-blue-600">Tổng quan</a>
-                    <a href="{{ url_for('transactions.list_transactions') }}" class="block py-2 hover:text-blue-600">Giao dịch</a>
-                    <a href="{{ url_for('budgets.list_budgets') }}" class="block py-2 hover:text-blue-600">Ngân sách</a>
-                    <a href="{{ url_for('tasks.list_tasks') }}" class="block py-2 hover:text-blue-600">Công việc</a>
-                    <a href="{{ url_for('auth.profile') }}" class="block py-2 hover:text-blue-600">Cá nhân</a>
-                    <a href="{{ url_for('auth.logout') }}" hx-boost="false" class="block py-2 text-red-500 font-semibold">Đăng xuất</a>
+                    <a href="{{ url_for('dashboard.index') }}" class="block py-2 hover:text-blue-600 transition-colors">Tổng quan</a>
+                    <a href="{{ url_for('transactions.list_transactions') }}" class="block py-2 hover:text-blue-600 transition-colors">Giao dịch</a>
+                    <a href="{{ url_for('budgets.list_budgets') }}" class="block py-2 hover:text-blue-600 transition-colors">Ngân sách</a>
+                    <a href="{{ url_for('tasks.list_tasks') }}" class="block py-2 hover:text-blue-600 transition-colors">Công việc</a>
+                    <a href="{{ url_for('auth.profile') }}" class="block py-2 hover:text-blue-600 transition-colors">Cá nhân</a>
+                    <a href="{{ url_for('auth.logout') }}" class="block py-2 text-red-500 font-semibold transition-colors">Đăng xuất</a>
                 {% else %}
-                    <!-- ✅ FIX: Bổ sung nút Đăng nhập/Đăng ký cho Mobile Menu -->
-                    {% set login_mobile = 'block py-2 text-blue-600 dark:text-blue-400 font-bold' if request.endpoint == 'auth.login' else 'block py-2 hover:text-blue-600' %}
-                    {% set register_mobile = 'block py-2 text-blue-600 dark:text-blue-400 font-bold' if request.endpoint == 'auth.register' else 'block py-2 hover:text-blue-600' %}
+                    {% set login_mobile = 'block py-2 text-blue-600 dark:text-blue-400 font-bold' if request.endpoint == 'auth.login' else 'block py-2 hover:text-blue-600 transition-colors' %}
+                    {% set register_mobile = 'block py-2 text-blue-600 dark:text-blue-400 font-bold' if request.endpoint == 'auth.register' else 'block py-2 hover:text-blue-600 transition-colors' %}
                     
                     <a href="{{ url_for('auth.login') }}" class="{{ login_mobile }}">Đăng nhập</a>
                     <a href="{{ url_for('auth.register') }}" class="{{ register_mobile }}">Đăng ký</a>
@@ -93,7 +121,15 @@
         </div>
     </nav>
 
+    <!-- ============================================================ -->
+    <!-- MAIN CONTENT                                                 -->
+    <!-- ============================================================ -->
     <main class="max-w-7xl mx-auto px-4 py-8 flex-grow w-full">
+        <!-- 
+            KHỐI FLASH MESSAGES:
+            Hiển thị thông báo (Thành công, Cảnh báo, Lỗi). 
+            JS (main.js) sẽ tự động ẩn các thông báo này sau 3 giây.
+        -->
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
@@ -106,8 +142,8 @@
                     {% endif %}
                     <div class="mb-4 p-4 rounded-md flex justify-between items-center shadow-sm flash-message {{ flash_class }}">
                         <span class="font-medium">{{ message }}</span>
-                        <button onclick="this.parentElement.remove()" class="text-gray-500 hover:text-gray-700 focus:outline-none">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        <button onclick="this.parentElement.remove()" class="text-gray-500 hover:text-gray-700 focus:outline-none transition-colors" aria-label="Đóng thông báo">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                         </button>
                     </div>
                 {% endfor %}
@@ -117,25 +153,34 @@
         {% block content %}{% endblock %}
     </main>
 
+    <!-- ============================================================ -->
+    <!-- FOOTER                                                       -->
+    <!-- ============================================================ -->
     <footer class="bg-white border-t border-gray-200 py-4 mt-auto transition-colors duration-300 dark:bg-slate-800 dark:border-slate-700">
         <div class="max-w-7xl mx-auto px-4 text-center text-sm text-gray-500 dark:text-slate-400">
             Personal Planner - Hệ thống quản lý tài chính & công việc cá nhân.
         </div>
     </footer>
 
-    <!-- CUSTOM MODAL XÓA -->
+    <!-- ============================================================ -->
+    <!-- CUSTOM MODAL XÓA (Dùng JS điều khiển)                        -->
+    <!-- ============================================================ -->
     <div id="custom-delete-modal" class="fixed inset-0 z-50 hidden bg-black/50 flex items-center justify-center transition-opacity duration-300">
         <div class="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-96 p-6 transform scale-95 transition-transform duration-300">
             <h3 class="text-lg font-bold text-gray-800 dark:text-slate-100 mb-2">Xác nhận xóa</h3>
             <p class="text-gray-600 dark:text-slate-300 mb-6">Bạn có chắc chắn muốn xóa mục này không? Hành động này không thể hoàn tác.</p>
             <div class="flex justify-end space-x-3">
-                <button id="modal-cancel-btn" class="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 dark:bg-slate-600 dark:text-white dark:hover:bg-slate-500 transition">Hủy</button>
-                <button id="modal-confirm-btn" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition">Xóa ngay</button>
+                <button id="modal-cancel-btn" class="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 dark:bg-slate-600 dark:text-white dark:hover:bg-slate-500 transition-colors">Hủy</button>
+                <button id="modal-confirm-btn" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors">Xóa ngay</button>
             </div>
         </div>
     </div>
 
-    <!-- main.js xử lý TẤT CẢ event delegation + initApp + htmx:afterSwap hooks -->
+    <!-- 
+        TẢI SCRIPT CHÍNH:
+        Đặt ở cuối <body> kết hợp 'defer' để không chặn quá trình render HTML.
+        Đảm bảo script chỉ chạy sau khi DOM đã sẵn sàng.
+    -->
     <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>
 
     {% block scripts %}{% endblock %}

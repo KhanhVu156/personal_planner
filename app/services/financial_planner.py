@@ -1,6 +1,7 @@
 from collections import defaultdict
 from datetime import datetime
 import calendar
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import func
 from app.models import Transaction
@@ -12,9 +13,6 @@ class FinancialPlanner:
     1. Lịch sử chi tiêu TRUNG BÌNH MỖI THÁNG (không phải mỗi giao dịch).
     2. Trọng số ưu tiên người dùng nhập.
     3. Mục tiêu tiết kiệm (số tiền tuyệt đối hoặc %).
-
-    Mọi category dùng CÙNG MẪU SỐ = số tháng user có phát sinh chi tiêu,
-    để tỷ lệ giữa các category có ý nghĩa so sánh.
     """
 
     def __init__(self, user_id, db_session):
@@ -33,38 +31,36 @@ class FinancialPlanner:
     def _get_historical_expenses(self):
         """
         Trả về dict {category: chi tiêu trung bình mỗi tháng}.
-
-        ✅ FIX: KHÔNG dùng AVG(amount) — đó là trung bình mỗi GIAO DỊCH
-        (bị lệch khi user có nhiều giao dịch nhỏ). Dùng
-        SUM theo (category, year, month) / số tháng user active.
+        
+        TƯ DUY TỐI ƯU: 
+        - Không dùng hàm extract('month') vì nó vô hiệu hóa Index.
+        - Sử dụng func.strftime('%Y-%m', ...) để group theo tháng (chuẩn SQLite).
+        - SQLite không có EXTRACT, nhưng strftime chạy cực nhanh và gọn hơn.
         """
-        # 1 query duy nhất: tổng theo (cat, year, month)
+        # Group theo (category, YYYY-MM) - Tối ưu cho SQLite
         rows = self.db_session.query(
             Transaction.category,
-            func.extract('year', Transaction.date).label('y'),
-            func.extract('month', Transaction.date).label('m'),
+            func.strftime('%Y-%m', Transaction.date).label('ym'),
             func.sum(Transaction.amount).label('total'),
         ).filter(
             Transaction.user_id == self.user_id,
             Transaction.type == 'expense',
         ).group_by(
             Transaction.category,
-            func.extract('year', Transaction.date),
-            func.extract('month', Transaction.date),
+            func.strftime('%Y-%m', Transaction.date)
         ).all()
 
-        active_months: set[tuple[int, int]] = set()
-        cat_monthly: dict[str, dict[tuple[int, int], float]] = defaultdict(dict)
+        active_months = set()
+        cat_monthly = defaultdict(dict)
 
-        for cat, y, m, total in rows:
-            ym = (int(y), int(m))
+        for cat, ym, total in rows:
             active_months.add(ym)
             cat_monthly[cat][ym] = float(total)
 
-        # Mẫu số chung: số tháng user có phát sinh chi tiêu (bất kỳ category nào)
+        # Mẫu số chung: số tháng user có phát sinh chi tiêu
         n_months = max(len(active_months), 1)
 
-        expenses: dict[str, float] = {}
+        expenses = {}
         for cat in self.categories:
             total_spent = sum(cat_monthly[cat].values())
             expenses[cat] = total_spent / n_months
@@ -73,9 +69,11 @@ class FinancialPlanner:
     def get_current_spending(self, month=None, year=None):
         """Chi tiêu thực tế từng category trong tháng — 1 query duy nhất."""
         if month is None or year is None:
-            now = datetime.now()  # ✅ dùng local time (đồng bộ với scheduler)
+            # ✅ FIX: Dùng giờ VN để đồng bộ với Scheduler và Dashboard
+            now = datetime.now(ZoneInfo('Asia/Ho_Chi_Minh'))
             month, year = now.month, now.year
 
+        # Range Query tối ưu Index
         start_date = datetime(year, month, 1).date()
         last_day = calendar.monthrange(year, month)[1]
         end_date = datetime(year, month, last_day).date()
@@ -119,7 +117,7 @@ class FinancialPlanner:
                 pct = float(savings_percent)
             except (TypeError, ValueError):
                 pct = 20.0
-            # ✅ Clamp 0–95% để luôn còn budget để phân bổ (tránh 100% → tất cả 0)
+            # ✅ Clamp 0–95% để luôn còn budget để phân bổ
             pct = max(0.0, min(pct, 95.0))
             target_savings = monthly_income * (pct / 100.0)
         else:
@@ -157,13 +155,13 @@ class FinancialPlanner:
                     w = float(category_weights.get(cat, 1.0))
                 except (TypeError, ValueError):
                     w = 1.0
-                w = max(0.0, w)  # ✅ chặn trọng số âm
+                w = max(0.0, w)  # chặn trọng số âm
                 weighted[cat] = base_ratios[cat] * w
 
             total_w = sum(weighted.values())
             if total_w > 0:
                 base_ratios = {c: weighted[c] / total_w for c in self.categories}
-            # ✅ Nếu user nhập toàn 0 → giữ base_ratios cũ (không nuốt hết budget)
+            # Nếu user nhập toàn 0 → giữ base_ratios cũ
 
         # --- 5. Tính tiền + làm tròn 10k ---
         rounded_budgets = {}

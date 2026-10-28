@@ -2,7 +2,9 @@
 {% block content %}
 <div class="max-w-lg mx-auto bg-white dark:bg-slate-800 p-6 rounded shadow mt-4 transition-colors duration-300">
     <h2 class="text-2xl font-bold mb-6 text-gray-800 dark:text-slate-100">Thiết lập Ngân sách</h2>
-    <form method="POST" action="" novalidate hx-boost="false">
+    
+    <!-- ✅ FIX (3.4): Đã xóa bỏ hx-boost="false" dư thừa. Form submit chuẩn HTTP POST. -->
+    <form method="POST" action="" novalidate>
         {{ form.hidden_tag() }}
         
         <div class="mb-4">
@@ -23,7 +25,8 @@
             </div>
             <div>
                 {{ form.year.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
-                {{ form.year(class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white", placeholder="2026") }}
+                <!-- TƯ DUY UX: Thêm type="number" và các giới hạn min/max để trình duyệt tự validate -->
+                {{ form.year(class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white", placeholder="VD: 2024", type="number", min="2020", max="2100") }}
                 {% for error in form.year.errors %}
                     <span class="text-red-500 text-sm mt-1 block">{{ error }}</span>
                 {% endfor %}
@@ -34,7 +37,10 @@
             {{ form.amount.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
             <div class="relative">
                 <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500 dark:text-slate-400">VND</span>
-                <!-- ✅ FIX: Thêm type="text" và id="budget_amount" -->
+                <!-- 
+                    TƯ DUY: Dùng type="text" thay vì type="number" để có thể nhập dấu chấm (VD: 1.000.000). 
+                    Backend (parse_vnd_amount) sẽ tự động lọc bỏ dấu chấm trước khi lưu vào DB.
+                -->
                 {{ form.amount(class="w-full pl-12 pr-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white", placeholder="VD: 1.000.000", type="text", id="budget_amount") }}
             </div>
             {% for error in form.amount.errors %}
@@ -44,31 +50,41 @@
         
         <div class="flex items-center justify-between space-x-4">
             <a href="{{ url_for('budgets.list_budgets') }}" class="w-1/3 text-center bg-gray-200 text-gray-800 dark:bg-slate-600 dark:text-slate-200 py-2 rounded hover:bg-gray-300 dark:hover:bg-slate-500 transition duration-200 font-semibold">Hủy</a>
-            {{ form.submit(class="w-2/3 bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition duration-200 cursor-pointer font-semibold", value="Lưu lại") }}
+            {{ form.submit(class="w-2/3 bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition duration-200 cursor-pointer font-semibold shadow-sm", value="Lưu lại") }}
         </div>
     </form>
 </div>
 
 <script>
-    // ✅ Tự động format số tiền khi gõ (VD: gõ 1000000 -> hiện 1.000.000)
+    /**
+     * TƯ DUY TỐI ƯU UX (Auto-format tiền tệ):
+     * - Người dùng gõ "1000000" -> Tự động hiển thị "1.000.000".
+     * - Khi người dùng xóa hết -> Hiển thị rỗng.
+     * - Xử lý cả trường hợp load trang ở chế độ "Sửa" (đã có số tiền từ trước).
+     */
     (function() {
         const amountInput = document.getElementById('budget_amount');
-        if (amountInput) {
-            // Khi load trang, format lại số tiền cũ (nếu đang Sửa)
-            if (amountInput.value) {
-                let val = amountInput.value.replace(/\D/g, '');
-                amountInput.value = new Intl.NumberFormat('vi-VN').format(val);
-            }
-            // Khi đang gõ
-            amountInput.addEventListener('input', function(e) {
-                let value = this.value.replace(/\D/g, '');
-                if (value) {
-                    this.value = new Intl.NumberFormat('vi-VN').format(value);
-                } else {
-                    this.value = '';
-                }
-            });
+        if (!amountInput) return;
+
+        // GUARD: Tránh bind trùng sự kiện nếu DOM bị thay thế (HTMX swap)
+        if (amountInput.dataset.bound === '1') return;
+        amountInput.dataset.bound = '1';
+
+        const formatValue = (val) => {
+            // Chỉ giữ lại các ký tự số
+            let raw = val.replace(/\D/g, '');
+            return raw ? new Intl.NumberFormat('vi-VN').format(raw) : '';
+        };
+
+        // Format số tiền ban đầu (khi Sửa)
+        if (amountInput.value) {
+            amountInput.value = formatValue(amountInput.value);
         }
+
+        // Lắng nghe sự kiện gõ phím
+        amountInput.addEventListener('input', function(e) {
+            this.value = formatValue(this.value);
+        });
     })();
 </script>
 {% endblock %}

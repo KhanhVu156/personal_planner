@@ -3,8 +3,9 @@
 <div class="min-h-screen flex items-center justify-center py-8">
     <div class="bg-white dark:bg-slate-800 p-8 rounded shadow-md w-full max-w-md transition-colors duration-300 border border-gray-100 dark:border-slate-700">
         <h2 class="text-2xl font-bold mb-6 text-center text-gray-800 dark:text-slate-100">Tạo tài khoản mới</h2>
-        <!-- ✅ hx-boost="false": register tạo session → full reload để meta CSRF token mới có hiệu lực -->
-        <form method="POST" action="" hx-boost="false"
+        
+        <!-- ✅ FIX (3.4): Xóa hx-boost="false" -->
+        <form method="POST" action="" 
               onsubmit="const b=this.querySelector('[type=submit]');if(b){b.disabled=true;b.value='Đang tạo tài khoản...';}">
             {{ form.hidden_tag() }}
 
@@ -35,15 +36,15 @@
 
             <div class="mb-4">
                 {{ form.password.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
-                <div class="relative flex items-center">
-                    {{ form.password(class="w-full pl-3 pr-14 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white",
+                <div class="flex items-center w-full border border-gray-300 rounded focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500 transition-all dark:bg-slate-700 dark:border-slate-600">
+                    {{ form.password(class="flex-1 px-3 py-2 bg-transparent text-gray-800 dark:text-white focus:outline-none border-none",
                                      placeholder="Tối thiểu 6 ký tự",
                                      autocomplete="new-password",
                                      minlength="6") }}
                     <button type="button" tabindex="-1"
-                            class="absolute inset-y-0 right-0 pr-3 flex items-center text-xs font-bold text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+                            class="px-3 py-2 text-xs font-bold text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 focus:outline-none"
                             aria-label="Hiện/ẩn mật khẩu"
-                            onclick="var i=this.previousElementSibling;if(i.type==='password'){i.type='text';this.innerText='Ẩn';}else{i.type='password';this.innerText='Hiện';}">
+                            onclick="togglePassword(this)">
                         Hiện
                     </button>
                 </div>
@@ -55,15 +56,15 @@
 
             <div class="mb-6">
                 {{ form.confirm.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
-                <div class="relative flex items-center">
-                    {{ form.confirm(class="w-full pl-3 pr-14 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white",
+                <div class="flex items-center w-full border border-gray-300 rounded focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500 transition-all dark:bg-slate-700 dark:border-slate-600">
+                    {{ form.confirm(class="flex-1 px-3 py-2 bg-transparent text-gray-800 dark:text-white focus:outline-none border-none",
                                     placeholder="Nhập lại mật khẩu",
                                     autocomplete="new-password",
                                     minlength="6") }}
                     <button type="button" tabindex="-1"
-                            class="absolute inset-y-0 right-0 pr-3 flex items-center text-xs font-bold text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+                            class="px-3 py-2 text-xs font-bold text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 focus:outline-none"
                             aria-label="Hiện/ẩn mật khẩu"
-                            onclick="var i=this.previousElementSibling;if(i.type==='password'){i.type='text';this.innerText='Ẩn';}else{i.type='password';this.innerText='Hiện';}">
+                            onclick="togglePassword(this)">
                         Hiện
                     </button>
                 </div>
@@ -74,7 +75,21 @@
 
             {{ form.submit(class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition duration-200 cursor-pointer font-semibold disabled:opacity-60 disabled:cursor-not-allowed") }}
         </form>
+        
         <p class="mt-4 text-center text-sm text-gray-600 dark:text-slate-400">Đã có tài khoản? <a href="{{ url_for('auth.login') }}" class="text-blue-600 dark:text-blue-400 hover:underline font-semibold">Đăng nhập</a></p>
     </div>
 </div>
+
+<script>
+    function togglePassword(btn) {
+        const input = btn.parentElement.querySelector('input');
+        if (input.type === 'password') {
+            input.type = 'text';
+            btn.innerText = 'Ẩn';
+        } else {
+            input.type = 'password';
+            btn.innerText = 'Hiện';
+        }
+    }
+</script>
 {% endblock %}

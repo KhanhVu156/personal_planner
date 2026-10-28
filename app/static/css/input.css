@@ -1,4 +1,6 @@
 @import "tailwindcss";
+@import "./custom.css";
+/* ✅ Gộp custom.css vào chung file build */
 
 /* Quét class trong HTML template */
 @source "../../templates";
@@ -9,11 +11,5 @@
 /* Quét trong Python nếu backend có render HTML string */
 @source "../../app";
 
-/* Dark mode theo class (nút gạt), không theo prefers-color-scheme */
+/* Dark mode theo class (nút gạt) */
 @custom-variant dark (&:where(.dark, .dark *));
-
-/* Lưu ý: File custom.css hiện được load riêng trong base.html.
-   Nếu muốn gộp chung vào 1 file style.css, bạn có thể thêm:
-   @import "./custom.css"; 
-   và xoá thẻ <link custom.css> trong base.html.
-*/

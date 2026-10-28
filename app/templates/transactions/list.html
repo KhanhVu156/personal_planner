@@ -3,8 +3,11 @@
 <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
     <h2 class="text-2xl font-bold text-gray-800 dark:text-slate-100">Lịch sử Giao dịch</h2>
     <div class="flex gap-2 w-full md:w-auto">
-        <!-- ✅ FIX: hx-boost="false" để form upload file submit thật (HTMX không hỗ trợ multipart nếu không có hx-encoding) -->
-        <form method="POST" action="{{ url_for('transactions.import_csv') }}" enctype="multipart/form-data" hx-boost="false" class="flex-1 md:flex-none">
+        <!-- 
+            ✅ FIX (3.4): Đã xóa hx-boost="false". 
+            Form upload file vẫn hoạt động bình thường vì chúng ta dùng submit truyền thống.
+        -->
+        <form method="POST" action="{{ url_for('transactions.import_csv') }}" enctype="multipart/form-data" class="flex-1 md:flex-none">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <input type="file" name="csv_file" accept=".csv" class="hidden" id="csvInput"
                    onchange="if (this.files.length) this.form.submit();">
@@ -40,10 +43,13 @@
                 <td class="py-3 px-4 text-sm text-gray-800 dark:text-slate-100 font-medium">{{ trans.description }}</td>
                 <td class="py-3 px-4">
                     <span class="px-2 py-1 bg-gray-100 text-gray-700 dark:bg-slate-600 dark:text-slate-200 text-xs font-semibold rounded-md border border-gray-200 dark:border-slate-500">
-                        {% if trans.category == 'food' %}Ăn uống
-                        {% elif trans.category == 'transport' %}Di chuyển
-                        {% elif trans.category == 'salary' %}Lương
-                        {% else %}Khác{% endif %}
+                        <!-- TƯ DUY: Mapping đầy đủ các danh mục thay vì chỉ hiện 3 cái như bản cũ -->
+                        {% set cat_names = {
+                            'food': 'Ăn uống', 'transport': 'Di chuyển', 'education': 'Học tập',
+                            'entertainment': 'Giải trí', 'shopping': 'Mua sắm', 'bills': 'Hóa đơn',
+                            'salary': 'Lương', 'other': 'Khác'
+                        } %}
+                        {{ cat_names.get(trans.category, trans.category) }}
                     </span>
                 </td>
                 <td class="py-3 px-4 text-center">
@@ -58,8 +64,19 @@
                 </td>
                 <td class="py-3 px-4 text-center space-x-3 whitespace-nowrap">
                     <a href="{{ url_for('transactions.edit_transaction', id=trans.id) }}" class="text-blue-600 dark:text-blue-400 hover:text-blue-800 font-medium text-sm">Sửa</a>
-                    <!-- ✅ FIX: hx-boost="false" để link xoá không bị HTMX tự follow (tránh xoá không xác nhận) -->
-                    <a href="{{ url_for('transactions.delete_transaction', id=trans.id) }}" hx-boost="false" class="delete-confirm text-red-600 dark:text-red-400 hover:text-red-800 font-medium text-sm">Xóa</a>
+                    
+                    <!-- 
+                        ✅ FIX (2.1): CHUYỂN TỪ GET SANG POST.
+                        Thay vì dùng thẻ <a> (phương thức GET dễ bị bot quét và kích hoạt),
+                        ta bọc nút Xóa trong một form POST có kèm CSRF Token.
+                        JS (main.js) sẽ bắt sự kiện click vào class .delete-confirm để mở Modal.
+                    -->
+                    <form action="{{ url_for('transactions.delete_transaction', id=trans.id) }}" method="POST" class="inline delete-form">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <button type="button" class="delete-confirm text-red-600 dark:text-red-400 hover:text-red-800 font-medium text-sm">
+                            Xóa
+                        </button>
+                    </form>
                 </td>
             </tr>
             {% else %}

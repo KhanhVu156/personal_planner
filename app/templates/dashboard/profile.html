@@ -3,44 +3,45 @@
 <div class="max-w-2xl mx-auto mt-8">
     <div class="bg-white dark:bg-slate-800 rounded-xl shadow-lg overflow-hidden transition-colors duration-300 border border-gray-100 dark:border-slate-700">
         
-        <!-- Header màu xanh -->
+        <!-- Header màu xanh Gradient -->
         <div class="bg-gradient-to-r from-blue-500 to-blue-700 h-32"></div>
         
         <!-- Nội dung Profile -->
         <div class="px-8 pb-8">
             
-            <!-- Sử dụng Flexbox, CHỈ kéo Avatar lên, Tên/Email để dưới nền trắng -->
             <div class="flex flex-col sm:flex-row items-center sm:items-end gap-4 sm:gap-6 mb-6 relative z-10 mt-4 sm:mt-0">
                 
-                <!-- Avatar (Chỉ thẻ div này có -mt-12 để kéo lên) -->
-                <div class="-mt-16 sm:-mt-12 w-24 h-24 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center shadow-lg border-4 border-white dark:border-slate-800 text-3xl font-bold text-blue-600 uppercase flex-shrink-0">
+                <!-- Avatar (Tối ưu: Thêm tooltip title) -->
+                <div class="-mt-16 sm:-mt-12 w-24 h-24 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center shadow-lg border-4 border-white dark:border-slate-800 text-3xl font-bold text-blue-600 uppercase flex-shrink-0" title="{{ current_user.username }}">
                     {{ current_user.username[0] }}
                 </div>
                 
-                <!-- Tên và Email (Nằm yên dưới nền trắng) -->
-                <div class="text-center sm:text-left mb-2 w-full">
-                    <h2 class="text-2xl font-bold text-gray-800 dark:text-slate-100">{{ current_user.username }}</h2>
-                    <p class="text-gray-500 dark:text-slate-400">{{ current_user.email }}</p>
+                <!-- Tên và Email (Tối ưu: Dùng truncate để không bị vỡ bố cục nếu tên quá dài) -->
+                <div class="text-center sm:text-left mb-2 w-full min-w-0">
+                    <h2 class="text-2xl font-bold text-gray-800 dark:text-slate-100 truncate">{{ current_user.username }}</h2>
+                    <p class="text-gray-500 dark:text-slate-400 truncate">{{ current_user.email }}</p>
                 </div>
             </div>
             
             <!-- Thông tin chi tiết -->
             <div class="border-t border-gray-200 dark:border-slate-700 pt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
+                <div class="bg-gray-50 dark:bg-slate-900/50 p-4 rounded-lg border border-gray-100 dark:border-slate-700">
                     <label class="block text-sm font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Thành viên từ</label>
-                    <p class="text-lg text-gray-800 dark:text-slate-200 mt-1">{{ current_user.created_at.strftime('%d/%m/%Y') }}</p>
+                    <p class="text-lg font-medium text-gray-800 dark:text-slate-200 mt-1">{{ current_user.created_at.strftime('%d/%m/%Y') }}</p>
                 </div>
-                <div>
+                <div class="bg-gray-50 dark:bg-slate-900/50 p-4 rounded-lg border border-gray-100 dark:border-slate-700">
                     <label class="block text-sm font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Trạng thái</label>
-                    <span class="inline-block bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300 px-3 py-1 rounded-full text-sm font-semibold mt-1">
+                    <span class="inline-flex items-center gap-1.5 bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300 px-3 py-1 rounded-full text-sm font-semibold mt-1">
+                        <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
                         Hoạt động
                     </span>
                 </div>
             </div>
             
-            <!-- Nút Đổi mật khẩu -->
+            <!-- Nút Đổi mật khẩu (Thêm icon trực quan) -->
             <div class="mt-8">
-                <a href="{{ url_for('auth.change_password') }}" class="inline-block bg-gray-800 dark:bg-slate-600 text-white py-2 px-6 rounded shadow hover:bg-gray-900 dark:hover:bg-slate-500 transition duration-200 font-semibold">
+                <a href="{{ url_for('auth.change_password') }}" class="inline-flex items-center bg-gray-800 dark:bg-slate-600 text-white py-2 px-6 rounded shadow hover:bg-gray-900 dark:hover:bg-slate-500 transition duration-200 font-semibold gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path></svg>
                     Đổi mật khẩu
                 </a>
             </div>
