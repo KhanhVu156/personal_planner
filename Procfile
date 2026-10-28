@@ -1,1 +1,1 @@
-web: gunicorn run:app
+web: python -m flask db upgrade && gunicorn -c gunicorn.conf.py run:appgit add Procfile
