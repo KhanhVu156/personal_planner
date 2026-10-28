@@ -19,15 +19,14 @@ class Config:
         
         SQLALCHEMY_DATABASE_URI = f"sqlite+libsql://{host}?secure=true"
         
+        # ✅ FIX: Bỏ 'pool_size' và 'max_overflow' vì libsql không hỗ trợ
         SQLALCHEMY_ENGINE_OPTIONS = {
             "connect_args": {
                 "auth_token": turso_token,
-                "timeout": 30 # ✅ Tăng timeout cho mạng chậm
+                "timeout": 30 # ✅ Tăng timeout mạng
             },
             "pool_pre_ping": True,
             "pool_recycle": 280,
-            "pool_size": 10,      # ✅ Tăng số kết nối đồng thời
-            "max_overflow": 20,   # ✅ Cho phép mở rộng thêm
         }
     else:
         SQLALCHEMY_DATABASE_URI = 'sqlite:///' + os.path.join(basedir, 'app.db')
