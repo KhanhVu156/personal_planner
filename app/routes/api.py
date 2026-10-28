@@ -46,7 +46,8 @@ def get_dashboard_stats():
 
         balance = total_income - total_expense
 
-        budgets = Budget.query.filter_by(user_id=user_id, month=month, year=year).all()
+        # SỬA LỖI: Ép kiểu int cho month, year khi query Budget
+        budgets = Budget.query.filter_by(user_id=user_id, month=int(month), year=int(year)).all()
         budget_dict = {b.category: float(b.amount) for b in budgets}
 
         upcoming_tasks = Task.query.filter_by(user_id=user_id) \

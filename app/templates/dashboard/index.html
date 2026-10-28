@@ -128,8 +128,10 @@
     
     let budgetChartInstance = null;
     let predChartInstance = null;
+    let dashboardInterval = null;
+    let isCalculating = false; // Biến cờ hiệu để dừng cập nhật tự động khi đang tính toán
 
-    // HÀM HIỂN THỊ TOAST THAY VÌ ALERT
+    // HÀM HIỂN THỊ TOAST
     function showToast(message, type = 'success') {
         const toast = document.createElement('div');
         toast.className = `fixed top-5 right-5 z-[100] px-6 py-4 rounded-lg shadow-2xl text-white font-semibold transition-all duration-300 transform translate-x-full flex items-center gap-3 ${
@@ -156,6 +158,7 @@
     }
 
     async function fetchDashboardStats() {
+        if (isCalculating) return; // Nếu đang tính toán thì không fetch đè dữ liệu
         try {
             const response = await fetch('/api/dashboard-stats?t=' + new Date().getTime());
             if (!response.ok) throw new Error("Lỗi Server");
@@ -199,10 +202,14 @@
 
             const cat_expenses = data.cat_expenses || {};
             const budgets = data.budgets || {};
-            const rawCategories = Object.keys(cat_expenses);
-            const categories = rawCategories.map(c => categoryMap[c] || c);
-            const spendingData = rawCategories.map(c => cat_expenses[c] || 0);
-            const budgetData = rawCategories.map(c => budgets[c] || 0);
+            
+            // SỬA LỖI QUAN TRỌNG: Hợp nhất danh mục từ Chi tiêu và Ngân sách
+            // Để đảm bảo hiển thị cả những danh mục chỉ có Ngân sách mà chưa có Chi tiêu
+            const combinedCategories = Array.from(new Set([...Object.keys(cat_expenses), ...Object.keys(budgets)]));
+            
+            const categories = combinedCategories.map(c => categoryMap[c] || c);
+            const spendingData = combinedCategories.map(c => cat_expenses[c] || 0);
+            const budgetData = combinedCategories.map(c => budgets[c] || 0);
 
             const isDark = document.documentElement.classList.contains('dark');
             const textColor = isDark ? '#cbd5e1' : '#475569';
@@ -230,7 +237,17 @@
                     options: { 
                         responsive: true, maintainAspectRatio: false,
                         plugins: { 
-                            legend: { position: 'top', labels: { font: { family: "'Inter', sans-serif", size: 13, weight: '600' }, color: textColor, usePointStyle: true, boxWidth: 8 } },
+                            legend: { 
+                                position: 'top', 
+                                labels: { 
+                                    font: { family: "'Inter', sans-serif", size: 13, weight: '600' }, 
+                                    color: textColor, 
+                                    usePointStyle: true, // Kích hoạt chế độ ô vuông
+                                    boxWidth: 15, // Tăng kích thước ô vuông
+                                    boxHeight: 15, // Thêm chiều cao cho ô vuông
+                                    padding: 20 // Thêm khoảng cách giữa các mục
+                                } 
+                            },
                             tooltip: {
                                 backgroundColor: isDark ? '#0f172a' : '#1e293b',
                                 titleFont: { family: "'Inter', sans-serif", size: 14 },
@@ -313,9 +330,10 @@
         } catch(err) { console.error("Lỗi AI:", err); }
     }
 
-    // GỌI HÀM CHẠY NGAY LẬP TỨC
+    // Chạy lần đầu và setup interval
     fetchDashboardStats(); 
-    setInterval(fetchDashboardStats, 3000); 
+    if (dashboardInterval) clearInterval(dashboardInterval);
+    dashboardInterval = setInterval(fetchDashboardStats, 3000); 
     fetchAIPrediction();
 
     // Gắn sự kiện cho Form
@@ -329,6 +347,8 @@
             btn.innerText = 'Đang tính...'; 
             btn.disabled = true; 
             btn.classList.add('opacity-70');
+            
+            isCalculating = true; // Bật cờ dừng fetch đè dữ liệu
 
             const payload = {
                 monthly_income: parseFloat(document.getElementById('monthly_income').value),
@@ -372,17 +392,15 @@
                     }
                     document.getElementById('plan-result').classList.remove('hidden');
                     
-                    // HIỂN THỊ TOAST THÀNH CÔNG
                     showToast('Lập kế hoạch thành công!', 'success');
                 } else { 
-                    // HIỂN THỊ TOAST LỖI
                     showToast('Lỗi: ' + (data.error || 'Không thể tạo kế hoạch'), 'error'); 
                 }
             } catch (error) { 
                 console.error(error);
-                // HIỂN THỊ TOAST LỖI KẾT NỐI
                 showToast('Lỗi kết nối máy chủ hoặc dữ liệu không hợp lệ!', 'error'); 
             } finally {
+                isCalculating = false; // Tắt cờ cho phép fetch tiếp tục
                 btn.innerText = originalText; 
                 btn.disabled = false; 
                 btn.classList.remove('opacity-70');
