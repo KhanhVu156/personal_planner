@@ -30,3 +30,4 @@ instance/
 # Hệ điều hành
 .DS_Store
 Thumbs.db
+*.exe
