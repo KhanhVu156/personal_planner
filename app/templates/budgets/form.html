@@ -34,7 +34,8 @@
             {{ form.amount.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
             <div class="relative">
                 <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500 dark:text-slate-400">VND</span>
-                {{ form.amount(class="w-full pl-12 pr-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white", placeholder="VD: 1.000.000", step="any") }}
+                <!-- ✅ FIX: Thêm type="text" và id="budget_amount" -->
+                {{ form.amount(class="w-full pl-12 pr-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white", placeholder="VD: 1.000.000", type="text", id="budget_amount") }}
             </div>
             {% for error in form.amount.errors %}
                 <span class="text-red-500 text-sm mt-1 block">{{ error }}</span>
@@ -47,4 +48,27 @@
         </div>
     </form>
 </div>
+
+<script>
+    // ✅ Tự động format số tiền khi gõ (VD: gõ 1000000 -> hiện 1.000.000)
+    (function() {
+        const amountInput = document.getElementById('budget_amount');
+        if (amountInput) {
+            // Khi load trang, format lại số tiền cũ (nếu đang Sửa)
+            if (amountInput.value) {
+                let val = amountInput.value.replace(/\D/g, '');
+                amountInput.value = new Intl.NumberFormat('vi-VN').format(val);
+            }
+            // Khi đang gõ
+            amountInput.addEventListener('input', function(e) {
+                let value = this.value.replace(/\D/g, '');
+                if (value) {
+                    this.value = new Intl.NumberFormat('vi-VN').format(value);
+                } else {
+                    this.value = '';
+                }
+            });
+        }
+    })();
+</script>
 {% endblock %}

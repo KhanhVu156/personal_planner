@@ -45,8 +45,16 @@ class Config:
     # Sẽ hoạt động tốt nếu trên Render bạn thêm biến môi trường TZ=Asia/Ho_Chi_Minh
     TIMEZONE = 'Asia/Ho_Chi_Minh'
 
-    PERMANENT_SESSION_LIFETIME = timedelta(hours=2)
+    # ✅ FIX LỖI TỰ ĐĂNG XUẤT: Tăng thời gian sống của Session lên 7 ngày
+    PERMANENT_SESSION_LIFETIME = timedelta(days=7)
     REMEMBER_COOKIE_DURATION = timedelta(days=30)
+    
+    # Tự động gia hạn session mỗi khi user có tương tác
+    SESSION_REFRESH_EACH_REQUEST = True
+    # Bảo mật Cookie (Bật True khi chạy trên Render HTTPS, nếu chạy local HTTP hãy đổi thành False)
+    SESSION_COOKIE_SECURE = True 
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = 'Lax'
 
     MAIL_SERVER = os.environ.get('MAIL_SERVER')
     MAIL_PORT = int(os.environ.get('MAIL_PORT', 587))

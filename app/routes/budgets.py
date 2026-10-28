@@ -10,10 +10,22 @@ bp = Blueprint('budgets', __name__)
 @bp.route('/budgets')
 @login_required
 def list_budgets():
-    month = request.args.get('month', datetime.utcnow().month, type=int)
-    year = request.args.get('year', datetime.utcnow().year, type=int)
-    budgets = Budget.query.filter_by(user_id=current_user.id, month=month, year=year).all()
-    return render_template('budgets/list.html', budgets=budgets, month=month, year=year)
+    # ✅ FIX: Lấy tham số từ URL (nếu có)
+    month_str = request.args.get('month')
+    year_str = request.args.get('year')
+    
+    # Khởi tạo query cơ bản
+    query = Budget.query.filter_by(user_id=current_user.id)
+    
+    # Nếu người dùng có nhập cả tháng và năm thì mới lọc
+    if month_str and year_str:
+        query = query.filter_by(month=int(month_str), year=int(year_str))
+        
+    # Sắp xếp: Năm mới nhất lên đầu, tháng mới nhất lên đầu, sau đó xếp theo danh mục
+    budgets = query.order_by(Budget.year.desc(), Budget.month.desc(), Budget.category).all()
+    
+    # Trả về template cùng với tháng/năm đã chọn (để hiển thị lại trên form)
+    return render_template('budgets/list.html', budgets=budgets, month=month_str, year=year_str)
 
 @bp.route('/budgets/add', methods=['GET', 'POST'])
 @login_required
@@ -88,4 +100,5 @@ def delete_budget(id):
         flash('Đã xóa ngân sách.', 'success')
     else:
         flash('Bạn không có quyền thực hiện hành động này.', 'danger')
-    return redirect(url_for('budgets.list_budgets', month=budget.month, year=budget.year))
+    # Quay lại trang danh sách, giữ nguyên bộ lọc hiện tại (nếu có)
+    return redirect(url_for('budgets.list_budgets', month=request.args.get('month'), year=request.args.get('year')))

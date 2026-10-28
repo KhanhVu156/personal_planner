@@ -6,8 +6,7 @@ import calendar
 from sqlalchemy import func
 
 from app.models import Transaction, Budget, Task
-# ✅ Thêm request_prediction_batch
-from app.services.ai_manager import request_prediction, request_training, request_prediction_batch
+from app.services.ai_manager import request_prediction, request_training, request_prediction_batch, trigger_training_async
 
 bp = Blueprint('api', __name__, url_prefix='/api')
 
@@ -17,19 +16,12 @@ def get_dashboard_stats():
     try:
         user_id = current_user.id
         today = datetime.now()
-        month, year = today.month, today.year
         
-        has_trans = db.session.query(Transaction.id).filter(
-            Transaction.user_id == user_id,
-            func.extract('month', Transaction.date) == month,
-            func.extract('year', Transaction.date) == year
-        ).first()
+        # ✅ FIX: Lấy tháng/năm từ request
+        month = request.args.get('month', today.month, type=int)
+        year = request.args.get('year', today.year, type=int)
 
-        if not has_trans:
-            latest_trans = db.session.query(Transaction.date).filter_by(user_id=user_id).order_by(Transaction.date.desc()).first()
-            if latest_trans:
-                month, year = latest_trans.date.month, latest_trans.date.year
-
+        # 1. Tính tổng thu nhập & chi tiêu TOÀN THỜI GIAN
         totals = db.session.query(
             Transaction.type,
             func.coalesce(func.sum(Transaction.amount), 0)
@@ -39,6 +31,7 @@ def get_dashboard_stats():
         total_expense = next((float(t[1]) for t in totals if t[0] == 'expense'), 0.0)
         balance = total_income - total_expense
 
+        # 2. Tính thu/chi THÁNG ĐÃ CHỌN
         month_totals = db.session.query(
             Transaction.type,
             func.coalesce(func.sum(Transaction.amount), 0)
@@ -51,6 +44,7 @@ def get_dashboard_stats():
         income_month = next((float(t[1]) for t in month_totals if t[0] == 'income'), 0.0)
         expense_month = next((float(t[1]) for t in month_totals if t[0] == 'expense'), 0.0)
 
+        # 3. Chi tiêu theo category trong tháng
         cat_exp = db.session.query(
             Transaction.category,
             func.coalesce(func.sum(Transaction.amount), 0)
@@ -63,9 +57,11 @@ def get_dashboard_stats():
         
         cat_exp_dict = {cat: float(total) for cat, total in cat_exp}
 
+        # 4. Lấy Ngân sách
         budgets = Budget.query.filter_by(user_id=user_id, month=int(month), year=int(year)).all()
         budget_dict = {b.category: float(b.amount) for b in budgets}
 
+        # 5. Lấy Task sắp tới
         upcoming_tasks = Task.query.filter_by(user_id=user_id) \
             .filter(Task.status.in_(['pending', 'in_progress'])) \
             .order_by(Task.deadline.asc()).limit(5).all()
@@ -100,7 +96,7 @@ def get_predictions():
         user_id = current_user.id
         categories = ['food', 'transport', 'education', 'entertainment', 'shopping', 'bills', 'other']
         
-        # ✅ FIX: Gom 49 items (7 ngày x 7 danh mục) thành 1 batch
+        # Gom 49 items (7 ngày x 7 danh mục) thành 1 batch
         items = []
         for i in range(1, 8):
             future_date = datetime.now().date() + timedelta(days=i)
