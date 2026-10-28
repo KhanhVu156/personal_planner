@@ -82,9 +82,7 @@ def create_app(config_class=Config):
             response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
         return response
 
-    # --- TỰ ĐỘNG TẠO BẢNG NẾU CHƯA CÓ ---
-    with app.app_context():
-        db.create_all()
+    # ĐÃ XÓA ĐOẠN db.create_all() Ở ĐÂY
 
     return app
 
