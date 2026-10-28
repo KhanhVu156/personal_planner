@@ -7,9 +7,11 @@ from sklearn.preprocessing import StandardScaler, LabelEncoder, MinMaxScaler
 from sklearn.model_selection import train_test_split
 import joblib
 
+# ✅ TỐI ƯU RAM: Tắt oneDNN và giới hạn luồng xử lý
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
 os.environ['TF_NUM_INTEROP_THREADS'] = '1'
 os.environ['TF_NUM_INTRAOP_THREADS'] = '1'
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODEL_DIR = os.path.join(BASE_DIR, 'static', 'models')
@@ -63,10 +65,10 @@ def prepare_data(transactions, user_id):
 def build_teacher_model(input_dim):
     import keras
     from keras import layers
+    # ✅ TỐI ƯU: Giảm kích thước mô hình để tiết kiệm RAM
     model = keras.Sequential([
-        layers.Dense(64, activation='relu', input_shape=(input_dim,)),
+        layers.Dense(32, activation='relu', input_shape=(input_dim,)),
         layers.Dropout(0.2),
-        layers.Dense(32, activation='relu'),
         layers.Dense(16, activation='relu'),
         layers.Dense(1)
     ])
@@ -76,9 +78,9 @@ def build_teacher_model(input_dim):
 def build_student_model(input_dim):
     import keras
     from keras import layers
+    # ✅ TỐI ƯU: Giảm kích thước mô hình để tiết kiệm RAM
     model = keras.Sequential([
-        layers.Dense(16, activation='relu', input_shape=(input_dim,)),
-        layers.Dense(8, activation='relu'),
+        layers.Dense(8, activation='relu', input_shape=(input_dim,)),
         layers.Dense(1)
     ])
     model.compile(optimizer='adam', loss='mse')
@@ -96,7 +98,7 @@ class Distiller:
     def compile(self, optimizer):
         self.optimizer = optimizer
 
-    def fit(self, X, y, epochs=20, batch_size=16, validation_data=None):
+    def fit(self, X, y, epochs=10, batch_size=16, validation_data=None):
         import tensorflow as tf
         X_tensor = tf.convert_to_tensor(X, dtype=tf.float32)
         y_tensor = tf.convert_to_tensor(y, dtype=tf.float32)
@@ -141,13 +143,14 @@ def train_model(user_id, db_session):
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
         
         teacher = build_teacher_model(X.shape[1])
-        teacher.fit(X_train, y_train, epochs=30, batch_size=16, verbose=0)
+        # ✅ TỐI ƯU: Giảm epochs từ 30 xuống 15
+        teacher.fit(X_train, y_train, epochs=15, batch_size=16, verbose=0)
         
         student = build_student_model(X.shape[1])
         
         distiller = Distiller(student=student, teacher=teacher)
         distiller.compile(optimizer=keras.optimizers.Adam(learning_rate=0.001))
-        distiller.fit(X_train, y_train, epochs=20, batch_size=16)
+        distiller.fit(X_train, y_train, epochs=10, batch_size=16)
         
         converter = tf.lite.TFLiteConverter.from_keras_model(student)
         converter.optimizations = [tf.lite.Optimize.DEFAULT]
@@ -164,14 +167,16 @@ def train_model(user_id, db_session):
         return True
     except Exception as e:
         print(f"[AI Debug] Lỗi khi train model: {e}")
+        # ✅ Dọn dẹp file rác nếu train thất bại
+        for p in _get_paths(user_id).values():
+            if os.path.exists(p):
+                os.remove(p)
         return None
 
 def predict_expense(user_id, future_date, category, db_session):
     paths = _get_paths(user_id)
     import tensorflow as tf
     
-    # ✅ FIX TRIỆT ĐỂ: Tuyệt đối KHÔNG gọi train_model ở đây.
-    # Nếu thiếu file, trả về 0.0 ngay lập tức để không bao giờ bị timeout.
     if not all(os.path.exists(p) for p in paths.values()):
         return 0.0
             
@@ -224,7 +229,6 @@ def predict_expense(user_id, future_date, category, db_session):
     interpreter.invoke()
     prediction_scaled = interpreter.get_tensor(output_details[0]['index'])[0][0]
     
-    # ✅ Dịch ngược kết quả từ 0-1 ra số tiền thực tế
     prediction = y_scaler.inverse_transform([[prediction_scaled]])[0][0]
     
     return max(0, float(prediction))

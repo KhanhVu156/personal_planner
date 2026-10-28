@@ -3,10 +3,13 @@ from flask_login import login_required, current_user
 from app import db, cache
 from datetime import datetime, timedelta
 import calendar
+import os
 from sqlalchemy import func
 
 from app.models import Transaction, Budget, Task
+# ✅ Import thêm trigger_training_async và _get_paths
 from app.services.ai_manager import request_prediction, request_training, request_prediction_batch, trigger_training_async
+from app.ml.expense_model import _get_paths
 
 bp = Blueprint('api', __name__, url_prefix='/api')
 
@@ -17,11 +20,9 @@ def get_dashboard_stats():
         user_id = current_user.id
         today = datetime.now()
         
-        # ✅ FIX: Lấy tháng/năm từ request
         month = request.args.get('month', today.month, type=int)
         year = request.args.get('year', today.year, type=int)
 
-        # 1. Tính tổng thu nhập & chi tiêu TOÀN THỜI GIAN
         totals = db.session.query(
             Transaction.type,
             func.coalesce(func.sum(Transaction.amount), 0)
@@ -31,7 +32,6 @@ def get_dashboard_stats():
         total_expense = next((float(t[1]) for t in totals if t[0] == 'expense'), 0.0)
         balance = total_income - total_expense
 
-        # 2. Tính thu/chi THÁNG ĐÃ CHỌN
         month_totals = db.session.query(
             Transaction.type,
             func.coalesce(func.sum(Transaction.amount), 0)
@@ -44,7 +44,6 @@ def get_dashboard_stats():
         income_month = next((float(t[1]) for t in month_totals if t[0] == 'income'), 0.0)
         expense_month = next((float(t[1]) for t in month_totals if t[0] == 'expense'), 0.0)
 
-        # 3. Chi tiêu theo category trong tháng
         cat_exp = db.session.query(
             Transaction.category,
             func.coalesce(func.sum(Transaction.amount), 0)
@@ -57,11 +56,9 @@ def get_dashboard_stats():
         
         cat_exp_dict = {cat: float(total) for cat, total in cat_exp}
 
-        # 4. Lấy Ngân sách
         budgets = Budget.query.filter_by(user_id=user_id, month=int(month), year=int(year)).all()
         budget_dict = {b.category: float(b.amount) for b in budgets}
 
-        # 5. Lấy Task sắp tới
         upcoming_tasks = Task.query.filter_by(user_id=user_id) \
             .filter(Task.status.in_(['pending', 'in_progress'])) \
             .order_by(Task.deadline.asc()).limit(5).all()
@@ -94,33 +91,33 @@ def get_dashboard_stats():
 def get_predictions():
     try:
         user_id = current_user.id
-        categories = ['food', 'transport', 'education', 'entertainment', 'shopping', 'bills', 'other']
+        # ✅ TỐI ƯU: Chỉ dự đoán cho 'food' vì giao diện chỉ vẽ 'food'
+        target_category = 'food'
         
-        # Gom 49 items (7 ngày x 7 danh mục) thành 1 batch
+        paths = _get_paths(user_id)
+        has_model = all(os.path.exists(p) for p in paths.values())
+        
+        # ✅ FIX: Nếu chưa có model, kích hoạt train ngầm và trả về 0 NGAY LẬP TỨC
+        if not has_model:
+            trigger_training_async(user_id)
+            return jsonify({target_category: [0]*7})
+        
         items = []
         for i in range(1, 8):
             future_date = datetime.now().date() + timedelta(days=i)
-            for cat in categories:
-                items.append((future_date, cat))
+            items.append((future_date, target_category))
         
-        # Gọi AI dự đoán 1 lần, timeout 60s để chờ AI train (nếu là lần đầu)
-        results = request_prediction_batch(user_id, items, timeout=60.0)
+        # ✅ TỐI ƯU: Giảm timeout xuống 10s thay vì 60s để không treo web
+        results = request_prediction_batch(user_id, items, timeout=10.0)
         
         if results is None:
-            results = [0.0] * len(items)
+            results = [0.0] * 7
             
-        # Chia kết quả trả về cho từng danh mục
-        predictions = {cat: [] for cat in categories}
-        idx = 0
-        for i in range(1, 8):
-            for cat in categories:
-                predictions[cat].append(results[idx])
-                idx += 1
-                
+        predictions = {target_category: results}
         return jsonify(predictions)
     except Exception as e:
         current_app.logger.error(f"Lỗi API Predict: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'food': [0]*7}), 200 # Trả về 200 thay vì 500 để frontend không báo lỗi đỏ
 
 @bp.route('/train', methods=['POST'])
 @login_required
