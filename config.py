@@ -7,31 +7,28 @@ load_dotenv(os.path.join(basedir, '.env'))
 
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-key-change-in-prod'
-    
-    db_url = os.environ.get('DATABASE_URL')
-    if db_url and db_url.startswith("postgres://"):
-        db_url = db_url.replace("postgres://", "postgresql://", 1)
-    
-    SQLALCHEMY_DATABASE_URI = db_url or 'sqlite:///' + os.path.join(basedir, 'app.db')
-    SQLALCHEMY_TRACK_MODIFICATIONS = False
-    
-    # TỐI ƯU HÓA CONNECTION POOLING
-    SQLALCHEMY_ENGINE_OPTIONS = {
-        "pool_pre_ping": True,      # Tự động kiểm tra kết nối trước khi dùng
-        "pool_recycle": 280,        # Tự động tạo kết nối mới sau 280s
-        "pool_size": 10,            # Duy trì 10 kết nối thường xuyên
-        "max_overflow": 20,         # Cho phép mở thêm 20 kết nối nếu 10 cái kia bận
-        "pool_timeout": 30,         # Thời gian chờ tối đa để lấy kết nối từ pool
-    }
-    
-    # Cấu hình thời gian
-    PERMANENT_SESSION_LIFETIME = timedelta(hours=2) 
-    REMEMBER_COOKIE_DURATION = timedelta(days=30)
 
-    # Cấu hình bảo mật (Bắt buộc cho Production)
-    PREFERRED_URL_SCHEME = 'https'
-    SESSION_COOKIE_SECURE = True
-    SESSION_COOKIE_HTTPONLY = True
+    # --- CẤU HÌNH TURSO (CHỈ KHI CÓ BIẾN MÔI TRƯỜNG) ---
+    turso_url = os.environ.get('TURSO_DATABASE_URL')
+    turso_token = os.environ.get('TURSO_AUTH_TOKEN')
+
+    if turso_url and turso_token:
+        # Trên Render (Linux): dùng Turso
+        db_url = turso_url.replace('libsql://', '')
+        SQLALCHEMY_DATABASE_URI = f"sqlite+libsql://{db_url}/?authToken={turso_token}&secure=true"
+    else:
+        # Dưới Windows (local): dùng SQLite file
+        SQLALCHEMY_DATABASE_URI = 'sqlite:///' + os.path.join(basedir, 'app.db')
+
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        "pool_pre_ping": True,
+        "pool_recycle": 280,
+    }
+    # ------------------------------------------------
+
+    PERMANENT_SESSION_LIFETIME = timedelta(hours=2)
+    REMEMBER_COOKIE_DURATION = timedelta(days=30)
 
     MAIL_SERVER = os.environ.get('MAIL_SERVER')
     MAIL_PORT = int(os.environ.get('MAIL_PORT', 587))

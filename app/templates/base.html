@@ -6,17 +6,26 @@
     <title>Personal Planner</title>
     <meta name="csrf-token" content="{{ csrf_token() }}">
     
-    <!-- SCRIPT CHỐNG NHÁY SÁNG (FOUC): Chạy ngay lập tức trước khi load CSS -->
     <script>
         if (localStorage.getItem('darkMode') === 'enabled') {
             document.documentElement.classList.add('dark');
         }
     </script>
 
-    <!-- TẢI CSS TRỰC TIẾP (Đã bỏ mẹo Async gây lỗi) -->
+    <!-- Tải CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    
+    <!-- HTMX: Thư viện giúp chuyển trang siêu mượt không cần tải lại -->
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    
+    <!-- Prefetch các trang để tải trước khi cần -->
+    <link rel="prefetch" href="{{ url_for('dashboard.index') }}">
+    <link rel="prefetch" href="{{ url_for('transactions.list_transactions') }}">
+    <link rel="prefetch" href="{{ url_for('budgets.list_budgets') }}">
+    <link rel="prefetch" href="{{ url_for('tasks.list_tasks') }}">
 </head>
-<body class="bg-gray-50 text-gray-800 flex flex-col min-h-screen transition-colors duration-300 dark:bg-slate-900 dark:text-slate-200">
+<!-- KÍCH HOẠT HTMX BOOST: Tự động AJAX hóa mọi thẻ a và form -->
+<body hx-boost="true" hx-headers='{"X-CSRFToken": "{{ csrf_token() }}"}' class="bg-gray-50 text-gray-800 flex flex-col min-h-screen transition-colors duration-300 dark:bg-slate-900 dark:text-slate-200">
 
     <!-- NAVBAR -->
     <nav class="bg-white shadow-md sticky top-0 z-50 transition-colors duration-300 dark:bg-slate-800 dark:border-b dark:border-slate-700">
@@ -26,7 +35,7 @@
                     <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
                     Planner
                 </a>
-
+                <!-- ... (Phần Navbar giữ nguyên) ... -->
                 <div class="hidden md:flex items-center space-x-6 font-medium dark:text-slate-300">
                     {% if current_user.is_authenticated %}
                         <a href="{{ url_for('dashboard.index') }}" class="hover:text-blue-600 dark:hover:text-blue-400 transition">Tổng quan</a>
@@ -58,6 +67,7 @@
                 </div>
             </div>
         </div>
+        <!-- ... (Mobile Menu giữ nguyên) ... -->
         <div id="mobileMenu" class="hidden md:hidden bg-white border-t border-gray-100 shadow-lg transition-colors duration-300 dark:bg-slate-800 dark:border-slate-700">
             <div class="flex flex-col px-4 pt-2 pb-4 space-y-2 dark:text-slate-300">
                 {% if current_user.is_authenticated %}
@@ -107,13 +117,9 @@
         </div>
     </div>
 
-    <!-- Tối ưu JS (Defer) -->
     <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>
-    
-    <!-- Khối Script dành riêng cho các trang con (như Dashboard) chèn thêm JS -->
     {% block scripts %}{% endblock %}
 
-    <!-- Script xử lý Dark Mode và Mobile Menu -->
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const htmlEl = document.documentElement;
