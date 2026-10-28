@@ -89,19 +89,30 @@ personal_planner/
 │   ├── services/
 │   │   ├── ai_manager.py       # Cầu nối giao tiếp giữa Flask và AI Worker
 │   │   └── financial_planner.py# Thuật toán chia ngân sách & làm tròn 10k
-│   ├── routes/                 # Controllers (API, Auth, Dashboard, ...)
-│   ├── static/                 # Chứa file build tĩnh (style.css, dashboard.js)
+│   ├── routes/
+│   │   ├── api.py              # API Endpoints cho AJAX (Real-time)
+│   │   ├── auth.py             # Đăng nhập/Đăng ký
+│   │   ├── dashboard.py        # Trang Tổng quan
+│   │   ├── transactions.py     # Giao dịch (Import CSV)
+│   │   ├── budgets.py          # Ngân sách
+│   │   └── tasks.py            # Công việc
+│   ├── static/
+│   │   ├── css/                # Chứa file build tĩnh (style.css)
+│   │   ├── js/                 # Mã JS tĩnh (dashboard.js, main.js)
+│   │   └── models/             # Nơi lưu file .tflite, .pkl của AI
 │   ├── templates/              # Jinja2 Templates (Hỗ trợ HTMX)
 │   ├── **init**.py             # App Factory & Cấu hình nén, cache, db
 │   ├── forms.py                # WTForms Validations
-│   ├── models.py               # SQLAlchemy Models (Numeric type)
+│   ├── models.py               # SQLAlchemy Models
 │   └── scheduler.py            # Cronjobs gửi mail cảnh báo
+├── migrations/                 # Thư mục quản lý DB Migration
+├── .env                        # Biến môi trường (Không push lên Git)
 ├── config.py                   # Cấu hình môi trường (DB, Mail, Redis)
 ├── gunicorn.conf.py            # Cấu hình Production Server (gthread)
 ├── Procfile                    # Lệnh khởi chạy cho Render
-├── run.py                      # Entry point
 ├── requirements.txt            # Thư viện Python
-└── tailwind.config.js          # Cấu hình build Tailwind v4
+├── run.py                      # Entry point khởi chạy Server
+└── tailwind.config.js          # Cấu hình build Tailwind CSS v4
 
 ---
 

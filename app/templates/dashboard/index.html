@@ -82,9 +82,8 @@
     </div>
 </div>
 
-<!-- Form kế hoạch (Giữ nguyên) -->
+<!-- Form kế hoạch -->
 <div class="bg-white dark:bg-slate-800 p-6 rounded shadow border border-blue-100 dark:border-slate-700 transition-colors duration-300">
-    <!-- ... (Giữ nguyên form như cũ) ... -->
     <h3 class="text-xl font-semibold mb-4 text-gray-800 dark:text-slate-100 flex items-center">
         <svg class="w-6 h-6 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
         Kế hoạch chi tiêu tối ưu
@@ -123,6 +122,7 @@
 </div>
 
 <script>
+    // KHÔNG BỌC TRONG DOMContentLoaded NỮA ĐỂ HTMX CÓ THỂ CHẠY KHI CHUYỂN TRANG
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
     const formatMoney = (amount) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 }).format(amount || 0);
     
@@ -296,16 +296,15 @@
         } catch(err) { console.error("Lỗi AI:", err); }
     }
 
-    document.addEventListener('DOMContentLoaded', () => {
-        fetchDashboardStats(); 
-        setInterval(fetchDashboardStats, 3000); 
-        fetchAIPrediction();
+    // GỌI HÀM CHẠY NGAY LẬP TỨC
+    fetchDashboardStats(); 
+    setInterval(fetchDashboardStats, 3000); 
+    fetchAIPrediction();
 
-        document.getElementById('darkModeToggle')?.addEventListener('change', () => {
-            setTimeout(fetchDashboardStats, 100);
-        });
-
-        document.getElementById('plan-form').addEventListener('submit', async (e) => {
+    // Gắn sự kiện cho Form
+    const planForm = document.getElementById('plan-form');
+    if (planForm) {
+        planForm.addEventListener('submit', async (e) => {
             e.preventDefault(); 
             
             const btn = document.getElementById('plan-btn');
@@ -359,6 +358,6 @@
                 btn.classList.remove('opacity-70');
             }
         });
-    });
+    }
 </script>
 {% endblock %}
