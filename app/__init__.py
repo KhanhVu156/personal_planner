@@ -6,7 +6,7 @@ from flask_mail import Mail
 from flask_migrate import Migrate
 from flask_wtf.csrf import CSRFProtect, generate_csrf
 from flask_caching import Cache
-from flask_compress import Compress # Thêm import này
+from flask_compress import Compress
 from config import Config
 
 db = SQLAlchemy()
@@ -14,7 +14,7 @@ login_manager = LoginManager()
 mail = Mail()
 csrf = CSRFProtect()
 cache = Cache()
-compress = Compress() # Khởi tạo Compress
+compress = Compress()
 
 def create_app(config_class=Config):
     app = Flask(__name__)
@@ -25,19 +25,28 @@ def create_app(config_class=Config):
     mail.init_app(app)
     csrf.init_app(app)
 
-    # CẤU HÌNH UPSTASH REDIS CACHE
-    cache.init_app(app, config={
-        'CACHE_TYPE': 'RedisCache',
-        'CACHE_REDIS_URL': os.environ.get('REDIS_URL', 'redis://localhost:6379/0'),
-        'CACHE_DEFAULT_TIMEOUT': 10 
-    })
+    # --- FALLBACK REDIS AN TOÀN ---
+    redis_url = os.environ.get('REDIS_URL')
+    if redis_url and redis_url.startswith(('redis://', 'rediss://')):
+        cache_config = {
+            'CACHE_TYPE': 'RedisCache',
+            'CACHE_REDIS_URL': redis_url,
+            'CACHE_DEFAULT_TIMEOUT': 10
+        }
+        print("[Cache] Đang sử dụng Upstash Redis.")
+    else:
+        cache_config = {
+            'CACHE_TYPE': 'SimpleCache',
+            'CACHE_DEFAULT_TIMEOUT': 10
+        }
+        print("[Cache] Không tìm thấy REDIS_URL hợp lệ. Sử dụng SimpleCache.")
+    cache.init_app(app, config=cache_config)
 
-    # ---- LEVEL 4: BẬT NÉN GZIP/BROTLI ----
+    # --- LEVEL 4: NÉN GZIP/BROTLI ---
     compress.init_app(app)
-    app.config['COMPRESS_ALGORITHM'] = ['br', 'gzip'] # Ưu tiên Brotli
-    app.config['COMPRESS_BR_LEVEL'] = 4               # Mức nén Brotli (0-11)
-    app.config['COMPRESS_LEVEL'] = 6                  # Mức nén Gzip (0-9)
-    # -------------------------------------
+    app.config['COMPRESS_ALGORITHM'] = ['br', 'gzip']
+    app.config['COMPRESS_BR_LEVEL'] = 4
+    app.config['COMPRESS_LEVEL'] = 6
 
     Migrate(app, db)
 
@@ -46,24 +55,18 @@ def create_app(config_class=Config):
     login_manager.login_message_category = 'info'
 
     os.makedirs(os.path.join(app.root_path, 'static', 'models'), exist_ok=True)
-    os.makedirs(os.path.join(app.instance_path, 'cache'), exist_ok=True)
 
-    # Đăng ký các Blueprint
+    # Đăng ký Blueprint
     from app.routes.auth import bp as auth_bp
     app.register_blueprint(auth_bp)
-
     from app.routes.dashboard import bp as dashboard_bp
     app.register_blueprint(dashboard_bp)
-
     from app.routes.transactions import bp as transactions_bp
     app.register_blueprint(transactions_bp)
-
     from app.routes.budgets import bp as budgets_bp
     app.register_blueprint(budgets_bp)
-
     from app.routes.tasks import bp as tasks_bp
     app.register_blueprint(tasks_bp)
-    
     from app.routes.api import bp as api_bp
     app.register_blueprint(api_bp)
 
@@ -71,7 +74,6 @@ def create_app(config_class=Config):
     def inject_csrf_token():
         return dict(csrf_token=generate_csrf)
 
-    # CẤU HÌNH HTTP CACHING (LEVEL 3 - PHẦN 2)
     @app.after_request
     def add_cache_headers(response):
         if request.path.startswith('/static/'):
@@ -79,6 +81,10 @@ def create_app(config_class=Config):
         elif request.path.startswith('/api/') or request.path == '/':
             response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
         return response
+
+    # --- TỰ ĐỘNG TẠO BẢNG NẾU CHƯA CÓ ---
+    with app.app_context():
+        db.create_all()
 
     return app
 
