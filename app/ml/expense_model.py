@@ -8,6 +8,8 @@ import joblib
 
 # Tắt cảnh báo rác
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
+os.environ['TF_NUM_INTEROP_THREADS'] = '1'
+os.environ['TF_NUM_INTRAOP_THREADS'] = '1'
 
 # Trỏ đường dẫn lưu model
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -19,7 +21,7 @@ _model_cache = {}
 
 def _get_paths(user_id):
     return {
-        # ĐỔI ĐUÔI FILE SANG .tflite CHO SIÊU NHẸ
+        # Sử dụng đuôi .tflite cho siêu nhẹ
         'model': os.path.join(MODEL_DIR, f'expense_model_{user_id}.tflite'), 
         'scaler': os.path.join(MODEL_DIR, f'scaler_{user_id}.pkl'),
         'encoder': os.path.join(MODEL_DIR, f'encoder_{user_id}.pkl')
@@ -53,18 +55,83 @@ def prepare_data(transactions, user_id):
     
     return X_scaled, y
 
-def build_model(input_dim):
+# ==========================================
+# KIẾN TRÚC MÔ HÌNH CHO KNOWLEDGE DISTILLATION
+# ==========================================
+
+def build_teacher_model(input_dim):
+    """Mô hình Giáo viên (Lớn hơn, học sâu hơn)"""
     import keras
     from keras import layers
     
     model = keras.Sequential([
-        layers.Dense(32, activation='relu', input_shape=(input_dim,)),
+        layers.Dense(64, activation='relu', input_shape=(input_dim,)),
         layers.Dropout(0.2),
+        layers.Dense(32, activation='relu'),
         layers.Dense(16, activation='relu'),
         layers.Dense(1)
     ])
-    model.compile(optimizer='adam', loss='mse', metrics=['mae'])
+    model.compile(optimizer='adam', loss='mse')
     return model
+
+def build_student_model(input_dim):
+    """Mô hình Học trò (Nhỏ gọn, chạy cực nhanh)"""
+    import keras
+    from keras import layers
+    
+    model = keras.Sequential([
+        layers.Dense(16, activation='relu', input_shape=(input_dim,)),
+        layers.Dense(8, activation='relu'),
+        layers.Dense(1)
+    ])
+    model.compile(optimizer='adam', loss='mse')
+    return model
+
+class Distiller:
+    """Lớp quản lý quá trình huấn luyện Knowledge Distillation"""
+    def __init__(self, student, teacher):
+        import tensorflow as tf
+        self.teacher = teacher
+        self.student = student
+        self.student_loss_fn = tf.keras.losses.MeanSquaredError()
+        self.distillation_loss_fn = tf.keras.losses.MeanSquaredError()
+        self.alpha = 0.3 # Trọng số ưu tiên học từ dữ liệu thực (0.3) và giáo viên (0.7)
+
+    def compile(self, optimizer):
+        self.optimizer = optimizer
+
+    def fit(self, X, y, epochs=20, batch_size=16, validation_data=None):
+        import tensorflow as tf
+        X_tensor = tf.convert_to_tensor(X, dtype=tf.float32)
+        y_tensor = tf.convert_to_tensor(y, dtype=tf.float32)
+        
+        dataset = tf.data.Dataset.from_tensor_slices((X_tensor, y_tensor)).batch(batch_size)
+        
+        for epoch in range(epochs):
+            for x_batch, y_batch in dataset:
+                with tf.GradientTape() as tape:
+                    # 1. Giáo viên dự đoán (Không cập nhật trọng số giáo viên)
+                    teacher_predictions = self.teacher(x_batch, training=False)
+                    # 2. Học trò dự đoán
+                    student_predictions = self.student(x_batch, training=True)
+                    
+                    # 3. Tính Loss
+                    student_loss = self.student_loss_fn(y_batch, student_predictions)
+                    distillation_loss = self.distillation_loss_fn(teacher_predictions, student_predictions)
+                    
+                    # 4. Tổng hợp Loss
+                    loss = self.alpha * student_loss + (1 - self.alpha) * distillation_loss
+                
+                # Cập nhật trọng số Học trò
+                trainable_vars = self.student.trainable_variables
+                gradients = tape.gradient(loss, trainable_vars)
+                self.optimizer.apply_gradients(zip(gradients, trainable_vars))
+                
+        print(f"Hoàn thành huấn luyện Distillation. Loss cuối: {loss.numpy():.4f}")
+
+# ==========================================
+# HUẤN LUYỆN VÀ DỰ ĐOÁN
+# ==========================================
 
 def train_model(user_id, db_session):
     from app.models import Transaction
@@ -86,23 +153,30 @@ def train_model(user_id, db_session):
         
     try:
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-        keras_model = build_model(X.shape[1])
-        keras_model.fit(X_train, y_train, epochs=20, batch_size=16, validation_data=(X_test, y_test), verbose=0)
         
-        # --- BẮT ĐẦU QUÁ TRÌNH QUANTIZATION SANG TFLITE ---
-        converter = tf.lite.TFLiteConverter.from_keras_model(keras_model)
-        # Bật tối ưu hóa mặc định (Quantization động - Dynamic Range Quantization)
+        # 1. Huấn luyện Giáo viên
+        teacher = build_teacher_model(X.shape[1])
+        teacher.fit(X_train, y_train, epochs=30, batch_size=16, verbose=0)
+        
+        # 2. Khởi tạo Học trò
+        student = build_student_model(X.shape[1])
+        
+        # 3. Chưng cất tri thức (Distillation)
+        distiller = Distiller(student=student, teacher=teacher)
+        distiller.compile(optimizer=keras.optimizers.Adam(learning_rate=0.001))
+        distiller.fit(X_train, y_train, epochs=20, batch_size=16)
+        
+        # 4. Chuyển đổi Học trò sang TFLite (Quantization)
+        converter = tf.lite.TFLiteConverter.from_keras_model(student)
         converter.optimizations = [tf.lite.Optimize.DEFAULT]
-        
         tflite_model = converter.convert()
         
         # Lưu file .tflite siêu nhẹ
         with open(_get_paths(user_id)['model'], 'wb') as f:
             f.write(tflite_model)
-        # --- KẾT THÚC QUÁ TRÌNH QUANTIZATION ---
         
-        # Xóa Keras model khỏi RAM để giải phóng bộ nhớ ngay lập tức
-        del keras_model
+        # Giải phóng bộ nhớ
+        del teacher, student, distiller
         tf.keras.backend.clear_session()
         
         return True
@@ -129,7 +203,6 @@ def predict_expense(user_id, future_date, category, db_session):
         le = _model_cache[user_id]['encoder']
     else:
         try:
-            # TFLite Interpreter cực nhẹ, chỉ chiếm vài MB RAM
             interpreter = tf.lite.Interpreter(model_path=paths['model'])
             interpreter.allocate_tensors()
             
@@ -160,7 +233,7 @@ def predict_expense(user_id, future_date, category, db_session):
         future_date.month,
         future_date.year,
         cat_encoded
-    ]], dtype=np.float32) # TFLite yêu cầu float32 cho input
+    ]], dtype=np.float32)
     
     features_scaled = scaler.transform(features).astype(np.float32)
     

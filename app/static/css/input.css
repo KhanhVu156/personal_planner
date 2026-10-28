@@ -1,0 +1,7 @@
+@import "tailwindcss";
+
+/* 1. Chỉ định Tailwind quét các file HTML trong thư mục templates */
+@source "../../templates";
+
+/* 2. Kích hoạt tính năng Dark Mode theo class (nút gạt) thay vì theo hệ thống */
+@custom-variant dark (&:where(.dark, .dark *));
