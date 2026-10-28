@@ -8,17 +8,27 @@ from wtforms.validators import (
     NumberRange, InputRequired, Optional,
 )
 from app.models import User
-
+import re # ✅ Thêm thư viện re để xử lý Regex
 
 def _norm_email(value):
     """Chuẩn hoá email: trim + lowercase."""
     return value.strip().lower() if isinstance(value, str) else value
 
-
 def _norm_username(value):
     """Chuẩn hoá username: trim (giữ nguyên case)."""
     return value.strip() if isinstance(value, str) else value
 
+# ✅ Hàm lọc số tiền: Xóa dấu chấm, phẩy để chuyển "10.000.000" thành 10000000.0
+def parse_vnd_amount(value):
+    if not value:
+        return None
+    if isinstance(value, (int, float)):
+        return value
+    try:
+        clean_val = str(value).replace('.', '').replace(',', '').strip()
+        return float(clean_val)
+    except ValueError:
+        return None
 
 class RegistrationForm(FlaskForm):
     username = StringField(
@@ -48,14 +58,13 @@ class LoginForm(FlaskForm):
     email = StringField(
         'Email',
         validators=[DataRequired(), Email()],
-        filters=[_norm_email],   # ✅ tránh lỗi "User@X.com " không login được
+        filters=[_norm_email],
     )
     password = PasswordField('Mật khẩu', validators=[DataRequired()])
     remember = BooleanField('Ghi nhớ đăng nhập')
     submit = SubmitField('Đăng nhập')
 
 
-# Danh mục dùng chung
 CATEGORY_CHOICES = [
     ('food', 'Ăn uống'),
     ('transport', 'Di chuyển'),
@@ -63,7 +72,7 @@ CATEGORY_CHOICES = [
     ('entertainment', 'Giải trí'),
     ('shopping', 'Mua sắm'),
     ('bills', 'Hóa đơn'),
-    ('salary', 'Lương'),      # dành cho thu nhập
+    ('salary', 'Lương'),
     ('other', 'Khác'),
 ]
 
@@ -73,17 +82,21 @@ EXPENSE_CATEGORIES = {'food', 'transport', 'education', 'entertainment',
 
 
 class TransactionForm(FlaskForm):
-    date = DateField('Ngày', validators=[DataRequired()])
+    # ✅ FIX: Chấp nhận cả format YYYY-MM-DD (chuẩn HTML) và MM/DD/YYYY (từ trình duyệt)
+    date = DateField('Ngày', validators=[DataRequired()], format=['%Y-%m-%d', '%m/%d/%Y'])
     description = StringField('Mô tả', validators=[DataRequired(), Length(max=200)])
+    
+    # ✅ FIX: Thêm bộ lọc filters=[parse_vnd_amount] để tự động xóa dấu chấm
     amount = FloatField(
         'Số tiền',
         validators=[DataRequired(), NumberRange(min=0.01, message="Số tiền phải lớn hơn 0")],
+        filters=[parse_vnd_amount]
     )
+    
     category = SelectField('Danh mục', choices=CATEGORY_CHOICES)
     type = SelectField('Loại', choices=[('expense', 'Chi tiêu'), ('income', 'Thu nhập')])
     submit = SubmitField('Lưu')
 
-    # ✅ FIX P1: đảm bảo category khớp với type
     def validate_type(self, field):
         if field.data not in ('expense', 'income'):
             raise ValidationError('Loại giao dịch không hợp lệ.')
@@ -128,6 +141,7 @@ class BudgetForm(FlaskForm):
     amount = FloatField(
         'Số tiền ngân sách',
         validators=[DataRequired(), NumberRange(min=0.01, message="Số tiền phải lớn hơn 0")],
+        filters=[parse_vnd_amount] # ✅ Áp dụng luôn cho Ngân sách
     )
     submit = SubmitField('Thiết lập')
 
@@ -135,7 +149,7 @@ class BudgetForm(FlaskForm):
 class TaskForm(FlaskForm):
     title = StringField('Tiêu đề', validators=[DataRequired(), Length(max=100)])
     description = TextAreaField('Mô tả', validators=[Optional()])
-    deadline = DateField('Hạn chót', validators=[DataRequired()])
+    deadline = DateField('Hạn chót', validators=[DataRequired()], format=['%Y-%m-%d', '%m/%d/%Y'])
     status = SelectField(
         'Trạng thái',
         choices=[('pending', 'Chờ xử lý'), ('in_progress', 'Đang thực hiện'), ('done', 'Hoàn thành')],

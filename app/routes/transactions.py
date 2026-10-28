@@ -6,7 +6,7 @@ from app.models import Transaction
 from datetime import datetime
 import csv
 import io
-import re # ✅ Thêm thư viện Regex để lọc rác
+import re
 
 bp = Blueprint('transactions', __name__)
 
@@ -37,6 +37,11 @@ def add_transaction():
         db.session.commit()
         flash('Đã thêm giao dịch thành công.', 'success')
         return redirect(url_for('transactions.list_transactions'))
+    
+    # ✅ In lỗi ra Terminal để dễ debug
+    if form.errors:
+        print("LỖI FORM GIAO DỊCH:", form.errors)
+        
     return render_template('transactions/form.html', form=form, title='Thêm Giao dịch')
 
 @bp.route('/transactions/edit/<int:id>', methods=['GET', 'POST'])
@@ -52,6 +57,11 @@ def edit_transaction(id):
         db.session.commit()
         flash('Đã cập nhật giao dịch.', 'success')
         return redirect(url_for('transactions.list_transactions'))
+        
+    # ✅ In lỗi ra Terminal
+    if form.errors:
+        print("LỖI FORM GIAO DỊCH:", form.errors)
+        
     return render_template('transactions/form.html', form=form, title='Sửa Giao dịch')
 
 @bp.route('/transactions/delete/<int:id>')
@@ -78,7 +88,6 @@ def import_csv():
         return redirect(url_for('transactions.list_transactions'))
 
     try:
-        # Đọc bytes và xử lý bảng mã
         file_content = file.read()
         if isinstance(file_content, bytes):
             if file_content.startswith(b'\xff\xfe') or file_content.startswith(b'\xfe\xff'):
@@ -95,7 +104,6 @@ def import_csv():
         file_content = file_content.replace('\x00', '')
         stream = io.StringIO(file_content, newline='')
         
-        # Tự động phát hiện dấu phân cách
         try:
             dialect = csv.Sniffer().sniff(stream.read(1024))
             stream.seek(0)
@@ -104,11 +112,9 @@ def import_csv():
 
         csv_input = csv.DictReader(stream, dialect=dialect)
         
-        # ✅ FIX: Lọc sạch các ký tự rác trong Header, chỉ giữ lại các chữ cái a-z
         if csv_input.fieldnames:
             cleaned_fieldnames = []
             for f in csv_input.fieldnames:
-                # Chỉ giữ lại chữ cái tiếng Anh (a-z) và đưa về chữ thường
                 clean_name = re.sub(r'[^a-zA-Z]', '', str(f)).lower()
                 cleaned_fieldnames.append(clean_name)
             csv_input.fieldnames = cleaned_fieldnames
@@ -126,18 +132,15 @@ def import_csv():
         
         for row in csv_input:
             try:
-                # Lấy dữ liệu, xóa khoảng trắng thừa
                 date_str = row.get('date', '').strip()
                 amount_str = row.get('amount', '').strip()
                 
-                # Đề phòng dữ liệu ngày tháng bị dính chữ rác (VD: 2026-10-01[]), ta dùng Regex lấy ngày
                 date_match = re.search(r'\d{4}-\d{2}-\d{2}', date_str)
                 if date_match:
                     date = datetime.strptime(date_match.group(), '%Y-%m-%d').date()
                 else:
                     continue
 
-                # Tương tự với số tiền, chỉ lấy số
                 amount_match = re.search(r'\d+(\.\d+)?', amount_str)
                 if amount_match:
                     amount = float(amount_match.group())
