@@ -105,7 +105,7 @@
 </div>
 
 <script>
-    // ĐÓNG GÓI TRONG IIFE ĐỂ TRÁNH LỖI KHAI BÁO BIẾN TRÙNG LẶP KHI HTMX CHUYỂN TRANG
+    // IIFE để tránh ô nhiễm biến toàn cục khi HTMX chuyển trang
     (function() {
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
         const formatMoney = (amount) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 }).format(amount || 0);
@@ -137,7 +137,6 @@
 
         async function fetchDashboardStats() {
             if (isCalculating) return; 
-            // Kiểm tra xem có đang ở trang Dashboard không để tránh lỗi khi chuyển trang
             if (!document.getElementById('val-income')) return; 
 
             try {
@@ -221,7 +220,7 @@
                                         font: { family: "'Inter', sans-serif", size: 13, weight: '600' }, 
                                         color: textColor, 
                                         usePointStyle: true, 
-                                        pointStyle: 'rectRounded', // Đổi thành ô vuông bo góc
+                                        pointStyle: 'rectRounded', // Dạng ô vuông bo góc
                                         boxWidth: 12, 
                                         boxHeight: 12, 
                                         padding: 20 
@@ -251,7 +250,7 @@
                                     ticks: {
                                         font: { family: "'Inter', sans-serif", size: 13, weight: '600' },
                                         color: textColor, padding: 10,
-                                        callback: function(value) { return formatCompactMoney(value); } // Rút gọn số (VD: 2 Tr)
+                                        callback: function(value) { return formatCompactMoney(value); } 
                                     },
                                     grid: { color: gridColor, drawBorder: false, borderDash: [5, 5] }
                                 }
@@ -266,10 +265,6 @@
                 }
             } catch (error) { 
                 console.error("Lỗi API:", error);
-                document.getElementById('val-income').innerHTML = `<span class="text-red-500 text-base">Lỗi dữ liệu</span>`;
-                document.getElementById('val-expense').innerHTML = `<span class="text-red-500 text-base">Lỗi dữ liệu</span>`;
-                document.getElementById('val-balance').innerHTML = `<span class="text-red-500 text-base">Lỗi dữ liệu</span>`;
-                document.getElementById('chart-skeleton').innerHTML = `<span class="text-red-500">Không thể tải biểu đồ</span>`;
             }
         }
 
@@ -314,7 +309,7 @@
         fetchDashboardStats(); 
         fetchAIPrediction();
 
-        // Setup Interval tự động hủy khi rời trang
+        // Setup Interval tự động
         const intervalId = setInterval(() => {
             if (!document.getElementById('val-income')) {
                 clearInterval(intervalId);
@@ -322,77 +317,85 @@
                 fetchDashboardStats();
             }
         }, 3000); 
-
-        // Gắn sự kiện cho Form
-        const planForm = document.getElementById('plan-form');
-        if (planForm) {
-            planForm.addEventListener('submit', async (e) => {
-                e.preventDefault(); 
-                
-                const btn = document.getElementById('plan-btn');
-                const originalText = btn.innerText;
-                btn.innerText = 'Đang tính...'; 
-                btn.disabled = true; 
-                btn.classList.add('opacity-70');
-                
-                isCalculating = true; 
-
-                const payload = {
-                    monthly_income: parseFloat(document.getElementById('monthly_income').value),
-                    savings_percent: parseFloat(document.getElementById('savings_percent').value),
-                    category_weights: {
-                        food: parseFloat(document.getElementById('weight_food').value),
-                        transport: parseFloat(document.getElementById('weight_transport').value),
-                        education: parseFloat(document.getElementById('weight_education').value),
-                        entertainment: parseFloat(document.getElementById('weight_entertainment').value),
-                        shopping: parseFloat(document.getElementById('weight_shopping').value),
-                        bills: parseFloat(document.getElementById('weight_bills').value),
-                        other: parseFloat(document.getElementById('weight_other').value)
-                    }
-                };
-
-                try {
-                    const response = await fetch('/api/financial-plan', {
-                        method: 'POST', 
-                        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken }, 
-                        body: JSON.stringify(payload)
-                    });
-                    
-                    let data;
-                    const contentType = response.headers.get("content-type");
-                    if (contentType && contentType.indexOf("application/json") !== -1) {
-                        data = await response.json();
-                    } else {
-                        data = { error: "Máy chủ trả về dữ liệu không hợp lệ" };
-                    }
-                    
-                    if (response.ok) {
-                        document.getElementById('savings_amt').innerText = formatMoney(data.savings);
-                        const budgetsList = document.getElementById('budgets-list'); 
-                        budgetsList.innerHTML = '';
-                        const vnNames = { food: 'Ăn uống', transport: 'Di chuyển', other: 'Khác', education: 'Học tập', entertainment: 'Giải trí', shopping: 'Mua sắm', bills: 'Hóa đơn' };
-                        
-                        for (const [cat, amt] of Object.entries(data.budgets)) {
-                            const li = document.createElement('li'); 
-                            li.innerHTML = `<strong>${vnNames[cat] || cat}</strong>: ${formatMoney(amt)} VND`; 
-                            budgetsList.appendChild(li);
-                        }
-                        document.getElementById('plan-result').classList.remove('hidden');
-                        showToast('Lập kế hoạch thành công!', 'success');
-                    } else { 
-                        showToast('Lỗi: ' + (data.error || 'Không thể tạo kế hoạch'), 'error'); 
-                    }
-                } catch (error) { 
-                    console.error(error);
-                    showToast('Lỗi kết nối máy chủ hoặc dữ liệu không hợp lệ!', 'error'); 
-                } finally {
-                    isCalculating = false; 
-                    btn.innerText = originalText; 
-                    btn.disabled = false; 
-                    btn.classList.remove('opacity-70');
-                }
-            });
-        }
     })(); // Kết thúc IIFE
+</script>
+
+<!-- SCRIPT XỬ LÝ FORM BẰNG EVENT DELEGATION -->
+<script>
+    document.addEventListener('submit', async function(e) {
+        if (e.target && e.target.id === 'plan-form') {
+            e.preventDefault(); 
+            
+            const btn = document.getElementById('plan-btn');
+            const originalText = btn.innerText;
+            btn.innerText = 'Đang tính...'; 
+            btn.disabled = true; 
+            btn.classList.add('opacity-70');
+
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+
+            const payload = {
+                monthly_income: parseFloat(document.getElementById('monthly_income').value),
+                savings_percent: parseFloat(document.getElementById('savings_percent').value),
+                category_weights: {
+                    food: parseFloat(document.getElementById('weight_food').value),
+                    transport: parseFloat(document.getElementById('weight_transport').value),
+                    education: parseFloat(document.getElementById('weight_education').value),
+                    entertainment: parseFloat(document.getElementById('weight_entertainment').value),
+                    shopping: parseFloat(document.getElementById('weight_shopping').value),
+                    bills: parseFloat(document.getElementById('weight_bills').value),
+                    other: parseFloat(document.getElementById('weight_other').value)
+                }
+            };
+
+            try {
+                const response = await fetch('/api/financial-plan', {
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken }, 
+                    body: JSON.stringify(payload)
+                });
+                
+                let data;
+                const contentType = response.headers.get("content-type");
+                if (contentType && contentType.indexOf("application/json") !== -1) {
+                    data = await response.json();
+                } else {
+                    data = { error: "Máy chủ trả về dữ liệu không hợp lệ" };
+                }
+                
+                if (response.ok) {
+                    const formatMoney = (amount) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 }).format(amount || 0);
+                    document.getElementById('savings_amt').innerText = formatMoney(data.savings);
+                    const budgetsList = document.getElementById('budgets-list'); 
+                    budgetsList.innerHTML = '';
+                    const vnNames = { food: 'Ăn uống', transport: 'Di chuyển', other: 'Khác', education: 'Học tập', entertainment: 'Giải trí', shopping: 'Mua sắm', bills: 'Hóa đơn' };
+                    
+                    for (const [cat, amt] of Object.entries(data.budgets)) {
+                        const li = document.createElement('li'); 
+                        li.innerHTML = `<strong>${vnNames[cat] || cat}</strong>: ${formatMoney(amt)} VND`; 
+                        budgetsList.appendChild(li);
+                    }
+                    document.getElementById('plan-result').classList.remove('hidden');
+                    
+                    // Toast báo thành công
+                    const toast = document.createElement('div');
+                    toast.className = `fixed top-5 right-5 z-[100] px-6 py-4 rounded-lg shadow-2xl text-white font-semibold transition-all duration-300 transform translate-x-full flex items-center gap-3 bg-green-600`;
+                    toast.innerHTML = `<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> <span>Lập kế hoạch thành công!</span>`;
+                    document.body.appendChild(toast);
+                    setTimeout(() => { toast.classList.remove('translate-x-full'); toast.classList.add('translate-x-0'); }, 10);
+                    setTimeout(() => { toast.classList.remove('translate-x-0'); toast.classList.add('translate-x-full'); setTimeout(() => toast.remove(), 300); }, 3000);
+                } else { 
+                    alert('Lỗi: ' + (data.error || 'Không thể tạo kế hoạch')); 
+                }
+            } catch (error) { 
+                console.error(error);
+                alert('Lỗi kết nối máy chủ hoặc dữ liệu không hợp lệ!'); 
+            } finally {
+                btn.innerText = originalText; 
+                btn.disabled = false; 
+                btn.classList.remove('opacity-70');
+            }
+        }
+    });
 </script>
 {% endblock %}
