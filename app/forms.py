@@ -33,16 +33,28 @@ def parse_vnd_amount(value):
 class RegistrationForm(FlaskForm):
     username = StringField(
         'Tên đăng nhập',
-        validators=[DataRequired(), Length(min=3, max=64)],
+        validators=[
+            DataRequired(message='Vui lòng nhập tên đăng nhập.'), 
+            Length(min=3, max=64, message='Tên đăng nhập phải từ 3 đến 64 ký tự.')
+        ],
         filters=[_norm_username],
     )
     email = StringField(
         'Email',
-        validators=[DataRequired(), Email()],
+        validators=[
+            DataRequired(message='Vui lòng nhập email.'), 
+            Email(message='Địa chỉ email không hợp lệ.')
+        ],
         filters=[_norm_email],
     )
-    password = PasswordField('Mật khẩu', validators=[DataRequired(), Length(min=6)])
-    confirm = PasswordField('Xác nhận mật khẩu', validators=[DataRequired(), EqualTo('password')])
+    password = PasswordField('Mật khẩu', validators=[
+        DataRequired(message='Vui lòng nhập mật khẩu.'), 
+        Length(min=6, message='Mật khẩu phải có ít nhất 6 ký tự.')
+    ])
+    confirm = PasswordField('Xác nhận mật khẩu', validators=[
+        DataRequired(message='Vui lòng xác nhận mật khẩu.'), 
+        EqualTo('password', message='Mật khẩu xác nhận không khớp.')
+    ])
     submit = SubmitField('Đăng ký')
 
     def validate_username(self, username):
@@ -57,10 +69,13 @@ class RegistrationForm(FlaskForm):
 class LoginForm(FlaskForm):
     email = StringField(
         'Email',
-        validators=[DataRequired(), Email()],
+        validators=[
+            DataRequired(message='Vui lòng nhập email.'), 
+            Email(message='Địa chỉ email không hợp lệ.')
+        ],
         filters=[_norm_email],
     )
-    password = PasswordField('Mật khẩu', validators=[DataRequired()])
+    password = PasswordField('Mật khẩu', validators=[DataRequired(message='Vui lòng nhập mật khẩu.')])
     remember = BooleanField('Ghi nhớ đăng nhập')
     submit = SubmitField('Đăng nhập')
 
@@ -82,14 +97,19 @@ EXPENSE_CATEGORIES = {'food', 'transport', 'education', 'entertainment',
 
 
 class TransactionForm(FlaskForm):
-    # ✅ FIX: Chấp nhận cả format YYYY-MM-DD (chuẩn HTML) và MM/DD/YYYY (từ trình duyệt)
-    date = DateField('Ngày', validators=[DataRequired()], format=['%Y-%m-%d', '%m/%d/%Y'])
-    description = StringField('Mô tả', validators=[DataRequired(), Length(max=200)])
+    date = DateField('Ngày', validators=[DataRequired(message='Vui lòng chọn ngày.')], format=['%Y-%m-%d', '%m/%d/%Y'])
+    description = StringField('Mô tả', validators=[
+        DataRequired(message='Vui lòng nhập mô tả.'), 
+        Length(max=200, message='Mô tả không được vượt quá 200 ký tự.')
+    ])
     
-    # ✅ FIX: Thêm bộ lọc filters=[parse_vnd_amount] để tự động xóa dấu chấm
+    # ✅ FIX GIỚI HẠN SỐ TIỀN: Thêm max=10 tỷ để chặn lỗi nhập số ảo
     amount = FloatField(
         'Số tiền',
-        validators=[DataRequired(), NumberRange(min=0.01, message="Số tiền phải lớn hơn 0")],
+        validators=[
+            DataRequired(message='Vui lòng nhập số tiền.'), 
+            NumberRange(min=1000, max=10000000000, message="Số tiền phải từ 1.000 đến 10.000.000.000 VNĐ.")
+        ],
         filters=[parse_vnd_amount]
     )
     
@@ -132,31 +152,45 @@ class BudgetForm(FlaskForm):
     month = SelectField(
         'Tháng',
         choices=[(str(i), f'Tháng {i}') for i in range(1, 13)],
-        validators=[DataRequired()],
+        validators=[DataRequired(message='Vui lòng chọn tháng.')],
     )
     year = IntegerField(
         'Năm',
-        validators=[DataRequired(), NumberRange(min=2020, max=2100)],
+        validators=[
+            DataRequired(message='Vui lòng nhập năm.'), 
+            NumberRange(min=2020, max=2100, message='Năm phải từ 2020 đến 2100.')
+        ],
     )
+    
+    # ✅ FIX GIỚI HẠN SỐ TIỀN: Thêm max=10 tỷ để chặn lỗi nhập số ảo
     amount = FloatField(
         'Số tiền ngân sách',
-        validators=[DataRequired(), NumberRange(min=0.01, message="Số tiền phải lớn hơn 0")],
-        filters=[parse_vnd_amount] # ✅ Áp dụng luôn cho Ngân sách
+        validators=[
+            DataRequired(message='Vui lòng nhập số tiền ngân sách.'), 
+            NumberRange(min=1000, max=10000000000, message="Số tiền phải từ 1.000 đến 10.000.000.000 VNĐ.")
+        ],
+        filters=[parse_vnd_amount]
     )
     submit = SubmitField('Thiết lập')
 
 
 class TaskForm(FlaskForm):
-    title = StringField('Tiêu đề', validators=[DataRequired(), Length(max=100)])
+    title = StringField('Tiêu đề', validators=[
+        DataRequired(message='Vui lòng nhập tiêu đề.'), 
+        Length(max=100, message='Tiêu đề không được vượt quá 100 ký tự.')
+    ])
     description = TextAreaField('Mô tả', validators=[Optional()])
-    deadline = DateField('Hạn chót', validators=[DataRequired()], format=['%Y-%m-%d', '%m/%d/%Y'])
+    deadline = DateField('Hạn chót', validators=[DataRequired(message='Vui lòng chọn hạn chót.')], format=['%Y-%m-%d', '%m/%d/%Y'])
     status = SelectField(
         'Trạng thái',
         choices=[('pending', 'Chờ xử lý'), ('in_progress', 'Đang thực hiện'), ('done', 'Hoàn thành')],
     )
     progress = IntegerField(
         'Tiến độ (%)',
-        validators=[InputRequired(), NumberRange(min=0, max=100)],
+        validators=[
+            InputRequired(message='Vui lòng nhập tiến độ.'), 
+            NumberRange(min=0, max=100, message='Tiến độ phải từ 0 đến 100%.')
+        ],
         default=0,
     )
     milestone = SelectField(
@@ -170,23 +204,38 @@ class TaskForm(FlaskForm):
 class ForgotPasswordForm(FlaskForm):
     email = StringField(
         'Email',
-        validators=[DataRequired(), Email()],
+        validators=[
+            DataRequired(message='Vui lòng nhập email.'), 
+            Email(message='Địa chỉ email không hợp lệ.')
+        ],
         filters=[_norm_email],
     )
     submit = SubmitField('Gửi Link Đặt Lại')
 
 
 class ResetPasswordForm(FlaskForm):
-    password = PasswordField('Mật khẩu mới', validators=[DataRequired(), Length(min=6)])
-    confirm = PasswordField('Xác nhận mật khẩu', validators=[DataRequired(), EqualTo('password')])
+    password = PasswordField('Mật khẩu mới', validators=[
+        DataRequired(message='Vui lòng nhập mật khẩu mới.'), 
+        Length(min=6, message='Mật khẩu phải có ít nhất 6 ký tự.')
+    ])
+    confirm = PasswordField('Xác nhận mật khẩu', validators=[
+        DataRequired(message='Vui lòng xác nhận mật khẩu.'), 
+        EqualTo('password', message='Mật khẩu xác nhận không khớp.')
+    ])
     submit = SubmitField('Đặt lại mật khẩu')
 
 
 class ChangePasswordForm(FlaskForm):
-    old_password = PasswordField('Mật khẩu cũ', validators=[DataRequired()])
-    new_password = PasswordField('Mật khẩu mới', validators=[DataRequired(), Length(min=6)])
+    old_password = PasswordField('Mật khẩu cũ', validators=[DataRequired(message='Vui lòng nhập mật khẩu cũ.')])
+    new_password = PasswordField('Mật khẩu mới', validators=[
+        DataRequired(message='Vui lòng nhập mật khẩu mới.'), 
+        Length(min=6, message='Mật khẩu phải có ít nhất 6 ký tự.')
+    ])
     confirm = PasswordField(
         'Xác nhận mật khẩu mới',
-        validators=[DataRequired(), EqualTo('new_password')],
+        validators=[
+            DataRequired(message='Vui lòng xác nhận mật khẩu mới.'), 
+            EqualTo('new_password', message='Mật khẩu xác nhận không khớp.')
+        ],
     )
     submit = SubmitField('Đổi mật khẩu')

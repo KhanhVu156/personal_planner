@@ -19,6 +19,28 @@ def list_budgets():
 @login_required
 def add_budget():
     form = BudgetForm()
+    
+    # ✅ FIX: Nếu là GET (bấm nút Sửa), tự động lấy dữ liệu cũ điền vào form
+    if request.method == 'GET':
+        req_month = request.args.get('month')
+        req_year = request.args.get('year')
+        req_cat = request.args.get('category')
+        
+        if req_month and req_year and req_cat:
+            form.month.data = str(req_month)
+            form.year.data = int(req_year)
+            form.category.data = req_cat
+            
+            # Tìm ngân sách hiện tại để điền số tiền cũ
+            existing = Budget.query.filter_by(
+                user_id=current_user.id,
+                category=req_cat,
+                month=int(req_month),
+                year=int(req_year)
+            ).first()
+            if existing:
+                form.amount.data = existing.amount
+
     if form.validate_on_submit():
         month_val = int(form.month.data)
         year_val = int(form.year.data)
@@ -33,7 +55,7 @@ def add_budget():
         try:
             if existing:
                 existing.amount = form.amount.data
-                flash('Đã cập nhật ngân sách thành công!', 'success')
+                flash(f'Đã cập nhật ngân sách Tháng {month_val}/{year_val} thành công!', 'success')
             else:
                 budget = Budget(
                     user_id=current_user.id,
@@ -43,7 +65,7 @@ def add_budget():
                     amount=form.amount.data
                 )
                 db.session.add(budget)
-                flash('Đã thêm ngân sách mới thành công!', 'success')
+                flash(f'Đã thêm ngân sách Tháng {month_val}/{year_val} thành công!', 'success')
             db.session.commit()
             return redirect(url_for('budgets.list_budgets', month=month_val, year=year_val))
         except Exception as e:
@@ -56,7 +78,6 @@ def add_budget():
 
     return render_template('budgets/form.html', form=form)
 
-# ✅ THÊM HÀM NÀY ĐỂ SỬA LỖI BUILD ERROR
 @bp.route('/budgets/delete/<int:id>')
 @login_required
 def delete_budget(id):

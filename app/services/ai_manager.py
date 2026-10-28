@@ -82,6 +82,15 @@ def _send_task(task_data, timeout=10.0):
             _pending.pop(request_id, None)
         return None
 
+# ✅ BỔ SUNG: Hàm gửi lệnh train ngầm (fire-and-forget) không chờ kết quả
+def trigger_training_async(user_id):
+    _ensure_worker()
+    request_id = str(uuid.uuid4())
+    try:
+        _input_queue.put(("TRAIN", user_id, request_id), timeout=2.0)
+    except Exception as e:
+        print(f"[AI Manager] Lỗi trigger train async: {e}")
+
 def init_ai_worker():
     _ensure_worker()
     _ensure_dispatcher()

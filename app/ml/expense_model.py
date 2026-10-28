@@ -170,15 +170,10 @@ def predict_expense(user_id, future_date, category, db_session):
     paths = _get_paths(user_id)
     import tensorflow as tf
     
-    # ✅ FIX: Kiểm tra sự tồn tại của TẤT CẢ các file (model, scaler, encoder, target_scaler)
-    # Nếu thiếu bất kỳ file nào (ví dụ: chưa train bao giờ, hoặc vừa xóa), tiến hành train lại
+    # ✅ FIX TRIỆT ĐỂ: Tuyệt đối KHÔNG gọi train_model ở đây.
+    # Nếu thiếu file, trả về 0.0 ngay lập tức để không bao giờ bị timeout.
     if not all(os.path.exists(p) for p in paths.values()):
-        print(f"[AI Debug] Thiếu file model/scaler cho User {user_id}. Tiến hành train lại...")
-        train_model(user_id, db_session)
-        # Nếu train xong mà vẫn thiếu (do lỗi) thì trả về 0
-        if not all(os.path.exists(p) for p in paths.values()):
-            print(f"[AI Debug] Train lại thất bại hoặc vẫn thiếu file cho User {user_id}.")
-            return 0.0
+        return 0.0
             
     if user_id in _model_cache:
         interpreter = _model_cache[user_id]['interpreter']
