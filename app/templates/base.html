@@ -15,7 +15,7 @@
     <!-- Tải CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     
-    <!-- LEVEL 4: Tải Chart.js bất đồng bộ (Đã thêm lại) -->
+    <!-- Tải Chart.js (Bất đồng bộ) -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
 
     <!-- HTMX: Thư viện giúp chuyển trang siêu mượt không cần tải lại -->
@@ -169,12 +169,6 @@
         // CHẠY LẠI KHI HTMX CHUYỂN TRANG (Cực kỳ quan trọng)
         document.body.addEventListener('htmx:afterSwap', function(evt) {
             initApp(); 
-            // Nếu chuyển sang trang Dashboard, khởi động lại biểu đồ
-            if (window.location.pathname === '/') {
-                if (typeof initDashboardCharts === 'function') {
-                    initDashboardCharts();
-                }
-            }
         });
     </script>
 </body>
