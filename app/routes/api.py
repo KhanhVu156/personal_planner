@@ -15,41 +15,63 @@ bp = Blueprint('api', __name__, url_prefix='/api')
 def get_dashboard_stats():
     try:
         user_id = current_user.id
-        all_trans = Transaction.query.filter_by(user_id=user_id).order_by(Transaction.date.desc()).all()
-        
         today = datetime.now()
         month, year = today.month, today.year
         
-        if not any(t.date.month == month and t.date.year == year for t in all_trans):
-            if all_trans:
-                latest_date = all_trans[0].date
-                month, year = latest_date.month, latest_date.year
+        # 1. Kiểm tra tháng hiện tại có giao dịch không (chỉ query ID)
+        has_trans = db.session.query(Transaction.id).filter(
+            Transaction.user_id == user_id,
+            func.extract('month', Transaction.date) == month,
+            func.extract('year', Transaction.date) == year
+        ).first()
 
-        income_month = 0.0
-        expense_month = 0.0
-        cat_exp_dict = {}
-        total_income = 0.0
-        total_expense = 0.0
+        if not has_trans:
+            # Lấy tháng của giao dịch mới nhất
+            latest_trans = db.session.query(Transaction.date).filter_by(user_id=user_id).order_by(Transaction.date.desc()).first()
+            if latest_trans:
+                month, year = latest_trans.date.month, latest_trans.date.year
 
-        for t in all_trans:
-            if t.type == 'income':
-                total_income += float(t.amount)
-            else:
-                total_expense += float(t.amount)
-
-            if t.date.month == month and t.date.year == year:
-                if t.type == 'income':
-                    income_month += float(t.amount)
-                elif t.type == 'expense':
-                    expense_month += float(t.amount)
-                    cat_exp_dict[t.category] = cat_exp_dict.get(t.category, 0.0) + float(t.amount)
-
+        # 2. Tính tổng thu nhập & chi tiêu TOÀN THỜI GIAN bằng SQL
+        totals = db.session.query(
+            Transaction.type,
+            func.coalesce(func.sum(Transaction.amount), 0)
+        ).filter(Transaction.user_id == user_id).group_by(Transaction.type).all()
+        
+        total_income = next((float(t[1]) for t in totals if t[0] == 'income'), 0.0)
+        total_expense = next((float(t[1]) for t in totals if t[0] == 'expense'), 0.0)
         balance = total_income - total_expense
 
-        # SỬA LỖI: Ép kiểu int cho month, year khi query Budget
+        # 3. Tính thu/chi THÁNG HIỆN TẠI bằng SQL
+        month_totals = db.session.query(
+            Transaction.type,
+            func.coalesce(func.sum(Transaction.amount), 0)
+        ).filter(
+            Transaction.user_id == user_id,
+            func.extract('month', Transaction.date) == month,
+            func.extract('year', Transaction.date) == year
+        ).group_by(Transaction.type).all()
+
+        income_month = next((float(t[1]) for t in month_totals if t[0] == 'income'), 0.0)
+        expense_month = next((float(t[1]) for t in month_totals if t[0] == 'expense'), 0.0)
+
+        # 4. Chi tiêu theo category trong tháng
+        cat_exp = db.session.query(
+            Transaction.category,
+            func.coalesce(func.sum(Transaction.amount), 0)
+        ).filter(
+            Transaction.user_id == user_id,
+            Transaction.type == 'expense',
+            func.extract('month', Transaction.date) == month,
+            func.extract('year', Transaction.date) == year
+        ).group_by(Transaction.category).all()
+        
+        cat_exp_dict = {cat: float(total) for cat, total in cat_exp}
+
+        # 5. Lấy Ngân sách
         budgets = Budget.query.filter_by(user_id=user_id, month=int(month), year=int(year)).all()
         budget_dict = {b.category: float(b.amount) for b in budgets}
 
+        # 6. Lấy Task sắp tới
         upcoming_tasks = Task.query.filter_by(user_id=user_id) \
             .filter(Task.status.in_(['pending', 'in_progress'])) \
             .order_by(Task.deadline.asc()).limit(5).all()
@@ -113,7 +135,8 @@ def train():
 def financial_plan():
     try:
         from app.services.financial_planner import FinancialPlanner
-        data = request.get_json()
+        # ✅ FIX: silent=True để tránh crash nếu client gửi sai Content-Type
+        data = request.get_json(silent=True) or {}
         if not data: 
             return jsonify({'error': 'Dữ liệu gửi lên bị trống'}), 400
             

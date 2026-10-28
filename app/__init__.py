@@ -16,6 +16,7 @@ csrf = CSRFProtect()
 cache = Cache()
 compress = Compress()
 
+
 def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
@@ -25,24 +26,32 @@ def create_app(config_class=Config):
     mail.init_app(app)
     csrf.init_app(app)
 
-    # --- FALLBACK REDIS AN TOÀN ---
+    # --- REDIS FALLBACK AN TOÀN (thử Redis trước, tự fallback SimpleCache nếu lỗi) ---
     redis_url = os.environ.get('REDIS_URL')
+    cache_config = {
+        'CACHE_TYPE': 'SimpleCache',
+        'CACHE_DEFAULT_TIMEOUT': 10,
+    }
     if redis_url and redis_url.startswith(('redis://', 'rediss://')):
-        cache_config = {
-            'CACHE_TYPE': 'RedisCache',
-            'CACHE_REDIS_URL': redis_url,
-            'CACHE_DEFAULT_TIMEOUT': 10
-        }
-        print("[Cache] Đang sử dụng Upstash Redis.")
+        try:
+            test_cfg = {
+                'CACHE_TYPE': 'RedisCache',
+                'CACHE_REDIS_URL': redis_url,
+                'CACHE_DEFAULT_TIMEOUT': 10,
+            }
+            # Thử init và ping thử để chắc chắn Redis sống
+            probe = Cache()
+            probe.init_app(app, config=test_cfg)
+            probe.get('__probe__')
+            cache_config = test_cfg
+            print("[Cache] Đang sử dụng Upstash Redis.")
+        except Exception as e:
+            print(f"[Cache] Redis không khả dụng ({e}). Fallback SimpleCache.")
     else:
-        cache_config = {
-            'CACHE_TYPE': 'SimpleCache',
-            'CACHE_DEFAULT_TIMEOUT': 10
-        }
         print("[Cache] Không tìm thấy REDIS_URL hợp lệ. Sử dụng SimpleCache.")
     cache.init_app(app, config=cache_config)
 
-    # --- LEVEL 4: NÉN GZIP/BROTLI ---
+    # --- NÉN GZIP/BROTLI ---
     compress.init_app(app)
     app.config['COMPRESS_ALGORITHM'] = ['br', 'gzip']
     app.config['COMPRESS_BR_LEVEL'] = 4
@@ -54,9 +63,10 @@ def create_app(config_class=Config):
     login_manager.login_message = None
     login_manager.login_message_category = 'info'
 
+    # TODO: chuyển sang app/data/models/ để không lộ model qua /static/
     os.makedirs(os.path.join(app.root_path, 'static', 'models'), exist_ok=True)
 
-    # Đăng ký Blueprint
+    # Blueprints
     from app.routes.auth import bp as auth_bp
     app.register_blueprint(auth_bp)
     from app.routes.dashboard import bp as dashboard_bp
@@ -77,16 +87,27 @@ def create_app(config_class=Config):
     @app.after_request
     def add_cache_headers(response):
         if request.path.startswith('/static/'):
-            response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+            # ✅ FIX P2: CSS/JS được rebuild mỗi deploy → KHÔNG được cache immutable 1 năm,
+            # nếu không user sẽ dùng v1 mãi đến khi hết hạn.
+            if '/css/style.css' in request.path or '/js/main.js' in request.path:
+                response.headers['Cache-Control'] = 'no-cache, must-revalidate'
+            else:
+                response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
         elif request.path.startswith('/api/') or request.path == '/':
             response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
         return response
 
-    # ĐÃ XÓA ĐOẠN db.create_all() Ở ĐÂY
-
     return app
 
+
+# ✅ FIX P1: User.query.get() deprecated + int() có thể crash nếu cookie bị sửa
 from app.models import User
+
+
 @login_manager.user_loader
 def load_user(user_id):
-    return User.query.get(int(user_id))
+    try:
+        uid = int(user_id)
+    except (TypeError, ValueError):
+        return None
+    return db.session.get(User, uid)

@@ -27,7 +27,6 @@
                 {{ form.amount.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
                 <div class="relative">
                     <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500 dark:text-slate-400">VND</span>
-                    <!-- Đã bỏ max -->
                     {{ form.amount(class="w-full pl-12 pr-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white", placeholder="0", step="any") }}
                 </div>
             </div>
@@ -50,19 +49,23 @@
 </div>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
+    // ✅ FIX: dùng IIFE thay vì DOMContentLoaded (không fire khi HTMX swap)
+    (function() {
         const typeSelect = document.getElementById('trans-type');
         const categorySelect = document.getElementById('trans-category');
+        if (!typeSelect || !categorySelect) return;
 
-        if (typeSelect && categorySelect) {
-            typeSelect.addEventListener('change', function() {
-                if (this.value === 'income') {
-                    categorySelect.value = 'salary';
-                } else if (this.value === 'expense') {
-                    categorySelect.value = 'food';
-                }
-            });
-        }
-    });
+        // Guard: tránh bind trùng nếu script được eval lại sau HTMX swap
+        if (typeSelect.dataset.bound === '1') return;
+        typeSelect.dataset.bound = '1';
+
+        typeSelect.addEventListener('change', function() {
+            if (this.value === 'income') {
+                categorySelect.value = 'salary';
+            } else if (this.value === 'expense') {
+                categorySelect.value = 'food';
+            }
+        });
+    })();
 </script>
 {% endblock %}

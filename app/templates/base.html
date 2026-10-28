@@ -5,29 +5,27 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Personal Planner</title>
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    
+
+    <!-- Đọc dark mode từ localStorage TRƯỚC khi render để không bị flash -->
     <script>
         if (localStorage.getItem('darkMode') === 'enabled') {
             document.documentElement.classList.add('dark');
         }
     </script>
 
-    <!-- Tải CSS -->
+    <!-- CSS chính (Tailwind build) -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <!-- CSS bổ sung các class chưa được build -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}">
     
-    <!-- Tải Chart.js (Bất đồng bộ) -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
-
-    <!-- HTMX: Thư viện giúp chuyển trang siêu mượt không cần tải lại -->
     <script src="https://unpkg.com/htmx.org@1.9.12"></script>
-    
-    <!-- Prefetch các trang để tải trước khi cần -->
+
     <link rel="prefetch" href="{{ url_for('dashboard.index') }}">
     <link rel="prefetch" href="{{ url_for('transactions.list_transactions') }}">
     <link rel="prefetch" href="{{ url_for('budgets.list_budgets') }}">
     <link rel="prefetch" href="{{ url_for('tasks.list_tasks') }}">
 </head>
-<!-- KÍCH HOẠT HTMX BOOST -->
 <body hx-boost="true" hx-headers='{"X-CSRFToken": "{{ csrf_token() }}"}' class="bg-gray-50 text-gray-800 flex flex-col min-h-screen transition-colors duration-300 dark:bg-slate-900 dark:text-slate-200">
 
     <!-- NAVBAR -->
@@ -45,7 +43,7 @@
                         <a href="{{ url_for('budgets.list_budgets') }}" class="hover:text-blue-600 dark:hover:text-blue-400 transition">Ngân sách</a>
                         <a href="{{ url_for('tasks.list_tasks') }}" class="hover:text-blue-600 dark:hover:text-blue-400 transition">Công việc</a>
                         <a href="{{ url_for('auth.profile') }}" class="hover:text-blue-600 dark:hover:text-blue-400 transition">Cá nhân</a>
-                        <a href="{{ url_for('auth.logout') }}" class="text-red-500 hover:text-red-700 font-semibold transition">Đăng xuất</a>
+                        <a href="{{ url_for('auth.logout') }}" hx-boost="false" class="text-red-500 hover:text-red-700 font-semibold transition">Đăng xuất</a>
                     {% else %}
                         <a href="{{ url_for('auth.login') }}" class="hover:text-blue-600 transition">Đăng nhập</a>
                         <a href="{{ url_for('auth.register') }}" class="bg-blue-600 text-white px-4 py-1.5 rounded hover:bg-blue-700 transition">Đăng ký</a>
@@ -78,7 +76,7 @@
                     <a href="{{ url_for('budgets.list_budgets') }}" class="block py-2 hover:text-blue-600">Ngân sách</a>
                     <a href="{{ url_for('tasks.list_tasks') }}" class="block py-2 hover:text-blue-600">Công việc</a>
                     <a href="{{ url_for('auth.profile') }}" class="block py-2 hover:text-blue-600">Cá nhân</a>
-                    <a href="{{ url_for('auth.logout') }}" class="block py-2 text-red-500 font-semibold">Đăng xuất</a>
+                    <a href="{{ url_for('auth.logout') }}" hx-boost="false" class="block py-2 text-red-500 font-semibold">Đăng xuất</a>
                 {% endif %}
             </div>
         </div>
@@ -88,7 +86,14 @@
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
-                    <div class="mb-4 p-4 rounded-md flex justify-between items-center shadow-sm flash-message {{ 'bg-green-100 text-green-800 border-l-4 border-green-500 flash-success' if category=='success' else 'bg-red-100 text-red-800 border-l-4 border-red-500 flash-danger' }}">
+                    {% if category == 'success' %}
+                        {% set flash_class = 'bg-green-100 text-green-800 border-l-4 border-green-500 flash-success' %}
+                    {% elif category in ['info', 'message'] %}
+                        {% set flash_class = 'bg-blue-100 text-blue-800 border-l-4 border-blue-500 flash-info' %}
+                    {% else %}
+                        {% set flash_class = 'bg-red-100 text-red-800 border-l-4 border-red-500 flash-danger' %}
+                    {% endif %}
+                    <div class="mb-4 p-4 rounded-md flex justify-between items-center shadow-sm flash-message {{ flash_class }}">
                         <span class="font-medium">{{ message }}</span>
                         <button onclick="this.parentElement.remove()" class="text-gray-500 hover:text-gray-700 focus:outline-none">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
@@ -97,7 +102,7 @@
                 {% endfor %}
             {% endif %}
         {% endwith %}
-        
+
         {% block content %}{% endblock %}
     </main>
 
@@ -119,57 +124,9 @@
         </div>
     </div>
 
+    <!-- main.js xử lý TẤT CẢ event delegation + initApp + htmx:afterSwap hooks -->
     <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>
-    
-    <!-- Khối Script dành riêng cho các trang con -->
+
     {% block scripts %}{% endblock %}
-
-    <!-- Script xử lý Dark Mode, Mobile Menu và các sự kiện của HTMX -->
-    <script>
-        // Hàm khởi tạo giao diện (dùng chung cho cả lần load đầu và khi chuyển trang bằng HTMX)
-        function initApp() {
-            const htmlEl = document.documentElement;
-            const darkModeToggle = document.getElementById('darkModeToggle');
-            
-            if (htmlEl.classList.contains('dark') && darkModeToggle) darkModeToggle.checked = true;
-
-            const applyTheme = (isDark) => {
-                if (isDark) {
-                    htmlEl.classList.add('dark');
-                    localStorage.setItem('darkMode', 'enabled');
-                    if (darkModeToggle) darkModeToggle.checked = true;
-                } else {
-                    htmlEl.classList.remove('dark');
-                    localStorage.setItem('darkMode', 'disabled');
-                    if (darkModeToggle) darkModeToggle.checked = false;
-                }
-                // Cập nhật lại màu biểu đồ nếu có
-                if (window.updateChartTheme) window.updateChartTheme(isDark);
-            };
-            
-            if (darkModeToggle) {
-                // Xóa event cũ để tránh bị gán trùng lặp khi HTMX load lại
-                darkModeToggle.replaceWith(darkModeToggle.cloneNode(true));
-                const newToggle = document.getElementById('darkModeToggle');
-                newToggle.addEventListener('change', (e) => applyTheme(e.target.checked));
-            }
-            
-            const mobileMenuBtn = document.getElementById('mobileMenuBtn');
-            const mobileMenu = document.getElementById('mobileMenu');
-            if (mobileMenuBtn && mobileMenu) {
-                mobileMenuBtn.replaceWith(mobileMenuBtn.cloneNode(true));
-                const newBtn = document.getElementById('mobileMenuBtn');
-                newBtn.addEventListener('click', () => mobileMenu.classList.toggle('hidden'));
-            }
-        }
-
-        // Chạy khi load trang lần đầu
-        document.addEventListener('DOMContentLoaded', initApp);
-
-        // CHẠY LẠI KHI HTMX CHUYỂN TRANG (Cực kỳ quan trọng)
-        document.body.addEventListener('htmx:afterSwap', function(evt) {
-            initApp(); 
-        });
-    </script>
 </body>
 </html>

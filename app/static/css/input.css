@@ -1,7 +1,19 @@
 @import "tailwindcss";
 
-/* 1. Chỉ định Tailwind quét các file HTML trong thư mục templates */
+/* Quét class trong HTML template */
 @source "../../templates";
 
-/* 2. Kích hoạt tính năng Dark Mode theo class (nút gạt) thay vì theo hệ thống */
+/* Quét class trong JS (toast, slider badge, tag trạng thái) */
+@source "../../static/js";
+
+/* Quét trong Python nếu backend có render HTML string */
+@source "../../app";
+
+/* Dark mode theo class (nút gạt), không theo prefers-color-scheme */
 @custom-variant dark (&:where(.dark, .dark *));
+
+/* Lưu ý: File custom.css hiện được load riêng trong base.html.
+   Nếu muốn gộp chung vào 1 file style.css, bạn có thể thêm:
+   @import "./custom.css"; 
+   và xoá thẻ <link custom.css> trong base.html.
+*/

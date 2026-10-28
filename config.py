@@ -1,4 +1,5 @@
 import os
+from urllib.parse import urlparse
 from dotenv import load_dotenv
 from datetime import timedelta
 
@@ -6,6 +7,7 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 load_dotenv(os.path.join(basedir, '.env'))
 
 class Config:
+    # ✅ Bắt buộc phải có SECRET_KEY trên Production, nếu không sẽ báo lỗi
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-key-change-in-prod'
 
     # --- CẤU HÌNH TURSO (CHỈ KHI CÓ BIẾN MÔI TRƯỜNG) ---
@@ -13,31 +15,35 @@ class Config:
     turso_token = os.environ.get('TURSO_AUTH_TOKEN')
 
     if turso_url and turso_token:
-        # Trên Render (Linux): dùng Turso
-        # Lấy host từ URL (loại bỏ libsql:// và các dấu / thừa nếu có)
-        host = turso_url.replace('libsql://', '').replace('http://', '').replace('https://', '').rstrip('/')
+        # ✅ FIX P1: Dùng urlparse để bóc tách host chuẩn xác, tránh lỗi chuỗi
+        parsed_url = urlparse(turso_url)
+        host = parsed_url.netloc or parsed_url.path.replace('libsql://', '').strip('/')
         
         # Định dạng URI chuẩn cho sqlalchemy-libsql
         SQLALCHEMY_DATABASE_URI = f"sqlite+libsql://{host}?secure=true"
         
-        # Truyền token qua connect_args (Cách chuẩn của libsql)
+        # Truyền token qua connect_args
         SQLALCHEMY_ENGINE_OPTIONS = {
             "connect_args": {
                 "auth_token": turso_token
             },
             "pool_pre_ping": True,
-            "pool_recycle": 280,
+            "pool_recycle": 280, # Tránh timeout kết nối mạng tới Turso
         }
     else:
         # Dưới Windows (local): dùng SQLite file
         SQLALCHEMY_DATABASE_URI = 'sqlite:///' + os.path.join(basedir, 'app.db')
+        # ✅ FIX: SQLite không cần pool_recycle vì là file cục bộ
         SQLALCHEMY_ENGINE_OPTIONS = {
             "pool_pre_ping": True,
-            "pool_recycle": 280,
         }
 
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     # ------------------------------------------------
+
+    # ✅ FIX P1: Đảm bảo múi giờ Việt Nam cho các tác vụ (Scheduler)
+    # Sẽ hoạt động tốt nếu trên Render bạn thêm biến môi trường TZ=Asia/Ho_Chi_Minh
+    TIMEZONE = 'Asia/Ho_Chi_Minh'
 
     PERMANENT_SESSION_LIFETIME = timedelta(hours=2)
     REMEMBER_COOKIE_DURATION = timedelta(days=30)

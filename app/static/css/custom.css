@@ -1,0 +1,80 @@
+/* =========================================================
+ * custom.css — Bổ sung các class Tailwind bị thiếu
+ * Load file này SAU style.css trong base.html.
+ * ========================================================= */
+
+/* ---------- TOAST (dashboard JS tạo động) ---------- */
+.top-5 {
+    top: 1.25rem;
+}
+
+.right-5 {
+    right: 1.25rem;
+}
+
+.z-\[100\] {
+    z-index: 100;
+}
+
+.gap-3 {
+    gap: 0.75rem;
+}
+
+.shadow-2xl {
+    --tw-shadow: 0 25px 50px -12px var(--tw-shadow-color, rgb(0 0 0 / 0.25));
+    box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow),
+        var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+}
+
+.transition-all {
+    transition-property: all;
+    transition-timing-function: var(--tw-ease, var(--default-transition-timing-function));
+    transition-duration: var(--tw-duration, var(--default-transition-duration));
+}
+
+/* Tailwind v4 dùng CSS `translate` property (không phải transform) */
+.translate-x-full {
+    --tw-translate-x: 100%;
+    --tw-translate-y: 0;
+    translate: var(--tw-translate-x) var(--tw-translate-y);
+}
+
+.translate-x-0 {
+    --tw-translate-x: 0;
+    --tw-translate-y: 0;
+    translate: var(--tw-translate-x) var(--tw-translate-y);
+}
+
+/* ---------- AUTH: password toggle + disabled button ---------- */
+.pr-10 {
+    padding-right: 2.5rem;
+}
+
+.pr-4 {
+    padding-right: 1rem;
+}
+
+.-translate-y-1\/2 {
+    --tw-translate-x: 0;
+    --tw-translate-y: -50%;
+    translate: var(--tw-translate-x) var(--tw-translate-y);
+}
+
+.disabled\:opacity-60:disabled {
+    opacity: 0.6;
+}
+
+.disabled\:cursor-not-allowed:disabled {
+    cursor: not-allowed;
+}
+
+/* ---------- SKELETON LOADERS ---------- */
+@keyframes pulse {
+    50% {
+        opacity: 0.5;
+    }
+}
+
+.animate-pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}

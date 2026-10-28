@@ -55,7 +55,8 @@
                 </td>
                 <td class="py-4 px-4 text-center space-x-2">
                     <a href="{{ url_for('tasks.edit_task', id=task.id) }}" class="text-blue-600 hover:text-blue-800 font-medium text-sm">Sửa</a>
-                    <a href="{{ url_for('tasks.delete_task', id=task.id) }}" class="delete-confirm text-red-600 hover:text-red-800 font-medium text-sm">Xóa</a>
+                    <!-- ✅ FIX: hx-boost="false" để link xoá không bị HTMX tự follow -->
+                    <a href="{{ url_for('tasks.delete_task', id=task.id) }}" hx-boost="false" class="delete-confirm text-red-600 hover:text-red-800 font-medium text-sm">Xóa</a>
                 </td>
             </tr>
             {% else %}

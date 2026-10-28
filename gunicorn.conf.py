@@ -1,8 +1,8 @@
 import os
 
 workers = 1
-threads = 8 # Dùng 8 luồng để xử lý request
-worker_class = "gthread" # ĐỔI TỪ GEVENT VỀ GTHREAD
+threads = 8 # Xử lý 8 luồng (I/O bound + AI Worker chạy ngầm)
+worker_class = "gthread" # Gthread an toàn với TensorFlow và SQLAlchemy
 timeout = 120
 preload_app = False
 

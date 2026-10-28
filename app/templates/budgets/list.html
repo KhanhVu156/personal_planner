@@ -51,7 +51,8 @@
                 <td class="py-3 px-4 text-right font-bold text-gray-800 dark:text-slate-100">{{ "{:,.0f}".format(budget.amount) }} VND</td>
                 <td class="py-3 px-4 text-center space-x-3">
                     <a href="{{ url_for('budgets.add_budget', month=budget.month, year=budget.year, category=budget.category) }}" class="text-blue-600 dark:text-blue-400 hover:text-blue-800 font-medium">Sửa</a>
-                    <a href="{{ url_for('budgets.delete_budget', id=budget.id) }}" class="delete-confirm text-red-600 dark:text-red-400 hover:text-red-800 font-medium">Xóa</a>
+                    <!-- ✅ FIX: hx-boost="false" để link xoá không bị HTMX tự follow -->
+                    <a href="{{ url_for('budgets.delete_budget', id=budget.id) }}" hx-boost="false" class="delete-confirm text-red-600 dark:text-red-400 hover:text-red-800 font-medium">Xóa</a>
                 </td>
             </tr>
             {% else %}
