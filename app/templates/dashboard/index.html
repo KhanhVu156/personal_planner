@@ -10,11 +10,7 @@
             <div class="relative flex items-center h-full flex-1 md:flex-none">
                 <select name="month" aria-label="Chọn tháng" class="appearance-none bg-transparent pl-5 pr-10 h-full text-sm md:text-base font-semibold text-gray-700 dark:text-slate-200 focus:outline-none cursor-pointer">
                     {% for m in range(1, 13) %}
-                        <!-- 
-                            ✅ FIX DARK MODE DROPDOWN: 
-                            Thêm class nền trắng/chữ đen cho Light Mode và nền xám đậm/chữ trắng cho Dark Mode.
-                            Điều này ép trình duyệt phải render màu cho từng dòng bên trong danh sách xổ xuống.
-                        -->
+                        <!-- FIX: Nền tối cho option trong Dark Mode -->
                         <option value="{{ m }}" class="bg-white text-gray-800 dark:bg-slate-800 dark:text-slate-200" {% if m == display_month %}selected{% endif %}>
                             Tháng {{ m }}
                         </option>
@@ -123,12 +119,12 @@
             <input type="number" id="savings_percent" class="w-full px-3 py-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white" value="20">
         </div>
         <div class="md:col-span-2">
-            <button type="button" id="plan-btn" class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition font-semibold">Lập kế hoạch</button>
+            <button type="button" id="plan-btn" class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition font-semibold disabled:opacity-50 disabled:cursor-not-allowed">Lập kế hoạch</button>
         </div>
     </form>
-    <div id="plan-result" class="mt-6 p-4 bg-gray-50 dark:bg-slate-700 rounded hidden">
+    <div id="plan-result" class="mt-6 p-4 bg-gray-50 dark:bg-slate-700 rounded hidden border border-gray-200 dark:border-slate-600">
         <h4 class="font-bold text-lg text-green-700 dark:text-green-400">Ngân sách đề xuất:</h4>
-        <ul id="budgets-list" class="list-disc pl-5 mt-2"></ul>
+        <ul id="budgets-list" class="list-disc pl-5 mt-2 space-y-1 text-gray-700 dark:text-slate-300"></ul>
     </div>
 </div>
 
@@ -136,19 +132,12 @@
 
 {% block scripts %}
 <script>
-    /**
-     * TƯ DUY REFACTOR (SOLID - Single Responsibility Principle):
-     * Tách toàn bộ logic Dashboard thành các hàm nhỏ độc lập.
-     * Hàm chính fetchDashboardStats() chỉ làm nhiệm vụ gọi API và điều phối (orchestration).
-     * Việc chia nhỏ giúp code dễ đọc, dễ test và dễ bảo trì hơn rất nhiều so với việc nhồi nhét mọi thứ vào một hàm.
-     */
     (function () {
         'use strict';
         
-        // Các hằng số dùng chung
         const currentMonth = {{ display_month }};
         const currentYear = {{ display_year }};
-        const TODAY = new Date(); // Ngày hiện tại của Client (dùng để hiển thị text)
+        const TODAY = new Date();
         
         const formatMoney = (amount) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 }).format(amount || 0);
         const categoryMap = {'food': 'Ăn uống', 'transport': 'Di chuyển', 'education': 'Học tập', 'entertainment': 'Giải trí', 'shopping': 'Mua sắm', 'bills': 'Hóa đơn', 'other': 'Khác', 'salary': 'Lương'};
@@ -165,7 +154,6 @@
                 if (!response.ok) throw new Error('Network response was not ok');
                 const data = await response.json();
 
-                // Gọi các hàm render độc lập
                 renderSummary(data);
                 renderBurnRate(data.burn_rate);
                 renderInsights(data.insights);
@@ -175,7 +163,6 @@
                 
             } catch (err) {
                 console.error('Lỗi khi tải dữ liệu Dashboard:', err);
-                // Hiển thị lỗi lên UI thay vì chỉ log ra console
                 document.getElementById('insights-list').innerHTML = '<li class="text-red-500">Không thể tải dữ liệu. Vui lòng thử lại sau.</li>';
                 ['income', 'expense', 'balance'].forEach(id => {
                     const el = document.getElementById(`val-${id}`);
@@ -196,12 +183,10 @@
             
             const balanceEl = document.getElementById('val-balance');
             balanceEl.innerHTML = `${formatMoney(data.balance)} <span class="text-lg">VND</span>`;
-            // Đổi màu số dư nếu âm
             balanceEl.className = `text-3xl font-bold mt-2 ${data.balance < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-800 dark:text-slate-100'}`;
         }
 
         function renderBurnRate(burn) {
-            // Sửa lỗi logic so sánh tháng/năm: So sánh trực tiếp số tháng/năm thay vì dùng Date object của Client (tránh lỗi Timezone)
             const isCurrent = (currentMonth === TODAY.getMonth() + 1) && (currentYear === TODAY.getFullYear());
             const monthText = isCurrent ? 'tháng này' : 'tháng đã chọn';
 
@@ -240,7 +225,6 @@
             const isDark = document.documentElement.classList.contains('dark');
             const textColor = isDark ? '#94a3b8' : '#64748b';
 
-            // TƯ DUY TỐI ƯU UX: Tạo label ngày thực tế thay vì "Ngày 1", "Ngày 2"...
             const labels = [];
             for (let i = 1; i <= 7; i++) {
                 const d = new Date();
@@ -265,12 +249,8 @@
                     }]
                 },
                 options: {
-                    responsive: true, 
-                    maintainAspectRatio: false,
-                    plugins: { 
-                        legend: { display: false }, 
-                        tooltip: { callbacks: { label: (c) => ` ${formatMoney(c.parsed.y)} VND` } } 
-                    },
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => ` ${formatMoney(c.parsed.y)} VND` } } },
                     scales: {
                         y: { beginAtZero: true, ticks: { color: textColor }, grid: { color: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' } },
                         x: { ticks: { color: textColor }, grid: { display: false } }
@@ -310,8 +290,7 @@
                 const ctx = chartCanvas.getContext('2d');
                 
                 budgetChartInstance = new Chart(ctx, {
-                    type: 'bar', 
-                    indexAxis: 'y',
+                    type: 'bar', indexAxis: 'y',
                     data: {
                         labels: filteredData.map(d => d.label),
                         datasets: [
@@ -320,8 +299,7 @@
                         ]
                     },
                     options: {
-                        responsive: true, 
-                        maintainAspectRatio: false,
+                        responsive: true, maintainAspectRatio: false,
                         plugins: { legend: { position: 'top', align: 'end', labels: { usePointStyle: true, boxWidth: 8 } } },
                         scales: {
                             x: { beginAtZero: true, ticks: { color: textColor }, grid: { color: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' } },
@@ -339,7 +317,6 @@
                 return;
             }
             
-            // Dùng map để render an toàn hơn thay vì nối chuỗi (chống XSS cơ bản)
             taskList.innerHTML = tasks.map(task => `
                 <li class="flex justify-between items-center border-b border-gray-100 dark:border-slate-700 pb-2">
                     <div class="flex-1 pr-4 truncate">
@@ -359,7 +336,81 @@
             `).join('');
         }
 
-        // Khởi chạy
+        // ========================================================
+        // 3. XỬ LÝ FORM LẬP KẾ HOẠCH (BỔ SUNG LẠI)
+        // ========================================================
+        async function handleFinancialPlan() {
+            const incomeInput = document.getElementById('monthly_income');
+            const savingsInput = document.getElementById('savings_percent');
+            const btn = document.getElementById('plan-btn');
+            const resultBox = document.getElementById('plan-result');
+            const list = document.getElementById('budgets-list');
+
+            const income = parseFloat(incomeInput.value);
+            const percent = parseFloat(savingsInput.value) || 0;
+
+            if (!income || income <= 0) {
+                alert('Vui lòng nhập thu nhập hợp lệ (lớn hơn 0).');
+                incomeInput.focus();
+                return;
+            }
+
+            // UI Loading state
+            const originalText = btn.innerText;
+            btn.innerText = 'Đang tính toán...';
+            btn.disabled = true;
+
+            try {
+                const res = await fetch('/api/financial-plan', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        // Lấy CSRF token từ thẻ meta (đã có sẵn trong base.html)
+                        'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content 
+                    },
+                    body: JSON.stringify({
+                        monthly_income: income,
+                        savings_percent: percent
+                    })
+                });
+
+                if (!res.ok) throw new Error('Lỗi khi gọi API');
+                const data = await res.json();
+
+                // Hiển thị kết quả
+                resultBox.classList.remove('hidden');
+                list.innerHTML = ''; // Xóa kết quả cũ
+                
+                // Render danh sách ngân sách đề xuất
+                for (const [cat, amount] of Object.entries(data.budgets)) {
+                    if (amount > 0) {
+                        const catName = categoryMap[cat] || cat;
+                        list.innerHTML += `<li class="flex justify-between items-center py-1 border-b border-gray-200 dark:border-slate-600 last:border-0">
+                            <span>${catName}</span>
+                            <strong class="text-blue-600 dark:text-blue-400">${formatMoney(amount)} VND</strong>
+                        </li>`;
+                    }
+                }
+                
+                // Hiển thị thêm mục tiêu tiết kiệm
+                list.innerHTML += `<li class="flex justify-between items-center py-2 mt-2 bg-green-50 dark:bg-green-900/30 px-2 rounded font-semibold text-green-700 dark:text-green-400">
+                    <span>Mục tiêu tiết kiệm:</span>
+                    <span>${formatMoney(data.savings)} VND</span>
+                </li>`;
+
+            } catch (err) {
+                console.error(err);
+                alert('Có lỗi xảy ra khi tính toán. Vui lòng thử lại.');
+            } finally {
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        // Gắn sự kiện click cho nút Lập kế hoạch
+        document.getElementById('plan-btn').addEventListener('click', handleFinancialPlan);
+
+        // Khởi chạy tải dữ liệu dashboard
         fetchDashboardStats();
     })();
 </script>
