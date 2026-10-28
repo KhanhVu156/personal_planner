@@ -32,23 +32,36 @@ def create_app(config_class=Config):
         'CACHE_TYPE': 'SimpleCache',
         'CACHE_DEFAULT_TIMEOUT': 10,
     }
-    if redis_url and redis_url.startswith(('redis://', 'rediss://')):
-        try:
-            test_cfg = {
-                'CACHE_TYPE': 'RedisCache',
-                'CACHE_REDIS_URL': redis_url,
-                'CACHE_DEFAULT_TIMEOUT': 10,
-            }
-            # Thử init và ping thử để chắc chắn Redis sống
-            probe = Cache()
-            probe.init_app(app, config=test_cfg)
-            probe.get('__probe__')
-            cache_config = test_cfg
-            print("[Cache] Đang sử dụng Upstash Redis.")
-        except Exception as e:
-            print(f"[Cache] Redis không khả dụng ({e}). Fallback SimpleCache.")
+    
+    if redis_url:
+        # Tự động sửa lỗi nếu user copy link redis:// thay vì rediss://
+        if redis_url.startswith('redis://'):
+            redis_url = redis_url.replace('redis://', 'rediss://', 1)
+            
+        if redis_url.startswith('rediss://'):
+            try:
+                test_cfg = {
+                    'CACHE_TYPE': 'RedisCache',
+                    'CACHE_REDIS_URL': redis_url,
+                    'CACHE_DEFAULT_TIMEOUT': 10,
+                    # Thêm cấu hình SSL để tránh lỗi chứng chỉ trên Windows
+                    'CACHE_OPTIONS': {
+                        'ssl_cert_reqs': 'none'
+                    }
+                }
+                # Thử init và ping thử để chắc chắn Redis sống
+                probe = Cache()
+                probe.init_app(app, config=test_cfg)
+                probe.get('__probe__')
+                cache_config = test_cfg
+                print("[Cache] Đang sử dụng Upstash Redis (TLS).")
+            except Exception as e:
+                print(f"[Cache] Redis không khả dụng ({e}). Fallback SimpleCache.")
+        else:
+            print("[Cache] Link Redis không đúng định dạng (phải là rediss://).")
     else:
         print("[Cache] Không tìm thấy REDIS_URL hợp lệ. Sử dụng SimpleCache.")
+        
     cache.init_app(app, config=cache_config)
 
     # --- NÉN GZIP/BROTLI ---

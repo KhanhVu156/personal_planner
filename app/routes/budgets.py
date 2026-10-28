@@ -51,8 +51,20 @@ def add_budget():
             flash(f"Lỗi lưu DB: {str(e)}", 'danger')
             print(f"LỖI DATABASE KHI LƯU NGÂN SÁCH: {e}")
     else:
-        # In lỗi form ra màn hình đen nếu có
         if form.errors:
             print("LỖI FORM NGÂN SÁCH:", form.errors)
 
     return render_template('budgets/form.html', form=form)
+
+# ✅ THÊM HÀM NÀY ĐỂ SỬA LỖI BUILD ERROR
+@bp.route('/budgets/delete/<int:id>')
+@login_required
+def delete_budget(id):
+    budget = Budget.query.get_or_404(id)
+    if budget.user_id == current_user.id:
+        db.session.delete(budget)
+        db.session.commit()
+        flash('Đã xóa ngân sách.', 'success')
+    else:
+        flash('Bạn không có quyền thực hiện hành động này.', 'danger')
+    return redirect(url_for('budgets.list_budgets', month=budget.month, year=budget.year))

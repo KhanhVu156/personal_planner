@@ -6,6 +6,7 @@ from app.models import Transaction
 from datetime import datetime
 import csv
 import io
+import re # ✅ Thêm thư viện Regex để lọc rác
 
 bp = Blueprint('transactions', __name__)
 
@@ -77,13 +78,47 @@ def import_csv():
         return redirect(url_for('transactions.list_transactions'))
 
     try:
-        # SỬ DỤNG GENERATOR: Đọc từng dòng, không load toàn bộ file vào RAM
-        stream = io.TextIOWrapper(file.stream, encoding='utf-8')
-        csv_input = csv.DictReader(stream)
+        # Đọc bytes và xử lý bảng mã
+        file_content = file.read()
+        if isinstance(file_content, bytes):
+            if file_content.startswith(b'\xff\xfe') or file_content.startswith(b'\xfe\xff'):
+                file_content = file_content.decode('utf-16')
+            else:
+                try:
+                    file_content = file_content.decode('utf-8-sig')
+                except UnicodeDecodeError:
+                    try:
+                        file_content = file_content.decode('cp1258')
+                    except UnicodeDecodeError:
+                        file_content = file_content.decode('latin-1', errors='replace')
         
+        file_content = file_content.replace('\x00', '')
+        stream = io.StringIO(file_content, newline='')
+        
+        # Tự động phát hiện dấu phân cách
+        try:
+            dialect = csv.Sniffer().sniff(stream.read(1024))
+            stream.seek(0)
+        except csv.Error:
+            dialect = 'excel'
+
+        csv_input = csv.DictReader(stream, dialect=dialect)
+        
+        # ✅ FIX: Lọc sạch các ký tự rác trong Header, chỉ giữ lại các chữ cái a-z
+        if csv_input.fieldnames:
+            cleaned_fieldnames = []
+            for f in csv_input.fieldnames:
+                # Chỉ giữ lại chữ cái tiếng Anh (a-z) và đưa về chữ thường
+                clean_name = re.sub(r'[^a-zA-Z]', '', str(f)).lower()
+                cleaned_fieldnames.append(clean_name)
+            csv_input.fieldnames = cleaned_fieldnames
+        else:
+            flash('File CSV trống hoặc không có dòng tiêu đề.', 'danger')
+            return redirect(url_for('transactions.list_transactions'))
+
         required_fields = {'date', 'description', 'amount', 'category', 'type'}
-        if not required_fields.issubset(set(csv_input.fieldnames or [])):
-            flash('File CSV phải chứa các cột: date, description, amount, category, type.', 'danger')
+        if not required_fields.issubset(set(csv_input.fieldnames)):
+            flash(f'File CSV thiếu cột. Các cột tìm thấy: {", ".join(csv_input.fieldnames)}. Yêu cầu: date, description, amount, category, type.', 'danger')
             return redirect(url_for('transactions.list_transactions'))
 
         count = 0
@@ -91,29 +126,43 @@ def import_csv():
         
         for row in csv_input:
             try:
-                date = datetime.strptime(row['date'], '%Y-%m-%d').date()
-                amount = float(row['amount'])
+                # Lấy dữ liệu, xóa khoảng trắng thừa
+                date_str = row.get('date', '').strip()
+                amount_str = row.get('amount', '').strip()
+                
+                # Đề phòng dữ liệu ngày tháng bị dính chữ rác (VD: 2026-10-01[]), ta dùng Regex lấy ngày
+                date_match = re.search(r'\d{4}-\d{2}-\d{2}', date_str)
+                if date_match:
+                    date = datetime.strptime(date_match.group(), '%Y-%m-%d').date()
+                else:
+                    continue
+
+                # Tương tự với số tiền, chỉ lấy số
+                amount_match = re.search(r'\d+(\.\d+)?', amount_str)
+                if amount_match:
+                    amount = float(amount_match.group())
+                else:
+                    continue
+                    
             except Exception:
                 continue 
                 
             trans = Transaction(
                 user_id=current_user.id,
                 date=date,
-                description=row['description'],
+                description=row.get('description', '').strip(),
                 amount=amount,
-                category=row['category'],
-                type=row['type']
+                category=row.get('category', 'other').strip(),
+                type=row.get('type', 'expense').strip()
             )
             batch.append(trans)
             count += 1
             
-            # BULK INSERT: Cứ 500 dòng thì ghi 1 lần để giải phóng RAM
             if len(batch) >= 500:
                 db.session.bulk_save_objects(batch)
                 db.session.commit()
                 batch = []
                 
-        # Ghi nốt những dòng còn sót lại
         if batch:
             db.session.bulk_save_objects(batch)
             db.session.commit()

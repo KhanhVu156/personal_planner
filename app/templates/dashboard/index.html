@@ -71,7 +71,8 @@
         <svg class="w-6 h-6 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
         Kế hoạch chi tiêu tối ưu
     </h3>
-    <form id="plan-form" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <!-- ✅ FIX: Thêm onsubmit="return false;" để chặn form tải lại trang -->
+    <form id="plan-form" onsubmit="return false;" class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
             <label class="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-1">Thu nhập hàng tháng (VND)</label>
             <input type="number" id="monthly_income" class="w-full px-3 py-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white focus:ring-2 focus:ring-blue-500" placeholder="VD: 15000000" required>
@@ -93,7 +94,7 @@
             </div>
         </div>
         <div class="md:col-span-2 mt-2">
-            <button type="submit" id="plan-btn" class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition duration-200 font-semibold shadow">Lập kế hoạch</button>
+            <button type="button" id="plan-btn" class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition duration-200 font-semibold shadow">Lập kế hoạch</button>
         </div>
     </form>
 
@@ -104,12 +105,14 @@
     </div>
 </div>
 
+{% endblock %}
+
+{% block scripts %}
 <script>
     (function () {
         'use strict';
 
         const formatMoney = (amount) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 }).format(amount || 0);
-        const formatCompactMoney = (value) => new Intl.NumberFormat('vi-VN', { notation: 'compact', compactDisplay: 'short' }).format(value);
         const escapeHtml = (str) => String(str ?? '').replace(/[&<>"']/g, c => (
             { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
         ));
@@ -143,6 +146,7 @@
                 document.getElementById('val-expense').innerHTML = `-${formatMoney(data.expenses)} <span class="text-lg">VND</span>`;
                 document.getElementById('val-balance').innerHTML = `${formatMoney(data.balance)} <span class="text-lg">VND</span>`;
 
+                // Render Tasks
                 const taskList = document.getElementById('task-list');
                 if (taskList) {
                     taskList.innerHTML = '';
@@ -165,4 +169,307 @@
                                             <span>Tiến độ</span>
                                             <span>${p}%</span>
                                         </div>
-                                        <div class="
+                                        <div class="w-full bg-gray-200 dark:bg-slate-600 rounded-full h-2">
+                                            <div class="bg-blue-600 h-2 rounded-full" style="width: ${p}%"></div>
+                                        </div>
+                                    </div>
+                                </li>
+                            `;
+                        });
+                    }
+                }
+
+                // Render Chart
+                const chartSkeleton = document.getElementById('chart-skeleton');
+                const chartCanvas = document.getElementById('budgetChart');
+                if (chartSkeleton) chartSkeleton.style.display = 'none';
+                if (chartCanvas) {
+                    chartCanvas.classList.remove('opacity-0');
+                    chartCanvas.classList.add('opacity-100');
+                }
+
+                const budgets = data.budgets || {};
+                const catExp = data.cat_expenses || {};
+                
+                // ✅ FIX LỖI TRỐNG BIỂU ĐỒ: Lấy hợp (Union) của cả danh mục Ngân sách và Chi tiêu thực tế
+                const allKeys = Array.from(new Set([...Object.keys(budgets), ...Object.keys(catExp)]));
+                
+                let combinedData = allKeys.map(key => ({
+                    key: key,
+                    label: categoryMap[key] || key,
+                    budget: budgets[key] || 0, 
+                    actual: catExp[key] || 0
+                }));
+                
+                // Sắp xếp từ cao xuống thấp
+                if (combinedData.length > 0) {
+                    combinedData.sort((a, b) => b.actual - a.actual); 
+                }
+
+                const labels = combinedData.map(d => d.label);
+                const budgetData = combinedData.map(d => d.budget);
+                const actualData = combinedData.map(d => d.actual);
+
+                // Chỉ vẽ nếu có dữ liệu thực tế
+                if (window.Chart && labels.length > 0) {
+                    const isDark = document.documentElement.classList.contains('dark');
+                    const textColor = isDark ? '#94a3b8' : '#64748b';
+                    const gridColor = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
+
+                    if (budgetChartInstance) budgetChartInstance.destroy();
+                    const ctx = document.getElementById('budgetChart').getContext('2d');
+
+                    // Tạo Gradient Ngang (Trái sang Phải) cho thanh biểu đồ
+                    const gradientBlue = ctx.createLinearGradient(0, 0, 400, 0);
+                    gradientBlue.addColorStop(0, 'rgba(59, 130, 246, 1)');   
+                    gradientBlue.addColorStop(1, 'rgba(59, 130, 246, 0.6)'); 
+
+                    const gradientRed = ctx.createLinearGradient(0, 0, 400, 0);
+                    gradientRed.addColorStop(0, 'rgba(239, 68, 68, 1)');    
+                    gradientRed.addColorStop(1, 'rgba(239, 68, 68, 0.6)');  
+
+                    budgetChartInstance = new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: labels,
+                            datasets: [
+                                { 
+                                    label: 'Ngân sách', 
+                                    data: budgetData, 
+                                    backgroundColor: gradientBlue, 
+                                    borderRadius: { topRight: 6, bottomRight: 6 },
+                                    borderSkipped: 'left',
+                                    barPercentage: 0.6,
+                                    categoryPercentage: 0.8
+                                },
+                                { 
+                                    label: 'Thực tế', 
+                                    data: actualData, 
+                                    backgroundColor: gradientRed, 
+                                    borderRadius: { topRight: 6, bottomRight: 6 },
+                                    borderSkipped: 'left',
+                                    barPercentage: 0.6,
+                                    categoryPercentage: 0.8
+                                }
+                            ]
+                        },
+                        options: {
+                            indexAxis: 'y', // Biểu đồ thanh ngang
+                            responsive: true, 
+                            maintainAspectRatio: false,
+                            interaction: {
+                                mode: 'index',
+                                intersect: false,
+                            },
+                            plugins: { 
+                                legend: { 
+                                    position: 'top',
+                                    align: 'end',
+                                    labels: {
+                                        usePointStyle: true, 
+                                        pointStyle: 'circle',
+                                        boxWidth: 8,
+                                        boxHeight: 8,
+                                        padding: 20,
+                                        color: textColor,
+                                        font: { family: "'Inter', system-ui, sans-serif", size: 13, weight: '500' }
+                                    }
+                                },
+                                tooltip: {
+                                    backgroundColor: isDark ? 'rgba(15, 23, 42, 0.95)' : 'rgba(255, 255, 255, 0.95)',
+                                    titleColor: isDark ? '#f8fafc' : '#0f172a',
+                                    bodyColor: isDark ? '#cbd5e1' : '#334155',
+                                    borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+                                    borderWidth: 1,
+                                    padding: 12,
+                                    boxPadding: 6,
+                                    usePointStyle: true,
+                                    callbacks: {
+                                        label: function(context) {
+                                            return ` ${context.dataset.label}: ${formatMoney(context.parsed.x)} VND`;
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                x: { 
+                                    beginAtZero: true,
+                                    ticks: { 
+                                        color: textColor, 
+                                        font: { family: "'Inter', system-ui, sans-serif" },
+                                        callback: function(value) { return formatMoney(value); } 
+                                    }, 
+                                    grid: { color: gridColor, drawBorder: false, borderDash: [5, 5] } 
+                                },
+                                y: { 
+                                    ticks: { 
+                                        color: textColor, 
+                                        font: { family: "'Inter', system-ui, sans-serif", weight: '600' } 
+                                    }, 
+                                    grid: { display: false, drawBorder: false } 
+                                }
+                            }
+                        }
+                    });
+                }
+            } catch (err) {
+                console.error('[Dashboard]', err);
+            } finally {
+                isCalculating = false;
+            }
+        }
+
+        async function fetchAIPredictions() {
+            const aiSkeleton = document.getElementById('ai-skeleton');
+            const canvas = document.getElementById('predictionChart');
+            if (!canvas) return;
+
+            try {
+                const response = await fetch('/api/predict');
+                if (!response.ok) throw new Error('Lỗi AI');
+                const data = await response.json();
+
+                if (aiSkeleton) aiSkeleton.style.display = 'none';
+
+                if (window.Chart) {
+                    const isDark = document.documentElement.classList.contains('dark');
+                    const textColor = isDark ? '#94a3b8' : '#64748b';
+                    const gridColor = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
+
+                    if (predChartInstance) predChartInstance.destroy();
+                    const ctx = canvas.getContext('2d');
+
+                    const gradientPurple = ctx.createLinearGradient(0, 0, 0, 300);
+                    gradientPurple.addColorStop(0, 'rgba(168, 85, 247, 0.4)');
+                    gradientPurple.addColorStop(1, 'rgba(168, 85, 247, 0.0)');
+                    
+                    const foodData = data['food'] || [0,0,0,0,0,0,0];
+                    
+                    predChartInstance = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: ['Ngày 1', 'Ngày 2', 'Ngày 3', 'Ngày 4', 'Ngày 5', 'Ngày 6', 'Ngày 7'],
+                            datasets: [{
+                                label: 'Dự đoán chi tiêu (Ăn uống)',
+                                data: foodData,
+                                borderColor: '#a855f7',
+                                backgroundColor: gradientPurple,
+                                borderWidth: 3,
+                                pointBackgroundColor: '#a855f7',
+                                pointBorderColor: isDark ? '#1e293b' : '#fff',
+                                pointBorderWidth: 2,
+                                pointRadius: 4,
+                                pointHoverRadius: 6,
+                                fill: true,
+                                tension: 0.4 
+                            }]
+                        },
+                        options: {
+                            responsive: true, maintainAspectRatio: false,
+                            interaction: { mode: 'index', intersect: false },
+                            plugins: { 
+                                legend: { display: false },
+                                tooltip: {
+                                    backgroundColor: isDark ? 'rgba(15, 23, 42, 0.9)' : 'rgba(255, 255, 255, 0.95)',
+                                    titleColor: isDark ? '#f8fafc' : '#0f172a',
+                                    bodyColor: isDark ? '#cbd5e1' : '#334155',
+                                    borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+                                    borderWidth: 1,
+                                    padding: 12,
+                                    callbacks: {
+                                        label: function(context) {
+                                            return ` Dự đoán: ${formatMoney(context.parsed.y)} VND`;
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                y: { 
+                                    beginAtZero: true,
+                                    ticks: { color: textColor }, 
+                                    grid: { color: gridColor, drawBorder: false, borderDash: [5, 5] } 
+                                },
+                                x: { 
+                                    ticks: { color: textColor }, 
+                                    grid: { display: false, drawBorder: false } 
+                                }
+                            }
+                        }
+                    });
+                }
+            } catch (err) {
+                console.error('[AI Predict]', err);
+                if (aiSkeleton) aiSkeleton.innerHTML = '<span class="text-red-500 text-sm">Không thể tải dự đoán AI</span>';
+            }
+        }
+
+        // ✅ FIX: Bắt sự kiện CLICK của nút bấm thay vì SUBMIT của form
+        const planBtn = document.getElementById('plan-btn');
+        if (planBtn) {
+            planBtn.addEventListener('click', async function (e) {
+                e.preventDefault(); 
+                e.stopPropagation(); 
+
+                const incomeVal = parseFloat(document.getElementById('monthly_income').value);
+                if (!incomeVal || incomeVal <= 0) {
+                    alert('Vui lòng nhập thu nhập hàng tháng hợp lệ.');
+                    return;
+                }
+
+                const btn = document.getElementById('plan-btn');
+                btn.disabled = true;
+                btn.innerText = 'Đang tính toán...';
+
+                const payload = {
+                    monthly_income: incomeVal,
+                    savings_percent: parseFloat(document.getElementById('savings_percent').value),
+                    category_weights: {
+                        food: parseFloat(document.getElementById('weight_food').value),
+                        transport: parseFloat(document.getElementById('weight_transport').value),
+                        education: parseFloat(document.getElementById('weight_education').value),
+                        entertainment: parseFloat(document.getElementById('weight_entertainment').value),
+                        shopping: parseFloat(document.getElementById('weight_shopping').value),
+                        bills: parseFloat(document.getElementById('weight_bills').value),
+                        other: parseFloat(document.getElementById('weight_other').value),
+                    }
+                };
+
+                try {
+                    const res = await fetch('/api/financial-plan', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                        },
+                        body: JSON.stringify(payload)
+                    });
+                    const data = await res.json();
+                    
+                    if (!res.ok) throw new Error(data.error || 'Lỗi');
+                    
+                    document.getElementById('plan-result').classList.remove('hidden');
+                    document.getElementById('savings_amt').innerText = formatMoney(data.savings);
+                    
+                    const list = document.getElementById('budgets-list');
+                    list.innerHTML = '';
+                    for (const [cat, amount] of Object.entries(data.budgets)) {
+                        if (amount > 0) {
+                            list.innerHTML += `<li><strong>${categoryMap[cat] || cat}</strong>: ${formatMoney(amount)} VND</li>`;
+                        }
+                    }
+                } catch (err) {
+                    alert('Có lỗi xảy ra: ' + err.message);
+                } finally {
+                    btn.disabled = false;
+                    btn.innerText = 'Lập kế hoạch';
+                }
+            });
+        }
+
+        // ✅ FIX: Chạy trực tiếp (Không dùng DOMContentLoaded) để hỗ trợ HTMX
+        fetchDashboardStats();
+        fetchAIPredictions();
+
+    })();
+</script>
+{% endblock %}

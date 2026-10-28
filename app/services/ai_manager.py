@@ -72,11 +72,12 @@ def _send_task(task_data, timeout=10.0):
         _input_queue.put(tuple(task_data) + (request_id,), timeout=2.0)
         return fut.result(timeout=timeout)
     except TimeoutError:
-        # Xử lý timeout rõ ràng
+        print(f"[AI Manager] LỖI TIMEOUT: Tác vụ {task_data[0]} quá {timeout}s. (Có thể AI đang train)")
         with _pending_lock:
             _pending.pop(request_id, None)
         return None
-    except Exception:
+    except Exception as e:
+        print(f"[AI Manager] Lỗi gửi task: {e}")
         with _pending_lock:
             _pending.pop(request_id, None)
         return None

@@ -6,7 +6,8 @@ import calendar
 from sqlalchemy import func
 
 from app.models import Transaction, Budget, Task
-from app.services.ai_manager import request_prediction, request_training
+# ✅ Thêm request_prediction_batch
+from app.services.ai_manager import request_prediction, request_training, request_prediction_batch
 
 bp = Blueprint('api', __name__, url_prefix='/api')
 
@@ -18,7 +19,6 @@ def get_dashboard_stats():
         today = datetime.now()
         month, year = today.month, today.year
         
-        # 1. Kiểm tra tháng hiện tại có giao dịch không (chỉ query ID)
         has_trans = db.session.query(Transaction.id).filter(
             Transaction.user_id == user_id,
             func.extract('month', Transaction.date) == month,
@@ -26,12 +26,10 @@ def get_dashboard_stats():
         ).first()
 
         if not has_trans:
-            # Lấy tháng của giao dịch mới nhất
             latest_trans = db.session.query(Transaction.date).filter_by(user_id=user_id).order_by(Transaction.date.desc()).first()
             if latest_trans:
                 month, year = latest_trans.date.month, latest_trans.date.year
 
-        # 2. Tính tổng thu nhập & chi tiêu TOÀN THỜI GIAN bằng SQL
         totals = db.session.query(
             Transaction.type,
             func.coalesce(func.sum(Transaction.amount), 0)
@@ -41,7 +39,6 @@ def get_dashboard_stats():
         total_expense = next((float(t[1]) for t in totals if t[0] == 'expense'), 0.0)
         balance = total_income - total_expense
 
-        # 3. Tính thu/chi THÁNG HIỆN TẠI bằng SQL
         month_totals = db.session.query(
             Transaction.type,
             func.coalesce(func.sum(Transaction.amount), 0)
@@ -54,7 +51,6 @@ def get_dashboard_stats():
         income_month = next((float(t[1]) for t in month_totals if t[0] == 'income'), 0.0)
         expense_month = next((float(t[1]) for t in month_totals if t[0] == 'expense'), 0.0)
 
-        # 4. Chi tiêu theo category trong tháng
         cat_exp = db.session.query(
             Transaction.category,
             func.coalesce(func.sum(Transaction.amount), 0)
@@ -67,11 +63,9 @@ def get_dashboard_stats():
         
         cat_exp_dict = {cat: float(total) for cat, total in cat_exp}
 
-        # 5. Lấy Ngân sách
         budgets = Budget.query.filter_by(user_id=user_id, month=int(month), year=int(year)).all()
         budget_dict = {b.category: float(b.amount) for b in budgets}
 
-        # 6. Lấy Task sắp tới
         upcoming_tasks = Task.query.filter_by(user_id=user_id) \
             .filter(Task.status.in_(['pending', 'in_progress'])) \
             .order_by(Task.deadline.asc()).limit(5).all()
@@ -105,18 +99,31 @@ def get_predictions():
     try:
         user_id = current_user.id
         categories = ['food', 'transport', 'education', 'entertainment', 'shopping', 'bills', 'other']
-        predictions = {}
         
-        for cat in categories:
-            cat_pred = []
-            for i in range(1, 8):
-                future_date = datetime.now().date() + timedelta(days=i)
-                pred = request_prediction(user_id, future_date, cat)
-                cat_pred.append(pred if pred is not None else 0)
-            predictions[cat] = cat_pred
+        # ✅ FIX: Gom 49 items (7 ngày x 7 danh mục) thành 1 batch
+        items = []
+        for i in range(1, 8):
+            future_date = datetime.now().date() + timedelta(days=i)
+            for cat in categories:
+                items.append((future_date, cat))
+        
+        # Gọi AI dự đoán 1 lần, timeout 60s để chờ AI train (nếu là lần đầu)
+        results = request_prediction_batch(user_id, items, timeout=60.0)
+        
+        if results is None:
+            results = [0.0] * len(items)
             
+        # Chia kết quả trả về cho từng danh mục
+        predictions = {cat: [] for cat in categories}
+        idx = 0
+        for i in range(1, 8):
+            for cat in categories:
+                predictions[cat].append(results[idx])
+                idx += 1
+                
         return jsonify(predictions)
     except Exception as e:
+        current_app.logger.error(f"Lỗi API Predict: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @bp.route('/train', methods=['POST'])
@@ -135,7 +142,6 @@ def train():
 def financial_plan():
     try:
         from app.services.financial_planner import FinancialPlanner
-        # ✅ FIX: silent=True để tránh crash nếu client gửi sai Content-Type
         data = request.get_json(silent=True) or {}
         if not data: 
             return jsonify({'error': 'Dữ liệu gửi lên bị trống'}), 400
