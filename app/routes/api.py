@@ -6,11 +6,9 @@ import calendar
 from sqlalchemy import func
 from zoneinfo import ZoneInfo
 
-from app.models import Transaction, Budget, Task
+from app.models import Transaction, Budget, Task, Wallet
 
 bp = Blueprint('api', __name__, url_prefix='/api')
-
-# Định nghĩa múi giờ Việt Nam để đồng bộ thời gian
 VN_TZ = ZoneInfo('Asia/Ho_Chi_Minh')
 
 
@@ -18,15 +16,11 @@ VN_TZ = ZoneInfo('Asia/Ho_Chi_Minh')
 @login_required
 @cache.cached(timeout=120, query_string=True)
 def get_dashboard_stats():
-    """
-    API lấy toàn bộ dữ liệu cho Dashboard.
-    Bao gồm: Tổng thu/chi, Ngân sách, Task, Insights, Burn Rate và Dự báo.
-    """
+    # ... (Giữ nguyên phần này như code cũ của bạn) ...
     try:
         user_id = current_user.id
         today_vn = datetime.now(VN_TZ)
         
-        # Lấy tháng/năm từ query params (mặc định là tháng hiện tại)
         month = request.args.get('month', today_vn.month, type=int)
         year = request.args.get('year', today_vn.year, type=int)
 
@@ -34,12 +28,10 @@ def get_dashboard_stats():
         last_day = calendar.monthrange(year, month)[1]
         end_date = datetime(year, month, last_day).date()
 
-        # ==================== 1. TỔNG THU/CHI TOÀN THỜI GIAN & THÁNG ====================
         totals = db.session.query(
             Transaction.type, func.coalesce(func.sum(Transaction.amount), 0)
         ).filter(Transaction.user_id == user_id).group_by(Transaction.type).all()
         
-        # ✅ FIX: Ép kiểu float() để tránh lỗi Decimal - float trên Turso
         total_income = next((float(t[1]) for t in totals if t[0] == 'income'), 0.0)
         total_expense = next((float(t[1]) for t in totals if t[0] == 'expense'), 0.0)
         balance = total_income - total_expense
@@ -55,7 +47,6 @@ def get_dashboard_stats():
         income_month = next((float(t[1]) for t in month_totals if t[0] == 'income'), 0.0)
         expense_month = next((float(t[1]) for t in month_totals if t[0] == 'expense'), 0.0)
 
-        # ==================== 2. CHI TIÊU THEO CATEGORY ====================
         cat_exp = db.session.query(
             Transaction.category, func.coalesce(func.sum(Transaction.amount), 0)
         ).filter(
@@ -65,12 +56,9 @@ def get_dashboard_stats():
             Transaction.date <= end_date,
         ).group_by(Transaction.category).all()
         
-        # ✅ FIX: Chuẩn hóa key (lower, strip) để đảm bảo khớp với key của Budget
         cat_exp_dict = {str(cat).strip().lower(): float(total) for cat, total in cat_exp}
 
-        # ==================== 3. NGÂN SÁCH & TASK ====================
         budgets = Budget.query.filter_by(user_id=user_id, month=month, year=year).all()
-        # ✅ FIX: Chuẩn hóa key tương tự như cat_exp_dict
         budget_dict = {str(b.category).strip().lower(): float(b.amount) for b in budgets}
 
         upcoming_tasks = Task.query.filter_by(user_id=user_id) \
@@ -78,26 +66,20 @@ def get_dashboard_stats():
             .order_by(Task.deadline.asc()).limit(5).all()
         
         tasks_data = [{
-            'id': t.id, 
-            'title': t.title, 
-            'deadline': t.deadline.strftime('%d/%m/%Y'), 
-            'progress': t.progress
+            'id': t.id, 'title': t.title, 'deadline': t.deadline.strftime('%d/%m/%Y'), 'progress': t.progress
         } for t in upcoming_tasks]
 
-        # ==================== 4. INSIGHTS (Thông tin chi tiêu) ====================
         insights = []
         cat_names = {
             'food': 'Ăn uống', 'transport': 'Di chuyển', 'education': 'Học tập', 
             'entertainment': 'Giải trí', 'shopping': 'Mua sắm', 'bills': 'Hóa đơn', 'other': 'Khác'
         }
         
-        # Tìm danh mục chi tiêu nhiều nhất
         if cat_exp_dict:
             top_cat = max(cat_exp_dict, key=cat_exp_dict.get)
             top_amt = cat_exp_dict[top_cat]
             insights.append(f"Danh mục '{cat_names.get(top_cat, top_cat)}' chiếm nhiều nhất ({top_amt:,.0f} VNĐ).")
 
-        # So sánh với tháng trước
         prev_month = month - 1 if month > 1 else 12
         prev_year = year if month > 1 else year - 1
         
@@ -121,10 +103,8 @@ def get_dashboard_stats():
             elif diff_pct < 0:
                 insights.append(f"Tuyệt vời! Chi tiêu tháng này giảm {abs(diff_pct):.0f}% so với tháng trước.")
 
-        # ==================== 5. BURN RATE (Tốc độ đốt tiền) ====================
         _, days_in_month = calendar.monthrange(year, month)
         
-        # Xác định ngày hiện tại để tính trung bình
         if today_vn.month == month and today_vn.year == year:
             current_day = today_vn.day
         else:
@@ -139,9 +119,6 @@ def get_dashboard_stats():
             'days_left': days_in_month - current_day
         }
 
-        # ==================== 6. DỰ BÁO 7 NGÀY TỚI (Weekday Moving Average) ====================
-        # Thuật toán: Lấy dữ liệu chi tiêu 30 ngày gần nhất. 
-        # Tính trung bình chi tiêu theo từng thứ trong tuần. Dự báo ngày tới dựa trên trung bình thứ đó.
         start_30 = today_vn.date() - timedelta(days=30)
         
         trans_30d = db.session.query(Transaction.date, Transaction.amount).filter(
@@ -160,7 +137,6 @@ def get_dashboard_stats():
             weekday_counts[wd] += 1
             total_30d += float(t_amount)
 
-        # Trung bình chung của 30 ngày (dùng làm fallback nếu thứ đó chưa có dữ liệu)
         avg_daily_30d = total_30d / 30.0 if total_30d > 0 else 0.0
         
         forecast_data = []
@@ -175,16 +151,42 @@ def get_dashboard_stats():
                 
             forecast_data.append(pred_val)
 
-        # ==================== 7. TRẢ VỀ RESPONSE ====================
+        active_wallets = Wallet.query.filter_by(user_id=user_id, is_active=True).all()
+        total_assets = 0.0
+        wallets_data = []
+
+        if active_wallets:
+            wallet_flows = db.session.query(
+                Transaction.wallet_id,
+                Transaction.type,
+                func.coalesce(func.sum(Transaction.amount), 0)
+            ).filter(
+                Transaction.user_id == user_id,
+                Transaction.wallet_id.isnot(None)
+            ).group_by(Transaction.wallet_id, Transaction.type).all()
+
+            for w in active_wallets:
+                init_bal = float(w.initial_balance or 0.0)
+                in_flow = next((float(f[2]) for f in wallet_flows if f[0] == w.id and f[1] == 'income'), 0.0)
+                out_flow = next((float(f[2]) for f in wallet_flows if f[0] == w.id and f[1] == 'expense'), 0.0)
+                
+                current_bal = init_bal + in_flow - out_flow
+                total_assets += current_bal
+
+                wallets_data.append({
+                    'id': w.id, 'name': w.name, 'wallet_type': w.wallet_type, 'balance': current_bal
+                })
+
         data = {
             'income': income_month,
             'expenses': expense_month,
             'balance': balance,
+            'total_assets': total_assets,
+            'wallets': wallets_data,
             'budgets': budget_dict,
             'cat_expenses': cat_exp_dict,
             'tasks': tasks_data,
-            'month': month, 
-            'year': year,
+            'month': month, 'year': year,
             'insights': insights,
             'burn_rate': burn_rate,
             'forecast': forecast_data
@@ -202,9 +204,6 @@ def get_dashboard_stats():
 @bp.route('/financial-plan', methods=['POST'])
 @login_required
 def financial_plan():
-    """
-    API gợi ý phân bổ ngân sách thông minh dựa trên lịch sử chi tiêu.
-    """
     try:
         from app.services.financial_planner import FinancialPlanner
         data = request.get_json(silent=True) or {}
@@ -212,17 +211,22 @@ def financial_plan():
             return jsonify({'error': 'Dữ liệu trống'}), 400
             
         monthly_income = data.get('monthly_income')
-        if not monthly_income or monthly_income <= 0: 
-            return jsonify({'error': 'Thu nhập không hợp lệ'}), 400
+        if not monthly_income or float(monthly_income) <= 0: 
+            return jsonify({'error': 'Thu nhập không hợp lệ (phải lớn hơn 0)'}), 400
+
+        savings_percent = float(data.get('savings_percent', 20))
+        region = data.get('region', 'vn')
 
         planner = FinancialPlanner(current_user.id, db.session)
+        
+        # ✅ FIX: Đã xóa tham số inflation_rate vì Planner mới tự tính từ Region
         suggestion = planner.suggest_budgets(
-            monthly_income, 
-            savings_goal=data.get('savings_goal'),
-            savings_percent=data.get('savings_percent'), 
-            category_weights=data.get('category_weights')
+            monthly_income=float(monthly_income), 
+            savings_percent=savings_percent,
+            region=region
         )
         return jsonify(suggestion)
+        
     except Exception as e:
         current_app.logger.error(f"Lỗi API Financial Plan: {str(e)}")
         return jsonify({'error': f"Lỗi máy chủ: {str(e)}"}), 500

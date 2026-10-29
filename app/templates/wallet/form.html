@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-lg mx-auto bg-white dark:bg-slate-800 p-6 rounded shadow mt-4 transition-colors duration-300">
+    <h2 class="text-2xl font-bold mb-6 text-gray-800 dark:text-slate-100">{{ title }}</h2>
+    
+    <!-- Thêm autocomplete="off" để trình duyệt không tự điền lung tung -->
+    <form method="POST" action="" novalidate autocomplete="off">
+        {{ form.hidden_tag() }}
+        
+        <!-- Hàng 1: Tên ví -->
+        <div class="mb-4">
+            {{ form.name.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
+            {{ form.name(class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-slate-400 transition-colors") }}
+            {% for error in form.name.errors %}
+                <span class="text-red-500 text-sm mt-1 block">{{ error }}</span>
+            {% endfor %}
+        </div>
+        
+        <!-- Hàng 2: Loại ví (Custom Dropdown) -->
+        <div class="mb-4 relative" id="wallet-type-selector-wrapper">
+            {{ form.wallet_type.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
+            
+            <!-- Ẩn thẻ select gốc đi để form vẫn submit đúng giá trị -->
+            {{ form.wallet_type(class="hidden", id="real-wallet-type-select") }}
+
+            <!-- Nút bấm giả lập -->
+            <button type="button" id="wallet-type-btn" class="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded text-left flex justify-between items-center focus:ring-2 focus:ring-blue-500 outline-none transition-colors text-gray-900 dark:text-white font-medium">
+                <span id="wallet-type-label">
+                    {% set selected_type = form.wallet_type.data or 'cash' %}
+                    {% for value, label in form.wallet_type.choices %}
+                        {% if value == selected_type %}{{ label }}{% endif %}
+                    {% endfor %}
+                </span>
+                <svg class="w-4 h-4 text-gray-500 dark:text-slate-400 transition-transform duration-200" id="wallet-type-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+            </button>
+            
+            <!-- Menu xổ xuống -->
+            <div id="wallet-type-menu" class="absolute top-full left-0 mt-1 w-full bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg shadow-2xl hidden opacity-0 transform -translate-y-2 transition-all duration-200 overflow-hidden z-50">
+                <ul class="max-h-60 overflow-y-auto py-1" id="wallet-type-list">
+                    {% for value, label in form.wallet_type.choices %}
+                        <li>
+                            <button type="button" class="wallet-type-item w-full text-left px-4 py-2.5 text-sm transition-colors duration-150
+                                {% if value == selected_type %} bg-blue-600 text-white font-medium {% else %} text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-600 {% endif %}" 
+                                data-value="{{ value }}">{{ label }}</button>
+                        </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% for error in form.wallet_type.errors %}
+                <span class="text-red-500 text-sm mt-1 block">{{ error }}</span>
+            {% endfor %}
+        </div>
+        
+        <!-- Hàng 3: Số dư ban đầu -->
+        <div class="mb-6 relative">
+            {{ form.initial_balance.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
+            
+            <div class="flex items-center w-full border border-gray-300 dark:border-slate-600 rounded focus-within:ring-2 focus-within:ring-blue-500 bg-white dark:bg-slate-700 transition-colors overflow-hidden">
+                <span class="pl-3 pr-2 text-gray-700 dark:text-slate-300 font-bold select-none transition-colors">VND</span>
+                
+                <!-- ✅ FIX: Đổi placeholder thành "Nhập số tiền" -->
+                {{ form.initial_balance(class="flex-1 w-full py-2 pr-3 bg-white dark:bg-slate-700 border-0 focus:ring-0 focus:outline-none text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-slate-400 placeholder:font-normal font-semibold transition-colors", id="wallet_balance", placeholder="Nhập số tiền") }}
+            </div>
+            {% for error in form.initial_balance.errors %}
+                <span class="text-red-500 text-sm mt-1 block">{{ error }}</span>
+            {% endfor %}
+        </div>
+        
+        <!-- Nút bấm -->
+        <div class="flex items-center justify-between space-x-4 relative mt-2">
+            <a href="{{ url_for('wallets.list_wallets') }}" class="w-1/3 text-center bg-gray-200 text-gray-800 dark:bg-slate-600 dark:text-slate-200 py-2 rounded hover:bg-gray-300 dark:hover:bg-slate-500 transition duration-200 font-semibold">Hủy</a>
+            {{ form.submit(class="w-2/3 bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition duration-200 cursor-pointer font-semibold shadow-sm", value="Lưu ví") }}
+        </div>
+    </form>
+</div>
+
+<script>
+    (function() {
+        'use strict';
+
+        // ==========================================
+        // 1. XỬ LÝ CUSTOM DROPDOWN LOẠI VÍ
+        // ==========================================
+        const walletTypeBtn = document.getElementById('wallet-type-btn');
+        const walletTypeMenu = document.getElementById('wallet-type-menu');
+        const walletTypeLabel = document.getElementById('wallet-type-label');
+        const realWalletTypeSelect = document.getElementById('real-wallet-type-select');
+        const walletTypeArrow = document.getElementById('wallet-type-arrow');
+        const walletTypeItems = document.querySelectorAll('.wallet-type-item');
+
+        if (walletTypeBtn && walletTypeMenu && realWalletTypeSelect) {
+            walletTypeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                
+                const isOpen = walletTypeMenu.classList.contains('opacity-100');
+                
+                if (isOpen) {
+                    closeWalletTypeMenu();
+                } else {
+                    walletTypeMenu.classList.remove('hidden');
+                    void walletTypeMenu.offsetWidth; // Trigger reflow để animation chạy
+                    
+                    walletTypeMenu.classList.remove('opacity-0', '-translate-y-2');
+                    walletTypeMenu.classList.add('opacity-100', 'translate-y-0');
+                    walletTypeArrow.classList.add('rotate-180');
+                }
+            });
+
+            walletTypeItems.forEach(item => {
+                item.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const val = item.getAttribute('data-value');
+                    
+                    realWalletTypeSelect.value = val;
+                    walletTypeLabel.innerText = item.innerText;
+                    
+                    walletTypeItems.forEach(i => {
+                        i.classList.remove('bg-blue-600', 'text-white', 'font-medium');
+                        i.classList.add('text-gray-700', 'dark:text-slate-300', 'hover:bg-gray-100', 'dark:hover:bg-slate-600');
+                    });
+                    item.classList.remove('text-gray-700', 'dark:text-slate-300', 'hover:bg-gray-100', 'dark:hover:bg-slate-600');
+                    item.classList.add('bg-blue-600', 'text-white', 'font-medium');
+
+                    closeWalletTypeMenu();
+                });
+            });
+        }
+
+        function closeWalletTypeMenu() {
+            if (!walletTypeMenu) return;
+            walletTypeMenu.classList.remove('opacity-100', 'translate-y-0');
+            walletTypeMenu.classList.add('opacity-0', '-translate-y-2');
+            if (walletTypeArrow) walletTypeArrow.classList.remove('rotate-180');
+            
+            setTimeout(() => {
+                walletTypeMenu.classList.add('hidden');
+            }, 200);
+        }
+
+        // Đóng menu khi click ra ngoài
+        document.addEventListener('click', (e) => {
+            const wrapper = document.getElementById('wallet-type-selector-wrapper');
+            if (wrapper && !wrapper.contains(e.target)) {
+                closeWalletTypeMenu();
+            }
+        });
+
+        // ==========================================
+        // 2. TỰ ĐỘNG FORMAT TIỀN TỆ
+        // ==========================================
+        const amountInput = document.getElementById('wallet_balance');
+        if (amountInput) {
+            if (amountInput.dataset.bound === '1') return;
+            amountInput.dataset.bound = '1';
+
+            const formatValue = (val) => {
+                // Loại bỏ mọi ký tự không phải số
+                let raw = val.replace(/\D/g, '');
+                // Format theo chuẩn VN (dấu chấm phân cách hàng nghìn)
+                return raw ? new Intl.NumberFormat('vi-VN').format(raw) : '';
+            };
+
+            // Format ban đầu (khi Sửa)
+            if (amountInput.value) {
+                amountInput.value = formatValue(amountInput.value);
+            }
+
+            // Lắng nghe sự kiện gõ phím
+            amountInput.addEventListener('input', function() {
+                this.value = formatValue(this.value);
+            });
+        }
+    })();
+</script>
+{% endblock %}

@@ -22,56 +22,259 @@
     <form method="POST" action="" novalidate>
         {{ form.hidden_tag() }}
         
+        <!-- Hàng 1: Tiêu đề -->
         <div class="mb-4">
             {{ form.title.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
-            {{ form.title(class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white", placeholder="Nhập tên công việc...") }}
+            {{ form.title(class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white placeholder:text-gray-400 dark:placeholder:text-slate-500 transition-colors", placeholder="Nhập tên công việc...") }}
             {% for error in form.title.errors %}
                 <span class="text-red-500 text-sm mt-1 block">{{ error }}</span>
             {% endfor %}
         </div>
 
+        <!-- Hàng 2: Mô tả -->
         <div class="mb-4">
             {{ form.description.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
-            {{ form.description(class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white", rows="3", placeholder="Mô tả chi tiết (không bắt buộc)...") }}
+            {{ form.description(class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white placeholder:text-gray-400 dark:placeholder:text-slate-500 transition-colors", rows="3", placeholder="Mô tả chi tiết (không bắt buộc)...") }}
         </div>
 
+        <!-- Hàng 3: Hạn chót & Trạng thái -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
                 {{ form.deadline.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
-                <!-- ✅ FIX UX: Thêm type="date" để trình duyệt hiển thị Datepicker chuẩn -->
-                {{ form.deadline(class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white", type="date") }}
+                {{ form.deadline(class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white transition-colors", type="date") }}
                 {% for error in form.deadline.errors %}
                     <span class="text-red-500 text-sm mt-1 block">{{ error }}</span>
                 {% endfor %}
             </div>
-            <div>
+            
+            <!-- ✅ CUSTOM DROPDOWN: TRẠNG THÁI -->
+            <div class="relative" id="status-selector-wrapper">
                 {{ form.status.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
-                {{ form.status(class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white") }}
+                
+                <!-- Thẻ select gốc bị ẩn đi để form vẫn submit đúng -->
+                {{ form.status(class="hidden", id="real-status-select") }}
+
+                <button type="button" id="status-btn" class="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded text-left flex justify-between items-center focus:ring-2 focus:ring-blue-500 outline-none transition-colors text-gray-900 dark:text-white font-medium">
+                    <span id="status-label">
+                        {% set selected_status = form.status.data or 'pending' %}
+                        {% for value, label in form.status.choices %}
+                            {% if value == selected_status %}{{ label }}{% endif %}
+                        {% endfor %}
+                    </span>
+                    <svg class="w-4 h-4 text-gray-500 dark:text-slate-400 transition-transform duration-200" id="status-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </button>
+                
+                <div id="status-menu" class="absolute top-full left-0 mt-1 w-full bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg shadow-2xl hidden opacity-0 transform -translate-y-2 transition-all duration-200 overflow-hidden z-50">
+                    <ul class="max-h-60 overflow-y-auto py-1" id="status-list">
+                        {% for value, label in form.status.choices %}
+                            <li>
+                                <button type="button" class="status-item w-full text-left px-4 py-2.5 text-sm transition-colors duration-150
+                                    {% if value == selected_status %} bg-blue-600 text-white font-medium {% else %} text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-600 {% endif %}" 
+                                    data-value="{{ value }}">{{ label }}</button>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% for error in form.status.errors %}
+                    <span class="text-red-500 text-sm mt-1 block">{{ error }}</span>
+                {% endfor %}
             </div>
         </div>
 
+        <!-- Hàng 4: Tiến độ & Cột mốc -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             <div>
                 {{ form.progress.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
                 <div class="flex items-center space-x-2">
-                    <!-- TƯ DUY: Input type number giúp trình duyệt tự động chặn ký tự chữ cái và giới hạn min/max -->
-                    {{ form.progress(class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white", type="number", min="0", max="100") }}
+                    {{ form.progress(class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white transition-colors", type="number", min="0", max="100") }}
                     <span class="text-gray-500 dark:text-slate-400 font-bold">%</span>
                 </div>
                 {% for error in form.progress.errors %}
                     <span class="text-red-500 text-sm mt-1 block">{{ error }}</span>
                 {% endfor %}
             </div>
-            <div>
+            
+            <!-- ✅ CUSTOM DROPDOWN: CỘT MỐC QUAN TRỌNG -->
+            <div class="relative" id="milestone-selector-wrapper">
                 {{ form.milestone.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
-                {{ form.milestone(class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white") }}
+                
+                <!-- Thẻ select gốc bị ẩn đi -->
+                {{ form.milestone(class="hidden", id="real-milestone-select") }}
+
+                <button type="button" id="milestone-btn" class="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded text-left flex justify-between items-center focus:ring-2 focus:ring-blue-500 outline-none transition-colors text-gray-900 dark:text-white font-medium">
+                    <span id="milestone-label">
+                        {% set selected_milestone = form.milestone.data if form.milestone.data is not none else 0 %}
+                        {% for value, label in form.milestone.choices %}
+                            {% if value == selected_milestone %}{{ label }}{% endif %}
+                        {% endfor %}
+                    </span>
+                    <svg class="w-4 h-4 text-gray-500 dark:text-slate-400 transition-transform duration-200" id="milestone-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </button>
+                
+                <div id="milestone-menu" class="absolute top-full left-0 mt-1 w-full bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg shadow-2xl hidden opacity-0 transform -translate-y-2 transition-all duration-200 overflow-hidden z-50">
+                    <ul class="max-h-60 overflow-y-auto py-1" id="milestone-list">
+                        {% for value, label in form.milestone.choices %}
+                            <li>
+                                <button type="button" class="milestone-item w-full text-left px-4 py-2.5 text-sm transition-colors duration-150
+                                    {% if value == selected_milestone %} bg-blue-600 text-white font-medium {% else %} text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-600 {% endif %}" 
+                                    data-value="{{ value }}">{{ label }}</button>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% for error in form.milestone.errors %}
+                    <span class="text-red-500 text-sm mt-1 block">{{ error }}</span>
+                {% endfor %}
             </div>
         </div>
 
+        <!-- Nút bấm -->
         <div class="flex items-center justify-end space-x-4 border-t border-gray-200 dark:border-slate-700 pt-4">
             <a href="{{ url_for('tasks.list_tasks') }}" class="bg-gray-200 text-gray-800 dark:bg-slate-600 dark:text-slate-100 py-2 px-6 rounded hover:bg-gray-300 dark:hover:bg-slate-500 transition duration-200 font-semibold">Hủy</a>
             {{ form.submit(class="bg-blue-600 text-white py-2 px-6 rounded hover:bg-blue-700 transition duration-200 cursor-pointer font-semibold shadow", value="Lưu") }}
         </div>
     </form>
 </div>
+
+<script>
+    (function() {
+        'use strict';
+
+        // ==========================================
+        // HÀM DÙNG CHUNG: XỬ LÝ ĐÓNG/MỞ DROPDOWN
+        // ==========================================
+        function setupDropdown(config) {
+            const btn = document.getElementById(config.btnId);
+            const menu = document.getElementById(config.menuId);
+            const label = document.getElementById(config.labelId);
+            const realSelect = document.getElementById(config.selectId);
+            const arrow = document.getElementById(config.arrowId);
+            const items = document.querySelectorAll(`.${config.itemClass}`);
+
+            if (!btn || !menu || !realSelect) return;
+
+            // 1. Sự kiện click vào nút để mở/đóng
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const isOpen = menu.classList.contains('opacity-100');
+
+                // Đóng các menu khác trước khi mở menu hiện tại
+                document.querySelectorAll('.custom-dropdown-menu').forEach(m => {
+                    if (m !== menu) {
+                        m.classList.remove('opacity-100', 'translate-y-0');
+                        m.classList.add('opacity-0', '-translate-y-2');
+                        setTimeout(() => m.classList.add('hidden'), 200);
+                    }
+                });
+                // Reset tất cả các mũi tên khác
+                document.querySelectorAll('.custom-dropdown-arrow').forEach(a => {
+                    if (a !== arrow) a.classList.remove('rotate-180');
+                });
+
+                if (isOpen) {
+                    closeDropdown(menu, arrow);
+                } else {
+                    openDropdown(menu, arrow);
+                }
+            });
+
+            // 2. Sự kiện chọn item
+            items.forEach(item => {
+                item.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const val = item.getAttribute('data-value');
+                    
+                    // Cập nhật giá trị thẻ select gốc
+                    realSelect.value = val;
+                    // Cập nhật text hiển thị
+                    label.innerText = item.innerText;
+
+                    // Reset class active
+                    items.forEach(i => {
+                        i.classList.remove('bg-blue-600', 'text-white', 'font-medium');
+                        i.classList.add('text-gray-700', 'dark:text-slate-300', 'hover:bg-gray-100', 'dark:hover:bg-slate-600');
+                    });
+                    // Set class active cho item vừa chọn
+                    item.classList.remove('text-gray-700', 'dark:text-slate-300', 'hover:bg-gray-100', 'dark:hover:bg-slate-600');
+                    item.classList.add('bg-blue-600', 'text-white', 'font-medium');
+
+                    closeDropdown(menu, arrow);
+                });
+            });
+        }
+
+        function openDropdown(menu, arrow) {
+            menu.classList.remove('hidden');
+            void menu.offsetWidth; // Trigger reflow
+            menu.classList.remove('opacity-0', '-translate-y-2');
+            menu.classList.add('opacity-100', 'translate-y-0');
+            if (arrow) arrow.classList.add('rotate-180');
+        }
+
+        function closeDropdown(menu, arrow) {
+            menu.classList.remove('opacity-100', 'translate-y-0');
+            menu.classList.add('opacity-0', '-translate-y-2');
+            if (arrow) arrow.classList.remove('rotate-180');
+            setTimeout(() => {
+                menu.classList.add('hidden');
+            }, 200);
+        }
+
+        // ==========================================
+        // KHỞI TẠO CÁC DROPDOWN
+        // ==========================================
+        
+        // 1. Trạng thái
+        setupDropdown({
+            btnId: 'status-btn',
+            menuId: 'status-menu',
+            labelId: 'status-label',
+            selectId: 'real-status-select',
+            arrowId: 'status-arrow',
+            itemClass: 'status-item'
+        });
+        
+        // Gắn class chung để dễ quản lý (đóng khi mở cái khác)
+        const statusMenu = document.getElementById('status-menu');
+        const statusArrow = document.getElementById('status-arrow');
+        if (statusMenu) statusMenu.classList.add('custom-dropdown-menu');
+        if (statusArrow) statusArrow.classList.add('custom-dropdown-arrow');
+
+        // 2. Cột mốc
+        setupDropdown({
+            btnId: 'milestone-btn',
+            menuId: 'milestone-menu',
+            labelId: 'milestone-label',
+            selectId: 'real-milestone-select',
+            arrowId: 'milestone-arrow',
+            itemClass: 'milestone-item'
+        });
+
+        const milestoneMenu = document.getElementById('milestone-menu');
+        const milestoneArrow = document.getElementById('milestone-arrow');
+        if (milestoneMenu) milestoneMenu.classList.add('custom-dropdown-menu');
+        if (milestoneArrow) milestoneArrow.classList.add('custom-dropdown-arrow');
+
+        // ==========================================
+        // ĐÓNG MENU KHI CLICK RA NGOÀI
+        // ==========================================
+        document.addEventListener('click', (e) => {
+            const statusWrapper = document.getElementById('status-selector-wrapper');
+            const milestoneWrapper = document.getElementById('milestone-selector-wrapper');
+
+            if (statusWrapper && !statusWrapper.contains(e.target)) {
+                const menu = document.getElementById('status-menu');
+                const arrow = document.getElementById('status-arrow');
+                if (menu && menu.classList.contains('opacity-100')) closeDropdown(menu, arrow);
+            }
+            
+            if (milestoneWrapper && !milestoneWrapper.contains(e.target)) {
+                const menu = document.getElementById('milestone-menu');
+                const arrow = document.getElementById('milestone-arrow');
+                if (menu && menu.classList.contains('opacity-100')) closeDropdown(menu, arrow);
+            }
+        });
+
+    })();
+</script>
 {% endblock %}

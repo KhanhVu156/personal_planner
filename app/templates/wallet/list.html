@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+    <h2 class="text-2xl font-bold text-gray-800 dark:text-slate-100">Quản lý Ví / Nguồn tiền</h2>
+    
+    <div class="flex items-center gap-4">
+        <!-- CÔNG TẮC BẬT/TẮT HIỂN THỊ VÍ ĐÃ ẨN -->
+        <form method="GET" action="{{ url_for('wallets.list_wallets') }}" class="flex items-center">
+            <input type="hidden" name="show_hidden" value="{{ '0' if show_hidden else '1' }}">
+            <button type="submit" class="flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-slate-300 hover:text-blue-600 transition-colors">
+                <div class="relative inline-flex items-center cursor-pointer">
+                    <div class="w-9 h-5 {{ 'bg-blue-600' if show_hidden else 'bg-gray-300 dark:bg-slate-600' }} rounded-full transition-colors"></div>
+                    <div class="absolute top-[2px] left-[2px] w-4 h-4 bg-white rounded-full transition-transform {{ 'translate-x-4' if show_hidden else 'translate-x-0' }}"></div>
+                </div>
+                Hiện ví đã ẩn
+            </button>
+        </form>
+
+        <a href="{{ url_for('wallets.add_wallet') }}" class="bg-blue-600 text-white px-4 py-2 rounded shadow hover:bg-blue-700 transition duration-200 flex items-center font-semibold">
+            <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+            Thêm Ví mới
+        </a>
+    </div>
+</div>
+
+<div class="overflow-x-auto bg-white dark:bg-slate-800 rounded shadow transition-colors duration-300">
+    <table class="min-w-full">
+        <thead>
+            <tr class="bg-gray-50 dark:bg-slate-700 border-b border-gray-200 dark:border-slate-600">
+                <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600 dark:text-slate-300 uppercase tracking-wider">Tên Ví</th>
+                <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600 dark:text-slate-300 uppercase tracking-wider">Loại Ví</th>
+                <th class="py-3 px-4 text-right text-sm font-semibold text-gray-600 dark:text-slate-300 uppercase tracking-wider">Số dư hiện tại</th>
+                <th class="py-3 px-4 text-center text-sm font-semibold text-gray-600 dark:text-slate-300 uppercase tracking-wider">Thao tác</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200 dark:divide-slate-700">
+            {% for wallet in wallets %}
+            <!-- Nếu ví bị ẩn, làm mờ toàn bộ dòng -->
+            <tr class="transition duration-150 {{ 'opacity-60 bg-gray-50 dark:bg-slate-800/50' if not wallet.is_active else 'hover:bg-gray-50 dark:hover:bg-slate-700' }}">
+                <td class="py-3 px-4 text-sm text-gray-800 dark:text-slate-100 font-medium">
+                    {{ wallet.name }}
+                    {% if not wallet.is_active %}
+                        <span class="ml-2 px-1.5 py-0.5 bg-gray-200 text-gray-600 dark:bg-slate-700 dark:text-slate-400 text-[10px] font-bold rounded">Đã ẩn</span>
+                    {% endif %}
+                </td>
+                <td class="py-3 px-4">
+                    {% set type_names = {'cash': 'Tiền mặt', 'bank': 'Ngân hàng', 'ewallet': 'Ví điện tử', 'credit': 'Thẻ tín dụng'} %}
+                    <span class="px-2 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300 text-xs font-semibold rounded-full">
+                        {{ type_names.get(wallet.wallet_type, wallet.wallet_type) }}
+                    </span>
+                </td>
+                <td class="py-3 px-4 text-right font-bold {% if wallet.current_balance < 0 %}text-red-600 dark:text-red-400{% else %}text-green-600 dark:text-green-400{% endif %} whitespace-nowrap">
+                    {{ "{:,.0f}".format(wallet.current_balance).replace(',', '.') }} VND
+                </td>
+                <td class="py-3 px-4 text-center space-x-3 whitespace-nowrap">
+                    {% if wallet.is_active %}
+                        <a href="{{ url_for('wallets.edit_wallet', id=wallet.id) }}" class="text-blue-600 dark:text-blue-400 hover:text-blue-800 font-medium text-sm">Sửa</a>
+                        
+                        <form action="{{ url_for('wallets.delete_wallet', id=wallet.id) }}" method="POST" class="inline" id="delete-form-{{ wallet.id }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <input type="hidden" name="show_hidden" value="{{ 1 if show_hidden else 0 }}"> <!-- Giữ trạng thái filter -->
+                            <button type="button" onclick="openDeleteModal('{{ wallet.id }}', '{{ wallet.name }}')" class="text-red-600 dark:text-red-400 hover:text-red-800 font-medium text-sm">
+                                Ẩn ví
+                            </button>
+                        </form>
+                    {% else %}
+                        <!-- Nếu đã Ẩn: Chỉ hiện nút Khôi phục -->
+                        <form action="{{ url_for('wallets.restore_wallet', id=wallet.id) }}" method="POST" class="inline">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <button type="submit" class="text-green-600 dark:text-green-400 hover:text-green-800 font-semibold text-sm flex items-center justify-center gap-1 mx-auto">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                                Khôi phục
+                            </button>
+                        </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="4" class="py-12 text-center text-gray-500 dark:text-slate-400">
+                    <div class="flex flex-col items-center justify-center">
+                        <p class="text-lg">Không có ví nào được tìm thấy.</p>
+                        {% if not show_hidden %}
+                            <a href="{{ url_for('wallets.add_wallet') }}" class="text-blue-600 mt-2 hover:underline">Tạo ví đầu tiên</a>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- MODAL XÓA -->
+<div id="custom-wallet-delete-modal" class="fixed inset-0 z-[100] hidden bg-black/50 flex items-center justify-center transition-opacity duration-300">
+    <div class="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-96 p-6 transform scale-95 transition-transform duration-300">
+        <h3 class="text-lg font-bold text-gray-800 dark:text-slate-100 mb-2">Xác nhận ẩn ví</h3>
+        <p class="text-gray-600 dark:text-slate-300 mb-2" id="wallet-delete-message">Bạn có chắc chắn muốn ẩn ví này?</p>
+        <p class="text-xs text-gray-500 dark:text-slate-400 italic mb-6">* Dữ liệu giao dịch vẫn được giữ nguyên.</p>
+        <div class="flex justify-end space-x-3">
+            <button type="button" id="cancel-wallet-delete-btn" class="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 dark:bg-slate-600 dark:text-white dark:hover:bg-slate-500 transition-colors">Hủy</button>
+            <button type="button" id="confirm-wallet-delete-btn" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors shadow-sm">Ẩn ví</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function() {
+        'use strict';
+        let pendingDeleteWalletId = null;
+        const modal = document.getElementById('custom-wallet-delete-modal');
+        const modalContent = modal.querySelector('div');
+        const messageEl = document.getElementById('wallet-delete-message');
+        
+        window.openDeleteModal = function(id, name) {
+            pendingDeleteWalletId = id;
+            messageEl.innerHTML = `Bạn có chắc chắn muốn ẩn ví <strong class="text-gray-800 dark:text-slate-200">"${name}"</strong>?`;
+            modal.classList.remove('hidden');
+            void modal.offsetWidth; 
+            modalContent.classList.add('scale-100');
+            modalContent.classList.remove('scale-95');
+        };
+
+        function closeModal() {
+            modal.classList.add('hidden');
+            modalContent.classList.remove('scale-100');
+            modalContent.classList.add('scale-95');
+            pendingDeleteWalletId = null;
+        }
+
+        document.getElementById('cancel-wallet-delete-btn').addEventListener('click', closeModal);
+        modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+        
+        document.getElementById('confirm-wallet-delete-btn').addEventListener('click', () => {
+            if (pendingDeleteWalletId) {
+                const form = document.getElementById(`delete-form-${pendingDeleteWalletId}`);
+                if (form) form.submit();
+            }
+        });
+    })();
+</script>
+{% endblock %}

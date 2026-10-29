@@ -26,7 +26,7 @@ def create_app(config_class=Config):
     mail.init_app(app)
     csrf.init_app(app)
 
-    # --- REDIS FALLBACK AN TOÀN (thử Redis trước, tự fallback SimpleCache nếu lỗi) ---
+    # --- REDIS FALLBACK AN TOÀN ---
     redis_url = os.environ.get('REDIS_URL')
     cache_config = {
         'CACHE_TYPE': 'SimpleCache',
@@ -34,7 +34,6 @@ def create_app(config_class=Config):
     }
     
     if redis_url:
-        # Tự động sửa lỗi nếu user copy link redis:// thay vì rediss://
         if redis_url.startswith('redis://'):
             redis_url = redis_url.replace('redis://', 'rediss://', 1)
             
@@ -44,12 +43,8 @@ def create_app(config_class=Config):
                     'CACHE_TYPE': 'RedisCache',
                     'CACHE_REDIS_URL': redis_url,
                     'CACHE_DEFAULT_TIMEOUT': 10,
-                    # Thêm cấu hình SSL để tránh lỗi chứng chỉ trên Windows
-                    'CACHE_OPTIONS': {
-                        'ssl_cert_reqs': 'none'
-                    }
+                    'CACHE_OPTIONS': { 'ssl_cert_reqs': 'none' }
                 }
-                # Thử init và ping thử để chắc chắn Redis sống
                 probe = Cache()
                 probe.init_app(app, config=test_cfg)
                 probe.get('__probe__')
@@ -76,20 +71,28 @@ def create_app(config_class=Config):
     login_manager.login_message = None
     login_manager.login_message_category = 'info'
 
-    # TODO: chuyển sang app/data/models/ để không lộ model qua /static/
     os.makedirs(os.path.join(app.root_path, 'static', 'models'), exist_ok=True)
 
-    # Blueprints
+    # ==================== ĐĂNG KÝ BLUEPRINTS ====================
     from app.routes.auth import bp as auth_bp
     app.register_blueprint(auth_bp)
+    
     from app.routes.dashboard import bp as dashboard_bp
     app.register_blueprint(dashboard_bp)
+    
     from app.routes.transactions import bp as transactions_bp
     app.register_blueprint(transactions_bp)
+    
     from app.routes.budgets import bp as budgets_bp
     app.register_blueprint(budgets_bp)
+    
     from app.routes.tasks import bp as tasks_bp
     app.register_blueprint(tasks_bp)
+    
+    # ✅ ĐĂNG KÝ BLUEPRINT WALLET
+    from app.routes.wallet import bp as wallets_bp
+    app.register_blueprint(wallets_bp)
+    
     from app.routes.api import bp as api_bp
     app.register_blueprint(api_bp)
 
@@ -100,8 +103,6 @@ def create_app(config_class=Config):
     @app.after_request
     def add_cache_headers(response):
         if request.path.startswith('/static/'):
-            # ✅ FIX P2: CSS/JS được rebuild mỗi deploy → KHÔNG được cache immutable 1 năm,
-            # nếu không user sẽ dùng v1 mãi đến khi hết hạn.
             if '/css/style.css' in request.path or '/js/main.js' in request.path:
                 response.headers['Cache-Control'] = 'no-cache, must-revalidate'
             else:
@@ -113,9 +114,8 @@ def create_app(config_class=Config):
     return app
 
 
-# ✅ FIX P1: User.query.get() deprecated + int() có thể crash nếu cookie bị sửa
+# Load user an toàn
 from app.models import User
-
 
 @login_manager.user_loader
 def load_user(user_id):

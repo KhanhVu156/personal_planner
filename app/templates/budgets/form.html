@@ -3,52 +3,103 @@
 <div class="max-w-lg mx-auto bg-white dark:bg-slate-800 p-6 rounded shadow mt-4 transition-colors duration-300">
     <h2 class="text-2xl font-bold mb-6 text-gray-800 dark:text-slate-100">Thiết lập Ngân sách</h2>
     
-    <!-- ✅ FIX (3.4): Đã xóa bỏ hx-boost="false" dư thừa. Form submit chuẩn HTTP POST. -->
     <form method="POST" action="" novalidate>
         {{ form.hidden_tag() }}
         
-        <div class="mb-4">
+        <!-- Hàng 1: Danh mục -->
+        <!-- ✅ FIX: Chỉ dùng relative, bỏ hoàn toàn z-index ở thẻ cha -->
+        <div class="mb-4 relative" id="category-selector-wrapper">
             {{ form.category.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
-            {{ form.category(class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white") }}
+            
+            <!-- Ẩn thẻ select gốc đi để form vẫn submit đúng -->
+            {{ form.category(class="hidden", id="real-category-select") }}
+
+            <!-- Nút bấm giả lập -->
+            <button type="button" id="category-btn" class="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded text-left flex justify-between items-center focus:ring-2 focus:ring-blue-500 outline-none transition-colors text-gray-900 dark:text-white font-medium">
+                <span id="category-label">
+                    {% set selected_cat = form.category.data or 'food' %}
+                    {% for value, label in form.category.choices %}
+                        {% if value == selected_cat %}{{ label }}{% endif %}
+                    {% endfor %}
+                </span>
+                <svg class="w-4 h-4 text-gray-500 dark:text-slate-400 transition-transform duration-200" id="category-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+            </button>
+            
+            <!-- Menu xổ xuống: Dùng absolute + z-50 để nổi lên trên mọi thứ -->
+            <div id="category-menu" class="absolute top-full left-0 mt-1 w-full bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg shadow-2xl hidden opacity-0 transform -translate-y-2 transition-all duration-200 overflow-hidden z-50">
+                <ul class="max-h-60 overflow-y-auto py-1" id="category-list">
+                    {% for value, label in form.category.choices %}
+                        <li>
+                            <button type="button" class="category-item w-full text-left px-4 py-2.5 text-sm transition-colors duration-150
+                                {% if value == selected_cat %} bg-blue-600 text-white font-medium {% else %} text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-600 {% endif %}" 
+                                    data-value="{{ value }}">{{ label }}</button>
+                        </li>
+                    {% endfor %}
+                </ul>
+            </div>
             {% for error in form.category.errors %}
                 <span class="text-red-500 text-sm mt-1 block">{{ error }}</span>
             {% endfor %}
         </div>
         
+        <!-- Hàng 2: Tháng & Năm -->
         <div class="grid grid-cols-2 gap-4 mb-4">
-            <div>
+            
+            <!-- ✅ FIX: Bỏ z-index ở thẻ cha -->
+            <div class="relative" id="month-selector-wrapper">
                 {{ form.month.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
-                {{ form.month(class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white") }}
+                
+                <input type="hidden" name="month" id="month-input" value="{{ form.month.data or display_month }}">
+
+                <button type="button" id="month-btn" class="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded text-left flex justify-between items-center focus:ring-2 focus:ring-blue-500 outline-none transition-colors text-gray-900 dark:text-white font-medium">
+                    <span id="month-label">Tháng {{ form.month.data or display_month }}</span>
+                    <svg class="w-4 h-4 text-gray-500 dark:text-slate-400 transition-transform duration-200" id="month-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </button>
+                
+                <!-- Menu xổ xuống: Dùng absolute + z-50 -->
+                <div id="month-menu" class="absolute top-full left-0 mt-1 w-full bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg shadow-2xl hidden opacity-0 transform -translate-y-2 transition-all duration-200 overflow-hidden z-50">
+                    <ul class="max-h-60 overflow-y-auto py-1" id="month-list">
+                        {% for m in range(1, 13) %}
+                            {% set m_str = m|string %}
+                            {% set current_val = form.month.data|string if form.month.data else display_month|string %}
+                            <li>
+                                <button type="button" class="month-item w-full text-left px-4 py-2.5 text-sm transition-colors duration-150
+                                    {% if m_str == current_val %} bg-blue-600 text-white font-medium {% else %} text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-600 {% endif %}" 
+                                        data-value="{{ m }}">Tháng {{ m }}</button>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </div>
                 {% for error in form.month.errors %}
                     <span class="text-red-500 text-sm mt-1 block">{{ error }}</span>
                 {% endfor %}
             </div>
+            
             <div>
                 {{ form.year.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
-                <!-- TƯ DUY UX: Thêm type="number" và các giới hạn min/max để trình duyệt tự validate -->
-                {{ form.year(class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white", placeholder="VD: 2024", type="number", min="2020", max="2100") }}
+                {{ form.year(class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-slate-400 transition-colors", placeholder="VD: 2024", type="number", min="2020", max="2100") }}
                 {% for error in form.year.errors %}
                     <span class="text-red-500 text-sm mt-1 block">{{ error }}</span>
                 {% endfor %}
             </div>
         </div>
         
-        <div class="mb-6">
+        <!-- Hàng 3: Số tiền -->
+        <div class="mb-6 relative">
             {{ form.amount.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
-            <div class="relative">
-                <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500 dark:text-slate-400">VND</span>
-                <!-- 
-                    TƯ DUY: Dùng type="text" thay vì type="number" để có thể nhập dấu chấm (VD: 1.000.000). 
-                    Backend (parse_vnd_amount) sẽ tự động lọc bỏ dấu chấm trước khi lưu vào DB.
-                -->
-                {{ form.amount(class="w-full pl-12 pr-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white", placeholder="VD: 1.000.000", type="text", id="budget_amount") }}
+            
+            <div class="flex items-center w-full border border-gray-300 dark:border-slate-600 rounded focus-within:ring-2 focus-within:ring-blue-500 bg-white dark:bg-slate-700 transition-colors overflow-hidden">
+                <span class="pl-3 pr-2 text-gray-700 dark:text-slate-300 font-bold select-none transition-colors">VND</span>
+                
+                {{ form.amount(class="flex-1 w-full py-2 pr-3 bg-white dark:bg-slate-700 border-0 focus:ring-0 focus:outline-none text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-slate-400 placeholder:font-normal font-semibold transition-colors", placeholder="Nhập số tiền...", type="text", id="budget_amount") }}
             </div>
             {% for error in form.amount.errors %}
                 <span class="text-red-500 text-sm mt-1 block">{{ error }}</span>
             {% endfor %}
         </div>
         
-        <div class="flex items-center justify-between space-x-4">
+        <!-- Nút bấm -->
+        <div class="flex items-center justify-between space-x-4 relative">
             <a href="{{ url_for('budgets.list_budgets') }}" class="w-1/3 text-center bg-gray-200 text-gray-800 dark:bg-slate-600 dark:text-slate-200 py-2 rounded hover:bg-gray-300 dark:hover:bg-slate-500 transition duration-200 font-semibold">Hủy</a>
             {{ form.submit(class="w-2/3 bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition duration-200 cursor-pointer font-semibold shadow-sm", value="Lưu lại") }}
         </div>
@@ -56,35 +107,161 @@
 </div>
 
 <script>
-    /**
-     * TƯ DUY TỐI ƯU UX (Auto-format tiền tệ):
-     * - Người dùng gõ "1000000" -> Tự động hiển thị "1.000.000".
-     * - Khi người dùng xóa hết -> Hiển thị rỗng.
-     * - Xử lý cả trường hợp load trang ở chế độ "Sửa" (đã có số tiền từ trước).
-     */
     (function() {
-        const amountInput = document.getElementById('budget_amount');
-        if (!amountInput) return;
+        'use strict';
 
-        // GUARD: Tránh bind trùng sự kiện nếu DOM bị thay thế (HTMX swap)
-        if (amountInput.dataset.bound === '1') return;
-        amountInput.dataset.bound = '1';
+        // ==========================================
+        // 1. XỬ LÝ CUSTOM DROPDOWN DANH MỤC
+        // ==========================================
+        const categoryBtn = document.getElementById('category-btn');
+        const categoryMenu = document.getElementById('category-menu');
+        const categoryLabel = document.getElementById('category-label');
+        const realCategorySelect = document.getElementById('real-category-select'); 
+        const categoryArrow = document.getElementById('category-arrow');
+        const categoryItems = document.querySelectorAll('.category-item');
 
-        const formatValue = (val) => {
-            // Chỉ giữ lại các ký tự số
-            let raw = val.replace(/\D/g, '');
-            return raw ? new Intl.NumberFormat('vi-VN').format(raw) : '';
-        };
+        if (categoryBtn && categoryMenu && realCategorySelect) {
+            categoryBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                
+                // Nếu menu đang mở -> Đóng
+                if (categoryMenu.classList.contains('opacity-100')) {
+                    closeCategoryMenu();
+                } else {
+                    // Đảm bảo menu Tháng đóng lại nếu đang mở
+                    if (typeof closeMonthMenu === 'function') closeMonthMenu();
+                    
+                    categoryMenu.classList.remove('hidden');
+                    void categoryMenu.offsetWidth; // Trigger reflow
+                    
+                    categoryMenu.classList.remove('opacity-0', '-translate-y-2');
+                    categoryMenu.classList.add('opacity-100', 'translate-y-0');
+                    categoryArrow.classList.add('rotate-180');
+                }
+            });
 
-        // Format số tiền ban đầu (khi Sửa)
-        if (amountInput.value) {
-            amountInput.value = formatValue(amountInput.value);
+            categoryItems.forEach(item => {
+                item.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const val = item.getAttribute('data-value');
+                    
+                    realCategorySelect.value = val; 
+                    categoryLabel.innerText = item.innerText;
+                    
+                    categoryItems.forEach(i => {
+                        i.classList.remove('bg-blue-600', 'text-white', 'font-medium');
+                        i.classList.add('text-gray-700', 'dark:text-slate-300', 'hover:bg-gray-100', 'dark:hover:bg-slate-600');
+                    });
+                    item.classList.remove('text-gray-700', 'dark:text-slate-300', 'hover:bg-gray-100', 'dark:hover:bg-slate-600');
+                    item.classList.add('bg-blue-600', 'text-white', 'font-medium');
+
+                    closeCategoryMenu();
+                });
+            });
         }
 
-        // Lắng nghe sự kiện gõ phím
-        amountInput.addEventListener('input', function(e) {
-            this.value = formatValue(this.value);
+        function closeCategoryMenu() {
+            if (!categoryMenu) return;
+            categoryMenu.classList.remove('opacity-100', 'translate-y-0');
+            categoryMenu.classList.add('opacity-0', '-translate-y-2');
+            if (categoryArrow) categoryArrow.classList.remove('rotate-180');
+            setTimeout(() => {
+                categoryMenu.classList.add('hidden');
+            }, 200);
+        }
+
+        // ==========================================
+        // 2. XỬ LÝ CUSTOM DROPDOWN THÁNG
+        // ==========================================
+        const monthBtn = document.getElementById('month-btn');
+        const monthMenu = document.getElementById('month-menu');
+        const monthLabel = document.getElementById('month-label');
+        const monthInput = document.getElementById('month-input');
+        const monthArrow = document.getElementById('month-arrow');
+        const monthItems = document.querySelectorAll('.month-item');
+
+        if (monthBtn && monthMenu) {
+            monthBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                
+                if (monthMenu.classList.contains('opacity-100')) {
+                    closeMonthMenu();
+                } else {
+                    // Đảm bảo menu Danh mục đóng lại nếu đang mở
+                    if (typeof closeCategoryMenu === 'function') closeCategoryMenu();
+                    
+                    monthMenu.classList.remove('hidden');
+                    void monthMenu.offsetWidth; 
+                    
+                    monthMenu.classList.remove('opacity-0', '-translate-y-2');
+                    monthMenu.classList.add('opacity-100', 'translate-y-0');
+                    monthArrow.classList.add('rotate-180');
+                }
+            });
+
+            monthItems.forEach(item => {
+                item.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const val = item.getAttribute('data-value');
+                    monthInput.value = val;
+                    monthLabel.innerText = item.innerText;
+                    
+                    monthItems.forEach(i => {
+                        i.classList.remove('bg-blue-600', 'text-white', 'font-medium');
+                        i.classList.add('text-gray-700', 'dark:text-slate-300', 'hover:bg-gray-100', 'dark:hover:bg-slate-600');
+                    });
+                    item.classList.remove('text-gray-700', 'dark:text-slate-300', 'hover:bg-gray-100', 'dark:hover:bg-slate-600');
+                    item.classList.add('bg-blue-600', 'text-white', 'font-medium');
+
+                    closeMonthMenu();
+                });
+            });
+        }
+
+        function closeMonthMenu() {
+            if (!monthMenu) return;
+            monthMenu.classList.remove('opacity-100', 'translate-y-0');
+            monthMenu.classList.add('opacity-0', '-translate-y-2');
+            if (monthArrow) monthArrow.classList.remove('rotate-180');
+            setTimeout(() => {
+                monthMenu.classList.add('hidden');
+            }, 200);
+        }
+
+        // Đóng tất cả menu khi click ra ngoài
+        document.addEventListener('click', (e) => {
+            const categoryWrapper = document.getElementById('category-selector-wrapper');
+            const monthWrapper = document.getElementById('month-selector-wrapper');
+            
+            if (categoryWrapper && !categoryWrapper.contains(e.target)) {
+                closeCategoryMenu();
+            }
+            if (monthWrapper && !monthWrapper.contains(e.target)) {
+                closeMonthMenu();
+            }
         });
+
+        // ==========================================
+        // 3. TỰ ĐỘNG FORMAT TIỀN TỆ
+        // ==========================================
+        const amountInput = document.getElementById('budget_amount');
+        if (amountInput) {
+            if (amountInput.dataset.bound === '1') return;
+            amountInput.dataset.bound = '1';
+
+            const formatValue = (val) => {
+                let raw = val.replace(/\D/g, '');
+                return raw ? new Intl.NumberFormat('vi-VN').format(raw) : '';
+            };
+
+            if (amountInput.value) {
+                amountInput.value = formatValue(amountInput.value);
+            }
+
+            amountInput.addEventListener('input', function() {
+                this.value = formatValue(this.value);
+            });
+        }
     })();
 </script>
 {% endblock %}
