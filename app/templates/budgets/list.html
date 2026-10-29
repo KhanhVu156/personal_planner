@@ -3,7 +3,6 @@
 <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
     <h2 class="text-2xl font-bold text-gray-800 dark:text-slate-100">Quản lý Ngân sách</h2>
     <a href="{{ url_for('budgets.add_budget') }}" class="bg-blue-600 text-white px-4 py-2 rounded shadow hover:bg-blue-700 transition duration-200 flex items-center font-semibold">
-        <!-- TƯ DUY UI: Thêm icon dấu cộng cho đồng bộ với các trang quản lý khác -->
         <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
         Thiết lập Ngân sách
     </a>
@@ -14,18 +13,18 @@
     <form method="GET" class="flex flex-wrap items-end gap-4">
         <div>
             <label class="block text-sm font-semibold text-gray-600 dark:text-slate-400 mb-1">Tháng</label>
-            <!-- TƯ DUY: Dùng `month or ''` để nếu không có filter thì ô input hiển thị trống thay vì chữ "None" -->
-            <input type="number" name="month" aria-label="Lọc theo tháng" value="{{ month or '' }}" min="1" max="12" class="w-24 px-3 py-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Tất cả">
+            <!-- TƯ DUY UX: Placeholder "Tất cả" + aria-label rõ ràng để user biết có thể bỏ trống trường này -->
+            <input type="number" name="month" aria-label="Lọc theo tháng (để trống nếu muốn xem tất cả)" value="{{ month or '' }}" min="1" max="12" class="w-24 px-3 py-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Tất cả">
         </div>
         <div>
             <label class="block text-sm font-semibold text-gray-600 dark:text-slate-400 mb-1">Năm</label>
-            <input type="number" name="year" aria-label="Lọc theo năm" value="{{ year or '' }}" min="2000" max="2100" class="w-28 px-3 py-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Tất cả">
+            <input type="number" name="year" aria-label="Lọc theo năm (để trống nếu muốn xem tất cả)" value="{{ year or '' }}" min="2000" max="2100" class="w-28 px-3 py-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Tất cả">
         </div>
         <button type="submit" class="bg-gray-800 text-white px-4 py-2 rounded hover:bg-gray-900 transition duration-200 h-10 dark:bg-slate-600 dark:hover:bg-slate-500">
             Lọc
         </button>
         
-        <!-- Nút Xem tất cả chỉ hiện khi đang có bộ lọc -->
+        <!-- Nút Xem tất cả chỉ hiện khi đang có bộ lọc (dù là tháng hay năm) -->
         {% if month or year %}
         <a href="{{ url_for('budgets.list_budgets') }}" class="bg-blue-100 text-blue-700 dark:bg-slate-700 dark:text-blue-300 px-4 py-2 rounded hover:bg-blue-200 dark:hover:bg-slate-600 transition duration-200 h-10 flex items-center font-medium">
             Xóa bộ lọc
@@ -50,7 +49,6 @@
             <tr class="hover:bg-gray-50 dark:hover:bg-slate-700 transition duration-150">
                 <td class="py-3 px-4">
                     <span class="px-2 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300 text-xs font-semibold rounded-full">
-                        <!-- TƯ DUY CLEAN CODE: Dùng Dictionary mapping thay vì chuỗi if/elif dài dòng -->
                         {% set cat_names = {
                             'food': 'Ăn uống', 'transport': 'Di chuyển', 'education': 'Học tập',
                             'entertainment': 'Giải trí', 'shopping': 'Mua sắm', 'bills': 'Hóa đơn',
@@ -61,18 +59,18 @@
                 </td>
                 <td class="py-3 px-4 text-gray-700 dark:text-slate-300 whitespace-nowrap">{{ budget.month }}/{{ budget.year }}</td>
                 
-                <!-- TƯ DUY: Định dạng số theo chuẩn VNĐ (dùng dấu chấm phân cách hàng nghìn) -->
                 <td class="py-3 px-4 text-right font-bold text-gray-800 dark:text-slate-100 whitespace-nowrap">
                     {{ "{:,.0f}".format(budget.amount).replace(',', '.') }} VND
                 </td>
                 
                 <td class="py-3 px-4 text-center space-x-3 whitespace-nowrap">
+                    <!-- TƯ DUY: Sửa URL Edit, dùng chính tháng/năm của budget đó để fill vào form -->
                     <a href="{{ url_for('budgets.add_budget', month=budget.month, year=budget.year, category=budget.category) }}" class="text-blue-600 dark:text-blue-400 hover:text-blue-800 font-medium text-sm">Sửa</a>
                     
                     <!-- 
-                        ✅ FIX (2.1): CHUYỂN TỪ GET SANG POST.
-                        Bọc nút Xóa trong form POST để chống tấn công CSRF và tránh bot quét link.
-                        JS (main.js) sẽ bắt sự kiện click vào class .delete-confirm để mở Modal.
+                        TƯ DUY FIX: Bọc nút Xóa trong form POST để chống CSRF.
+                        Truyền kèm filter hiện tại (month, year) qua URL để backend có thể redirect 
+                        user quay lại đúng trang đang lọc sau khi xóa thành công.
                     -->
                     <form action="{{ url_for('budgets.delete_budget', id=budget.id, month=month, year=year) }}" method="POST" class="inline delete-form">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
@@ -86,8 +84,15 @@
             <tr>
                 <td colspan="4" class="py-12 text-center text-gray-500 dark:text-slate-400">
                     <div class="flex flex-col items-center justify-center">
+                        <!-- TƯ DUY FIX: Tách biệt logic Empty State cho từng trường hợp lọc độc lập -->
                         {% if month and year %}
                             <p class="text-lg">Không có ngân sách nào cho tháng {{ month }}/{{ year }}.</p>
+                            <a href="{{ url_for('budgets.list_budgets') }}" class="text-blue-600 mt-2 hover:underline">Xem tất cả ngân sách</a>
+                        {% elif month %}
+                            <p class="text-lg">Không có ngân sách nào trong tháng {{ month }} (của bất kỳ năm nào).</p>
+                            <a href="{{ url_for('budgets.list_budgets') }}" class="text-blue-600 mt-2 hover:underline">Xem tất cả ngân sách</a>
+                        {% elif year %}
+                            <p class="text-lg">Không có ngân sách nào trong năm {{ year }} (của bất kỳ tháng nào).</p>
                             <a href="{{ url_for('budgets.list_budgets') }}" class="text-blue-600 mt-2 hover:underline">Xem tất cả ngân sách</a>
                         {% else %}
                             <p class="text-lg">Chưa có ngân sách nào được thiết lập.</p>

@@ -70,7 +70,6 @@
         <p id="val-total-assets" class="text-3xl font-bold text-gray-800 dark:text-slate-100 mt-1">
             <span class="inline-block animate-pulse bg-gray-300 dark:bg-slate-600 rounded h-8 w-32"></span>
         </p>
-        <!-- Dòng tiền (Thu - Chi) hiển thị nhỏ bên dưới -->
         <p id="val-cash-flow" class="text-sm font-medium text-gray-500 dark:text-slate-400 mt-2">
             <span class="inline-block animate-pulse bg-gray-200 dark:bg-slate-700 rounded h-4 w-24"></span>
         </p>
@@ -78,7 +77,6 @@
 </div>
 
 <!-- ✅ KHU VỰC: PHÂN BỔ TÀI SẢN THEO VÍ -->
-<!-- Bỏ class hidden. JS sẽ render Empty State nếu không có ví -->
 <div id="wallets-overview-section" class="mb-8">
     <div class="flex items-center justify-between mb-3">
         <h3 class="text-lg font-semibold text-gray-800 dark:text-slate-100">Phân bổ tài sản</h3>
@@ -317,102 +315,106 @@
     (function () {
         'use strict';
         
+        // =====================================================================
+        // TƯ DUY THIẾT KẾ (DEFENSIVE PROGRAMMING):
+        // 1. Chống lỗi bfcache (back/forward cache): Đăng ký pageshow.
+        // 2. Chống treo vô hạn: Dùng AbortController kết hợp setTimeout 10s.
+        // 3. Chống chết script: Bọc từng hàm render trong try/catch riêng biệt.
+        // 4. Chống SPA (Turbo/HTMX): Lắng nghe sự kiện của các thư viện này.
+        // =====================================================================
+
         const CURRENT_MONTH = {{ display_month }};
         const CURRENT_YEAR = {{ display_year }};
-        const TODAY = new Date();
+        let TODAY = new Date();
         
         let budgetChartInstance = null;
         let forecastChartInstance = null;
         let chartDataState = { budgets: {}, catExp: {}, forecast: [] };
+        
+        // Cờ và controller để quản lý việc fetch dữ liệu
+        let isInitRunning = false;
+        let currentAbortController = null;
 
         const categoryMap = { 'food': 'Ăn uống', 'transport': 'Di chuyển', 'education': 'Học tập', 'entertainment': 'Giải trí', 'shopping': 'Mua sắm', 'bills': 'Hóa đơn', 'other': 'Khác', 'salary': 'Lương' };
 
-        // XỬ LÝ CUSTOM DROPDOWN THÁNG
-        const monthBtn = document.getElementById('month-btn');
-        const monthMenu = document.getElementById('month-menu');
-        const monthLabel = document.getElementById('month-label');
-        const monthInput = document.getElementById('month-input');
-        const monthItems = document.querySelectorAll('.month-item');
-
-        if (monthBtn && monthMenu) {
-            monthBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const isOpen = monthMenu.classList.contains('opacity-100');
-                
-                if (isOpen) {
-                    closeMonthMenu();
-                } else {
-                    const rect = monthBtn.getBoundingClientRect();
-                    monthMenu.style.top = (rect.bottom + 4) + 'px';
-                    monthMenu.style.left = rect.left + 'px';
-                    
-                    monthMenu.classList.remove('hidden');
-                    void monthMenu.offsetWidth;
-                    
-                    monthMenu.classList.remove('opacity-0', '-translate-y-2');
-                    monthMenu.classList.add('opacity-100', 'translate-y-0');
-                }
-            });
-
-            monthItems.forEach(item => {
-                item.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const val = item.getAttribute('data-value');
-                    monthInput.value = val;
-                    monthLabel.innerText = item.innerText;
-                    
-                    monthItems.forEach(i => {
-                        i.classList.remove('bg-blue-600', 'text-white', 'font-medium');
-                        i.classList.add('text-gray-700', 'dark:text-slate-300', 'hover:bg-gray-100', 'dark:hover:bg-slate-700');
-                    });
-                    item.classList.remove('text-gray-700', 'dark:text-slate-300', 'hover:bg-gray-100', 'dark:hover:bg-slate-700');
-                    item.classList.add('bg-blue-600', 'text-white', 'font-medium');
-
-                    closeMonthMenu();
-                });
-            });
-
-            function closeMonthMenu() {
-                monthMenu.classList.remove('opacity-100', 'translate-y-0');
-                monthMenu.classList.add('opacity-0', '-translate-y-2');
-                setTimeout(() => {
-                    monthMenu.classList.add('hidden');
-                }, 200);
-            }
-
-            document.addEventListener('click', (e) => {
-                if (!monthBtn.contains(e.target) && !monthMenu.contains(e.target)) {
-                    closeMonthMenu();
-                }
-            });
+        // =====================================================================
+        // HÀM KHỞI TẠO (CORE LOGIC)
+        // =====================================================================
+        async function initDashboard(isRetry = false) {
+            if (isInitRunning && !isRetry) return; // Tránh gọi đè
+            isInitRunning = true;
             
-            window.addEventListener('scroll', closeMonthMenu, true);
-        }
+            TODAY = new Date();
 
-        async function initDashboard() {
+            // Hủy request cũ nếu đang treo
+            if (currentAbortController) {
+                currentAbortController.abort();
+            }
+            currentAbortController = new AbortController();
+            const thisController = currentAbortController;
+            
+            // Timeout 10s phòng trường hợp mạng chập chờn hoặc server không phản hồi
+            const timeoutId = setTimeout(() => thisController.abort(), 10000);
+
             try {
-                const res = await fetch(`/api/dashboard-stats?month=${CURRENT_MONTH}&year=${CURRENT_YEAR}&t=${Date.now()}`);
-                if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+                const res = await fetch(`/api/dashboard-stats?month=${CURRENT_MONTH}&year=${CURRENT_YEAR}&t=${Date.now()}`, {
+                    signal: thisController.signal,
+                    headers: { 'Accept': 'application/json' }
+                });
+                
+                clearTimeout(timeoutId);
+
+                if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
+                
                 const data = await res.json();
 
-                renderSummary(data);
-                renderWallets(data.wallets);
-                renderBurnRate(data.burn_rate);
-                renderInsights(data.insights);
-                renderTasks(data.tasks);
+                // Safe Render: Từng phần lỗi không ảnh hưởng phần khác
+                safeRun(renderSummary, data);
+                safeRun(renderWallets, data.wallets);
+                safeRun(renderBurnRate, data.burn_rate);
+                safeRun(renderInsights, data.insights);
+                safeRun(renderTasks, data.tasks);
                 
                 chartDataState.budgets = data.budgets || {};
                 chartDataState.catExp = data.cat_expenses || {};
                 chartDataState.forecast = data.forecast || [];
                 
-                renderForecastChart(chartDataState.forecast);
-                renderBudgetChart(chartDataState.budgets, chartDataState.catExp);
+                safeRun(renderForecastChart, chartDataState.forecast);
+                safeRun(renderBudgetChart, chartDataState.budgets, chartDataState.catExp);
+
             } catch (err) {
-                console.error('[Dashboard Error]', err);
-                renderErrorState();
+                clearTimeout(timeoutId);
+                
+                // Nếu request này bị abort bởi 1 request mới hơn (không phải do timeout), bỏ qua
+                if (err.name === 'AbortError' && thisController !== currentAbortController) {
+                    return;
+                }
+
+                console.error('[Dashboard] Fetch error:', err);
+                
+                // Nếu bị abort do quá thời gian (timeout) hoặc lỗi mạng
+                if (err.name === 'AbortError') {
+                    renderErrorState('Yêu cầu quá thời gian. Vui lòng kiểm tra mạng và thử lại.');
+                } else {
+                    renderErrorState();
+                }
+            } finally {
+                isInitRunning = false;
             }
         }
 
+        // Hàm bọc render an toàn
+        function safeRun(fn, ...args) {
+            try {
+                fn(...args);
+            } catch (e) {
+                console.error(`[Render Error] ${fn.name}:`, e);
+            }
+        }
+
+        // =====================================================================
+        // CÁC HÀM RENDER
+        // =====================================================================
         function renderSummary(data) {
             document.getElementById('title-income').innerText = `Thu nhập (T${data.month}/${data.year})`;
             document.getElementById('title-expense').innerText = `Chi tiêu (T${data.month}/${data.year})`;
@@ -433,15 +435,10 @@
             document.getElementById('val-cash-flow').innerHTML = `Dòng tiền: <span class="${flowColor} font-semibold">${flowSign}${formatMoney(cashFlow)} VND</span>`;
         }
 
-        // ✅ HÀM ĐÃ ĐƯỢC SỬA: XỬ LÝ TRẠNG THÁI TRỐNG (EMPTY STATE)
         function renderWallets(wallets) {
-            const section = document.getElementById('wallets-overview-section');
             const grid = document.getElementById('wallets-grid');
+            if (!grid) return;
 
-            // Luôn hiển thị section này (không ẩn nữa)
-            section.classList.remove('hidden');
-
-            // Nếu không có ví, hiển thị thông báo kêu gọi tạo ví
             if (!wallets || wallets.length === 0) {
                 grid.innerHTML = `
                     <div class="col-span-full bg-white dark:bg-slate-800 p-8 rounded-xl border-2 border-dashed border-gray-300 dark:border-slate-700 flex flex-col items-center justify-center transition-colors">
@@ -451,7 +448,7 @@
                             </svg>
                         </div>
                         <h4 class="text-lg font-bold text-gray-800 dark:text-slate-200 mb-2">Chưa có Ví / Nguồn tiền nào</h4>
-                        <p class="text-sm text-gray-500 dark:text-slate-400 mb-6 text-center max-w-md">Thiết lập ví để quản lý số dư từng nguồn tiền (Tiền mặt, Ngân hàng, Ví điện tử...) và tính chính xác Tổng tài sản của bạn.</p>
+                        <p class="text-sm text-gray-500 dark:text-slate-400 mb-6 text-center max-w-md">Thiết lập ví để quản lý số dư từng nguồn tiền và tính chính xác Tổng tài sản của bạn.</p>
                         <a href="{{ url_for('wallets.add_wallet') }}" class="bg-blue-600 text-white px-6 py-2.5 rounded-lg hover:bg-blue-700 transition font-semibold shadow-sm flex items-center gap-2">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
                             Thiết lập Ví ngay
@@ -461,13 +458,7 @@
                 return;
             }
 
-            // Nếu có ví, render thẻ bình thường
-            const typeMap = {
-                'cash': 'Tiền mặt',
-                'bank': 'Ngân hàng',
-                'ewallet': 'Ví điện tử',
-                'credit': 'Thẻ tín dụng'
-            };
+            const typeMap = { 'cash': 'Tiền mặt', 'bank': 'Ngân hàng', 'ewallet': 'Ví điện tử', 'credit': 'Thẻ tín dụng' };
 
             grid.innerHTML = wallets.map(w => {
                 const typeName = typeMap[w.wallet_type] || w.wallet_type;
@@ -693,21 +684,123 @@
             }
         }
 
-        function renderErrorState() {
-            const errorMsg = '<li class="text-red-500 font-medium">Không thể kết nối tới máy chủ.</li>';
-            document.getElementById('insights-list').innerHTML = errorMsg;
-            document.getElementById('burn-rate-content').innerHTML = `<p class="text-red-500">${errorMsg}</p>`;
-            document.getElementById('task-list').innerHTML = `<li class="text-red-500 text-center py-4">Lỗi tải dữ liệu.</li>`;
-            ['chart-skeleton', 'forecast-skeleton'].forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
-            ['val-income', 'val-expense', 'val-total-assets'].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = '<span class="text-gray-400">---</span>'; });
-            if (document.getElementById('val-cash-flow')) document.getElementById('val-cash-flow').innerHTML = '<span class="text-gray-400">---</span>';
+        function renderErrorState(customMsg) {
+            const errorMsg = customMsg || 'Không thể tải dữ liệu. Vui lòng kiểm tra kết nối.';
             
-            // Nếu API lỗi, cũng hiển thị empty state cho ví để tránh khoảng trắng
+            // Ẩn tất cả skeleton
+            document.querySelectorAll('.animate-pulse').forEach(el => el.style.display = 'none');
+            const chartSkeleton = document.getElementById('chart-skeleton');
+            const forecastSkeleton = document.getElementById('forecast-skeleton');
+            if (chartSkeleton) chartSkeleton.style.display = 'none';
+            if (forecastSkeleton) forecastSkeleton.style.display = 'none';
+
+            const retryBtnHtml = `
+                <div class="flex flex-col items-center justify-center p-4">
+                    <p class="text-red-500 font-medium mb-3 text-center">${errorMsg}</p>
+                    <button onclick="window.retryDashboard()" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors shadow-sm">
+                        Thử lại
+                    </button>
+                </div>
+            `;
+
+            document.getElementById('insights-list').innerHTML = `<li>${retryBtnHtml}</li>`;
+            document.getElementById('burn-rate-content').innerHTML = '<p class="text-gray-500 italic text-center py-4">Không có dữ liệu</p>';
+            document.getElementById('task-list').innerHTML = '<li class="text-gray-500 text-center py-4">Lỗi tải dữ liệu</li>';
+            
+            ['val-income', 'val-expense', 'val-total-assets'].forEach(id => { 
+                const el = document.getElementById(id); 
+                if (el) el.innerHTML = '<span class="text-gray-400">---</span>'; 
+            });
+            if (document.getElementById('val-cash-flow')) document.getElementById('val-cash-flow').innerHTML = '';
+            
             const grid = document.getElementById('wallets-grid');
-            if (grid) grid.innerHTML = `<div class="col-span-full text-center text-red-500 p-4">Không thể tải dữ liệu ví.</div>`;
+            if (grid) grid.innerHTML = `<div class="col-span-full text-center text-red-500 p-4">Không thể tải dữ liệu ví</div>`;
         }
 
-        // Dropdown vùng miền
+        // Hàm global cho nút "Thử lại"
+        window.retryDashboard = function() {
+            // Reset UI về trạng thái loading
+            document.getElementById('insights-list').innerHTML = '<li class="animate-pulse h-4 bg-gray-200 dark:bg-slate-700 rounded w-full"></li>';
+            document.getElementById('burn-rate-content').innerHTML = '<div class="h-4 bg-gray-200 dark:bg-slate-700 rounded w-3/4 animate-pulse"></div>';
+            document.getElementById('task-list').innerHTML = '';
+            ['val-income', 'val-expense', 'val-total-assets'].forEach(id => { 
+                const el = document.getElementById(id); 
+                if (el) el.innerHTML = '<span class="inline-block animate-pulse bg-gray-300 dark:bg-slate-600 rounded h-8 w-32"></span>'; 
+            });
+            if (document.getElementById('chart-skeleton')) document.getElementById('chart-skeleton').style.display = 'flex';
+            if (document.getElementById('forecast-skeleton')) document.getElementById('forecast-skeleton').style.display = 'flex';
+            
+            // Gọi lại API
+            initDashboard(true);
+        };
+
+        // =====================================================================
+        // CUSTOM DROPDOWN THÁNG
+        // =====================================================================
+        const monthBtn = document.getElementById('month-btn');
+        const monthMenu = document.getElementById('month-menu');
+        const monthLabel = document.getElementById('month-label');
+        const monthInput = document.getElementById('month-input');
+        const monthItems = document.querySelectorAll('.month-item');
+
+        if (monthBtn && monthMenu) {
+            monthBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const isOpen = monthMenu.classList.contains('opacity-100');
+                
+                if (isOpen) {
+                    closeMonthMenu();
+                } else {
+                    const rect = monthBtn.getBoundingClientRect();
+                    monthMenu.style.top = (rect.bottom + 4) + 'px';
+                    monthMenu.style.left = rect.left + 'px';
+                    
+                    monthMenu.classList.remove('hidden');
+                    void monthMenu.offsetWidth;
+                    
+                    monthMenu.classList.remove('opacity-0', '-translate-y-2');
+                    monthMenu.classList.add('opacity-100', 'translate-y-0');
+                }
+            });
+
+            monthItems.forEach(item => {
+                item.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const val = item.getAttribute('data-value');
+                    monthInput.value = val;
+                    monthLabel.innerText = item.innerText;
+                    
+                    monthItems.forEach(i => {
+                        i.classList.remove('bg-blue-600', 'text-white', 'font-medium');
+                        i.classList.add('text-gray-700', 'dark:text-slate-300', 'hover:bg-gray-100', 'dark:hover:bg-slate-700');
+                    });
+                    item.classList.remove('text-gray-700', 'dark:text-slate-300', 'hover:bg-gray-100', 'dark:hover:bg-slate-700');
+                    item.classList.add('bg-blue-600', 'text-white', 'font-medium');
+
+                    closeMonthMenu();
+                });
+            });
+
+            function closeMonthMenu() {
+                monthMenu.classList.remove('opacity-100', 'translate-y-0');
+                monthMenu.classList.add('opacity-0', '-translate-y-2');
+                setTimeout(() => {
+                    monthMenu.classList.add('hidden');
+                }, 200);
+            }
+
+            document.addEventListener('click', (e) => {
+                if (!monthBtn.contains(e.target) && !monthMenu.contains(e.target)) {
+                    closeMonthMenu();
+                }
+            });
+            
+            window.addEventListener('scroll', closeMonthMenu, true);
+        }
+
+        // =====================================================================
+        // CUSTOM DROPDOWN VÙNG MIỀN
+        // =====================================================================
         const customDropdown = {
             wrapper: document.getElementById('custom-region-dropdown'),
             trigger: document.getElementById('dropdown-trigger'),
@@ -761,14 +854,48 @@
             customDropdown.input.value = 'vn';
         }
 
+        // =====================================================================
+        // ĐĂNG KÝ SỰ KIỆN LIFECYCLE VÀ KHỞI CHẠY
+        // =====================================================================
+        
+        // 1. Xử lý khi trình duyệt khôi phục trang từ bfcache (Back/Forward)
+        // Dùng event.persisted để đảm bảo chỉ chạy lại khi thực sự cần.
+        window.addEventListener('pageshow', function (event) {
+            if (event.persisted) {
+                console.log('[Dashboard] Restored from bfcache -> re-initializing');
+                initDashboard(true);
+            }
+        });
+
+        // 2. Xử lý cho các framework SPA/PJAX (nếu có dùng Turbo hoặc HTMX)
+        document.addEventListener('turbo:load', () => initDashboard(true));
+        document.addEventListener('htmx:afterSettle', () => initDashboard(true));
+
+        // 3. Khởi chạy lần đầu
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => initDashboard(false));
+        } else {
+            initDashboard(false);
+        }
+
+        // 4. Tự động vẽ lại Chart khi tab được active lại (tránh lỗi canvas)
+        document.addEventListener('visibilitychange', function () {
+            if (document.visibilityState === 'visible') {
+                if (budgetChartInstance && typeof budgetChartInstance.resize === 'function') {
+                    try { budgetChartInstance.resize(); } catch (e) {}
+                }
+                if (forecastChartInstance && typeof forecastChartInstance.resize === 'function') {
+                    try { forecastChartInstance.resize(); } catch (e) {}
+                }
+            }
+        });
+
         window.redrawCharts = function() {
             if (Object.keys(chartDataState.budgets).length > 0 || Object.keys(chartDataState.catExp).length > 0) {
                 renderForecastChart(chartDataState.forecast);
                 renderBudgetChart(chartDataState.budgets, chartDataState.catExp);
             }
         };
-
-        initDashboard();
     })();
 </script>
 {% endblock %}

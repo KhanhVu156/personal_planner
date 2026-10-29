@@ -7,7 +7,6 @@
         {{ form.hidden_tag() }}
         
         <!-- Hàng 1: Danh mục -->
-        <!-- ✅ FIX: Chỉ dùng relative, bỏ hoàn toàn z-index ở thẻ cha -->
         <div class="mb-4 relative" id="category-selector-wrapper">
             {{ form.category.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
             
@@ -25,7 +24,7 @@
                 <svg class="w-4 h-4 text-gray-500 dark:text-slate-400 transition-transform duration-200" id="category-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
             </button>
             
-            <!-- Menu xổ xuống: Dùng absolute + z-50 để nổi lên trên mọi thứ -->
+            <!-- Menu xổ xuống -->
             <div id="category-menu" class="absolute top-full left-0 mt-1 w-full bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg shadow-2xl hidden opacity-0 transform -translate-y-2 transition-all duration-200 overflow-hidden z-50">
                 <ul class="max-h-60 overflow-y-auto py-1" id="category-list">
                     {% for value, label in form.category.choices %}
@@ -44,8 +43,6 @@
         
         <!-- Hàng 2: Tháng & Năm -->
         <div class="grid grid-cols-2 gap-4 mb-4">
-            
-            <!-- ✅ FIX: Bỏ z-index ở thẻ cha -->
             <div class="relative" id="month-selector-wrapper">
                 {{ form.month.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
                 
@@ -56,7 +53,6 @@
                     <svg class="w-4 h-4 text-gray-500 dark:text-slate-400 transition-transform duration-200" id="month-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                 </button>
                 
-                <!-- Menu xổ xuống: Dùng absolute + z-50 -->
                 <div id="month-menu" class="absolute top-full left-0 mt-1 w-full bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg shadow-2xl hidden opacity-0 transform -translate-y-2 transition-all duration-200 overflow-hidden z-50">
                     <ul class="max-h-60 overflow-y-auto py-1" id="month-list">
                         {% for m in range(1, 13) %}
@@ -111,25 +107,49 @@
         'use strict';
 
         // ==========================================
+        // KHAI BÁO CÁC HÀM ĐÓNG MENU (Khai báo trước để tránh lỗi scope / hoisting)
+        // ==========================================
+        const categoryMenu = document.getElementById('category-menu');
+        const categoryArrow = document.getElementById('category-arrow');
+        const monthMenu = document.getElementById('month-menu');
+        const monthArrow = document.getElementById('month-arrow');
+
+        function closeCategoryMenu() {
+            if (!categoryMenu) return;
+            categoryMenu.classList.remove('opacity-100', 'translate-y-0');
+            categoryMenu.classList.add('opacity-0', '-translate-y-2');
+            if (categoryArrow) categoryArrow.classList.remove('rotate-180');
+            setTimeout(() => {
+                categoryMenu.classList.add('hidden');
+            }, 200);
+        }
+
+        function closeMonthMenu() {
+            if (!monthMenu) return;
+            monthMenu.classList.remove('opacity-100', 'translate-y-0');
+            monthMenu.classList.add('opacity-0', '-translate-y-2');
+            if (monthArrow) monthArrow.classList.remove('rotate-180');
+            setTimeout(() => {
+                monthMenu.classList.add('hidden');
+            }, 200);
+        }
+
+        // ==========================================
         // 1. XỬ LÝ CUSTOM DROPDOWN DANH MỤC
         // ==========================================
         const categoryBtn = document.getElementById('category-btn');
-        const categoryMenu = document.getElementById('category-menu');
         const categoryLabel = document.getElementById('category-label');
         const realCategorySelect = document.getElementById('real-category-select'); 
-        const categoryArrow = document.getElementById('category-arrow');
         const categoryItems = document.querySelectorAll('.category-item');
 
         if (categoryBtn && categoryMenu && realCategorySelect) {
             categoryBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 
-                // Nếu menu đang mở -> Đóng
                 if (categoryMenu.classList.contains('opacity-100')) {
                     closeCategoryMenu();
                 } else {
-                    // Đảm bảo menu Tháng đóng lại nếu đang mở
-                    if (typeof closeMonthMenu === 'function') closeMonthMenu();
+                    closeMonthMenu(); // Đóng menu Tháng nếu đang mở
                     
                     categoryMenu.classList.remove('hidden');
                     void categoryMenu.offsetWidth; // Trigger reflow
@@ -160,24 +180,12 @@
             });
         }
 
-        function closeCategoryMenu() {
-            if (!categoryMenu) return;
-            categoryMenu.classList.remove('opacity-100', 'translate-y-0');
-            categoryMenu.classList.add('opacity-0', '-translate-y-2');
-            if (categoryArrow) categoryArrow.classList.remove('rotate-180');
-            setTimeout(() => {
-                categoryMenu.classList.add('hidden');
-            }, 200);
-        }
-
         // ==========================================
         // 2. XỬ LÝ CUSTOM DROPDOWN THÁNG
         // ==========================================
         const monthBtn = document.getElementById('month-btn');
-        const monthMenu = document.getElementById('month-menu');
         const monthLabel = document.getElementById('month-label');
         const monthInput = document.getElementById('month-input');
-        const monthArrow = document.getElementById('month-arrow');
         const monthItems = document.querySelectorAll('.month-item');
 
         if (monthBtn && monthMenu) {
@@ -187,8 +195,7 @@
                 if (monthMenu.classList.contains('opacity-100')) {
                     closeMonthMenu();
                 } else {
-                    // Đảm bảo menu Danh mục đóng lại nếu đang mở
-                    if (typeof closeCategoryMenu === 'function') closeCategoryMenu();
+                    closeCategoryMenu(); // Đóng menu Danh mục nếu đang mở
                     
                     monthMenu.classList.remove('hidden');
                     void monthMenu.offsetWidth; 
@@ -218,17 +225,9 @@
             });
         }
 
-        function closeMonthMenu() {
-            if (!monthMenu) return;
-            monthMenu.classList.remove('opacity-100', 'translate-y-0');
-            monthMenu.classList.add('opacity-0', '-translate-y-2');
-            if (monthArrow) monthArrow.classList.remove('rotate-180');
-            setTimeout(() => {
-                monthMenu.classList.add('hidden');
-            }, 200);
-        }
-
-        // Đóng tất cả menu khi click ra ngoài
+        // ==========================================
+        // 3. CLICK RA NGOÀI ĐỂ ĐÓNG MENU
+        // ==========================================
         document.addEventListener('click', (e) => {
             const categoryWrapper = document.getElementById('category-selector-wrapper');
             const monthWrapper = document.getElementById('month-selector-wrapper');
@@ -242,10 +241,11 @@
         });
 
         // ==========================================
-        // 3. TỰ ĐỘNG FORMAT TIỀN TỆ
+        // 4. TỰ ĐỘNG FORMAT TIỀN TỆ KHI NHẬP
         // ==========================================
         const amountInput = document.getElementById('budget_amount');
         if (amountInput) {
+            // Chống bind trùng lặp sự kiện nếu script bị gọi 2 lần (VD: do Turbo/PJAX)
             if (amountInput.dataset.bound === '1') return;
             amountInput.dataset.bound = '1';
 
@@ -254,6 +254,7 @@
                 return raw ? new Intl.NumberFormat('vi-VN').format(raw) : '';
             };
 
+            // Format dữ liệu ban đầu (nếu có sẵn từ server khi Sửa)
             if (amountInput.value) {
                 amountInput.value = formatValue(amountInput.value);
             }
