@@ -5,7 +5,7 @@
 <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 bg-white dark:bg-slate-800 p-4 rounded-lg shadow transition-colors duration-300 gap-4">
     <h2 class="text-xl font-bold text-gray-800 dark:text-slate-100">Tổng quan tháng {{ display_month }}/{{ display_year }}</h2>
     
-    <form method="GET" action="{{ url_for('dashboard.index') }}" class="flex items-center w-full md:w-auto">
+    <form method="GET" action="{{ url_for('dashboard.index') }}" class="flex items-center w-full md:w-auto" id="filter-form">
         <div class="flex items-center bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl shadow-sm overflow-hidden h-12 w-full md:w-auto">
             
             <!-- Custom Dropdown Tháng -->
@@ -46,106 +46,128 @@
     </form>
 </div>
 
-<!-- PHẦN 2: THỐNG KÊ TỔNG QUAN -->
-<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-    <!-- Thu nhập -->
-    <div class="bg-white dark:bg-slate-800 p-6 rounded shadow border-l-4 border-green-500 transition-colors duration-300">
-        <h3 id="title-income" class="text-sm font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide">Thu nhập</h3>
-        <p id="val-income" class="text-3xl font-bold text-green-600 dark:text-green-400 mt-2">
-            <span class="inline-block animate-pulse bg-gray-300 dark:bg-slate-600 rounded h-8 w-32"></span>
-        </p>
+<!-- ✅ THÊM MỚI: EMPTY STATE KHI KHÔNG CÓ DỮ LIỆU -->
+<div id="dashboard-empty-state" class="hidden flex-col items-center justify-center py-20 bg-white dark:bg-slate-800 rounded-xl shadow transition-colors duration-300">
+    <div class="bg-blue-50 dark:bg-slate-700/50 p-6 rounded-full mb-6">
+        <svg class="w-16 h-16 text-blue-500 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+        </svg>
     </div>
-    
-    <!-- Chi tiêu -->
-    <div class="bg-white dark:bg-slate-800 p-6 rounded shadow border-l-4 border-red-500 transition-colors duration-300">
-        <h3 id="title-expense" class="text-sm font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide">Chi tiêu</h3>
-        <p id="val-expense" class="text-3xl font-bold text-red-600 dark:text-red-400 mt-2">
-            <span class="inline-block animate-pulse bg-gray-300 dark:bg-slate-600 rounded h-8 w-32"></span>
-        </p>
-    </div>
-    
-    <!-- Tổng tài sản -->
-    <div class="bg-white dark:bg-slate-800 p-6 rounded shadow border-l-4 border-blue-500 transition-colors duration-300 flex flex-col justify-center">
-        <h3 class="text-sm font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide">Tổng tài sản</h3>
-        <p id="val-total-assets" class="text-3xl font-bold text-gray-800 dark:text-slate-100 mt-1">
-            <span class="inline-block animate-pulse bg-gray-300 dark:bg-slate-600 rounded h-8 w-32"></span>
-        </p>
-        <p id="val-cash-flow" class="text-sm font-medium text-gray-500 dark:text-slate-400 mt-2">
-            <span class="inline-block animate-pulse bg-gray-200 dark:bg-slate-700 rounded h-4 w-24"></span>
-        </p>
+    <h3 class="text-2xl font-bold text-gray-800 dark:text-slate-100 mb-2">Chưa có dữ liệu</h3>
+    <p class="text-gray-500 dark:text-slate-400 mb-6 text-center max-w-md">Không có giao dịch hay ngân sách nào được ghi nhận trong tháng {{ display_month }}/{{ display_year }}.</p>
+    <div class="flex gap-4">
+        <a href="{{ url_for('transactions.add_transaction') }}" class="bg-blue-600 text-white px-6 py-2.5 rounded-lg hover:bg-blue-700 transition font-semibold shadow-sm">
+            Thêm giao dịch
+        </a>
+        <a href="{{ url_for('budgets.add_budget') }}" class="bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 text-gray-700 dark:text-slate-200 px-6 py-2.5 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-600 transition font-semibold shadow-sm">
+            Thiết lập ngân sách
+        </a>
     </div>
 </div>
 
-<!-- ✅ KHU VỰC: PHÂN BỔ TÀI SẢN THEO VÍ -->
-<div id="wallets-overview-section" class="mb-8">
-    <div class="flex items-center justify-between mb-3">
-        <h3 class="text-lg font-semibold text-gray-800 dark:text-slate-100">Phân bổ tài sản</h3>
-        <a href="{{ url_for('wallets.list_wallets') }}" class="text-sm text-blue-600 dark:text-blue-400 hover:underline font-medium">Quản lý ví &rarr;</a>
-    </div>
-    <div id="wallets-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <!-- JS sẽ render các thẻ ví hoặc Empty State vào đây -->
-    </div>
-</div>
-
-<!-- PHẦN 3: BURN RATE & INSIGHTS -->
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-    <div class="bg-white dark:bg-slate-800 p-6 rounded shadow transition-colors duration-300 border border-orange-100 dark:border-slate-700">
-        <h3 class="text-lg font-semibold mb-4 text-gray-800 dark:text-slate-100 flex items-center">
-            <svg class="w-5 h-5 mr-2 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-            Tốc độ chi tiêu
-        </h3>
-        <div id="burn-rate-content" class="space-y-4">
-            <div class="h-4 bg-gray-200 dark:bg-slate-700 rounded w-3/4 animate-pulse"></div>
-            <div class="h-4 bg-gray-200 dark:bg-slate-700 rounded w-1/2 animate-pulse"></div>
+<!-- KHU VỰC HIỂN THỊ DỮ LIỆU CHÍNH -->
+<div id="dashboard-main-content">
+    <!-- PHẦN 2: THỐNG KÊ TỔNG QUAN -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <!-- Thu nhập -->
+        <div class="bg-white dark:bg-slate-800 p-6 rounded shadow border-l-4 border-green-500 transition-colors duration-300">
+            <h3 id="title-income" class="text-sm font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide">Thu nhập</h3>
+            <p id="val-income" class="text-3xl font-bold text-green-600 dark:text-green-400 mt-2">
+                <span class="inline-block animate-pulse bg-gray-300 dark:bg-slate-600 rounded h-8 w-32"></span>
+            </p>
+        </div>
+        
+        <!-- Chi tiêu -->
+        <div class="bg-white dark:bg-slate-800 p-6 rounded shadow border-l-4 border-red-500 transition-colors duration-300">
+            <h3 id="title-expense" class="text-sm font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide">Chi tiêu</h3>
+            <p id="val-expense" class="text-3xl font-bold text-red-600 dark:text-red-400 mt-2">
+                <span class="inline-block animate-pulse bg-gray-300 dark:bg-slate-600 rounded h-8 w-32"></span>
+            </p>
+        </div>
+        
+        <!-- Tổng tài sản -->
+        <div class="bg-white dark:bg-slate-800 p-6 rounded shadow border-l-4 border-blue-500 transition-colors duration-300 flex flex-col justify-center">
+            <h3 class="text-sm font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide">Tổng tài sản</h3>
+            <p id="val-total-assets" class="text-3xl font-bold text-gray-800 dark:text-slate-100 mt-1">
+                <span class="inline-block animate-pulse bg-gray-300 dark:bg-slate-600 rounded h-8 w-32"></span>
+            </p>
+            <p id="val-cash-flow" class="text-sm font-medium text-gray-500 dark:text-slate-400 mt-2">
+                <span class="inline-block animate-pulse bg-gray-200 dark:bg-slate-700 rounded h-4 w-24"></span>
+            </p>
         </div>
     </div>
 
-    <div class="bg-white dark:bg-slate-800 p-6 rounded shadow transition-colors duration-300 border border-purple-100 dark:border-slate-700">
-        <h3 class="text-lg font-semibold mb-4 text-gray-800 dark:text-slate-100 flex items-center">
-            <svg class="w-5 h-5 mr-2 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>
-            Thông tin chi tiêu
-        </h3>
-        <ul id="insights-list" class="space-y-3 text-sm text-gray-700 dark:text-slate-300">
-            <li class="animate-pulse h-4 bg-gray-200 dark:bg-slate-700 rounded w-full"></li>
-        </ul>
+    <!-- KHU VỰC: PHÂN BỔ TÀI SẢN THEO VÍ -->
+    <div id="wallets-overview-section" class="mb-8">
+        <div class="flex items-center justify-between mb-3">
+            <h3 class="text-lg font-semibold text-gray-800 dark:text-slate-100">Phân bổ tài sản</h3>
+            <a href="{{ url_for('wallets.list_wallets') }}" class="text-sm text-blue-600 dark:text-blue-400 hover:underline font-medium">Quản lý ví &rarr;</a>
+        </div>
+        <div id="wallets-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- JS sẽ render các thẻ ví hoặc Empty State vào đây -->
+        </div>
     </div>
-</div>
 
-<!-- PHẦN 4: BIỂU ĐỒ & CÔNG VIỆC -->
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-    <div class="bg-white dark:bg-slate-800 p-6 rounded shadow transition-colors duration-300 flex flex-col">
-        <h3 class="text-xl font-semibold mb-4 text-gray-800 dark:text-slate-100">Chi tiêu & Ngân sách</h3>
-        <div class="relative h-72 w-full flex-grow">
-            <div id="chart-skeleton" class="absolute inset-0 flex items-center justify-center animate-pulse bg-gray-100 dark:bg-slate-700 rounded-lg z-10"></div>
-            <div id="chart-empty" class="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 dark:bg-slate-800 rounded-lg hidden z-10 border-2 border-dashed border-gray-300 dark:border-slate-600">
-                <p class="text-gray-500 dark:text-slate-400 font-medium mb-2">Chưa có dữ liệu chi tiêu</p>
+    <!-- PHẦN 3: BURN RATE & INSIGHTS -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        <div class="bg-white dark:bg-slate-800 p-6 rounded shadow transition-colors duration-300 border border-orange-100 dark:border-slate-700">
+            <h3 class="text-lg font-semibold mb-4 text-gray-800 dark:text-slate-100 flex items-center">
+                <svg class="w-5 h-5 mr-2 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                Tốc độ chi tiêu
+            </h3>
+            <div id="burn-rate-content" class="space-y-4">
+                <div class="h-4 bg-gray-200 dark:bg-slate-700 rounded w-3/4 animate-pulse"></div>
+                <div class="h-4 bg-gray-200 dark:bg-slate-700 rounded w-1/2 animate-pulse"></div>
             </div>
-            <canvas id="budgetChart" class="relative z-10 opacity-0 transition-opacity duration-500"></canvas>
         </div>
-        <div id="no-budget-warning" class="text-xs text-orange-500 mt-3 hidden items-center bg-orange-50 dark:bg-orange-900/20 p-2 rounded">
-            <svg class="w-4 h-4 mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-            <span>Bạn chưa thiết lập ngân sách cho tháng này. <a href="{{ url_for('budgets.add_budget') }}" class="underline font-semibold hover:text-orange-700">Thiết lập ngay</a></span>
-        </div>
-    </div>
-    
-    <div class="bg-white dark:bg-slate-800 p-6 rounded shadow flex flex-col transition-colors duration-300">
-        <h3 class="text-xl font-semibold mb-4 text-gray-800 dark:text-slate-100">Công việc sắp tới</h3>
-        <ul id="task-list" class="space-y-3 flex-grow"></ul>
-        <a href="{{ url_for('tasks.list_tasks') }}" class="text-blue-600 dark:text-blue-400 font-semibold mt-4 inline-block hover:underline">Xem tất cả &rarr;</a>
-    </div>
-</div>
 
-<!-- PHẦN 5: DỰ BÁO CHI TIÊU -->
-<div class="bg-white dark:bg-slate-800 p-6 rounded shadow mb-8 transition-colors duration-300">
-    <div class="flex justify-between items-center mb-4">
-        <h3 class="text-xl font-semibold text-gray-800 dark:text-slate-100">Dự báo chi tiêu (7 ngày tới)</h3>
-        <span class="text-xs bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300 px-2 py-1 rounded">Smart Forecast</span>
-    </div>
-    <div id="forecast-chart-container" class="relative h-64 w-full">
-        <div id="forecast-skeleton" class="absolute inset-0 flex flex-col items-center justify-center animate-pulse bg-gray-100 dark:bg-slate-700 rounded-lg z-10">
-            <div class="h-4 bg-gray-300 dark:bg-slate-600 rounded w-32"></div>
+        <div class="bg-white dark:bg-slate-800 p-6 rounded shadow transition-colors duration-300 border border-purple-100 dark:border-slate-700">
+            <h3 class="text-lg font-semibold mb-4 text-gray-800 dark:text-slate-100 flex items-center">
+                <svg class="w-5 h-5 mr-2 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>
+                Thông tin chi tiêu
+            </h3>
+            <ul id="insights-list" class="space-y-3 text-sm text-gray-700 dark:text-slate-300">
+                <li class="animate-pulse h-4 bg-gray-200 dark:bg-slate-700 rounded w-full"></li>
+            </ul>
         </div>
-        <canvas id="forecastChart"></canvas>
+    </div>
+
+    <!-- PHẦN 4: BIỂU ĐỒ & CÔNG VIỆC -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        <div class="bg-white dark:bg-slate-800 p-6 rounded shadow transition-colors duration-300 flex flex-col">
+            <h3 class="text-xl font-semibold mb-4 text-gray-800 dark:text-slate-100">Chi tiêu & Ngân sách</h3>
+            <div class="relative h-72 w-full flex-grow">
+                <div id="chart-skeleton" class="absolute inset-0 flex items-center justify-center animate-pulse bg-gray-100 dark:bg-slate-700 rounded-lg z-10"></div>
+                <div id="chart-empty" class="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 dark:bg-slate-800 rounded-lg hidden z-10 border-2 border-dashed border-gray-300 dark:border-slate-600">
+                    <p class="text-gray-500 dark:text-slate-400 font-medium mb-2">Chưa có dữ liệu chi tiêu</p>
+                </div>
+                <canvas id="budgetChart" class="relative z-10 opacity-0 transition-opacity duration-500"></canvas>
+            </div>
+            <div id="no-budget-warning" class="text-xs text-orange-500 mt-3 hidden items-center bg-orange-50 dark:bg-orange-900/20 p-2 rounded">
+                <svg class="w-4 h-4 mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <span>Bạn chưa thiết lập ngân sách cho tháng này. <a href="{{ url_for('budgets.add_budget') }}" class="underline font-semibold hover:text-orange-700">Thiết lập ngay</a></span>
+            </div>
+        </div>
+        
+        <div class="bg-white dark:bg-slate-800 p-6 rounded shadow flex flex-col transition-colors duration-300">
+            <h3 class="text-xl font-semibold mb-4 text-gray-800 dark:text-slate-100">Công việc sắp tới</h3>
+            <ul id="task-list" class="space-y-3 flex-grow"></ul>
+            <a href="{{ url_for('tasks.list_tasks') }}" class="text-blue-600 dark:text-blue-400 font-semibold mt-4 inline-block hover:underline">Xem tất cả &rarr;</a>
+        </div>
+    </div>
+
+    <!-- PHẦN 5: DỰ BÁO CHI TIÊU -->
+    <div class="bg-white dark:bg-slate-800 p-6 rounded shadow mb-8 transition-colors duration-300">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-xl font-semibold text-gray-800 dark:text-slate-100">Dự báo chi tiêu (7 ngày tới)</h3>
+            <span class="text-xs bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300 px-2 py-1 rounded">Smart Forecast</span>
+        </div>
+        <div id="forecast-chart-container" class="relative h-64 w-full">
+            <div id="forecast-skeleton" class="absolute inset-0 flex flex-col items-center justify-center animate-pulse bg-gray-100 dark:bg-slate-700 rounded-lg z-10">
+                <div class="h-4 bg-gray-300 dark:bg-slate-600 rounded w-32"></div>
+            </div>
+            <canvas id="forecastChart"></canvas>
+        </div>
     </div>
 </div>
 
@@ -194,7 +216,6 @@
     </form>
     
     <div id="plan-result" class="mt-6 p-6 bg-gray-50 dark:bg-slate-800/50 rounded-xl hidden border border-gray-200 dark:border-slate-700">
-        
         <div class="flex flex-col mb-6">
             <div class="flex flex-col sm:flex-row sm:items-center gap-4">
                 <div class="inline-flex items-center gap-4 bg-white dark:bg-slate-800 border border-orange-200 dark:border-orange-900/50 rounded-xl p-4 shadow-sm w-max">
@@ -209,7 +230,6 @@
                     </div>
                 </div>
             </div>
-            
             <div class="text-sm text-gray-500 dark:text-slate-400 italic mt-3 flex items-start gap-1.5">
                 <svg class="w-4 h-4 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                 <span>Tỷ lệ trượt giá được tính toán dựa trên cơ cấu thói quen chi tiêu thực tế của bạn.</span>
@@ -220,9 +240,7 @@
             <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
             Ngân sách đề xuất (Đã bù trượt giá):
         </h4>
-        
         <ul id="budgets-list" class="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 overflow-hidden mb-4 shadow-sm"></ul>
-        
         <div id="savings-container"></div>
     </div>
 </div>
@@ -233,14 +251,145 @@
 <script>
     const formatMoney = (amount) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 }).format(amount || 0);
 
-    // Format số tiền khi nhập
-    document.addEventListener('input', function(e) {
-        if (e.target && e.target.id === 'monthly_income') {
-            let rawValue = e.target.value.replace(/\D/g, '');
-            e.target.value = rawValue ? formatMoney(rawValue) : '';
-        }
-    });
+    // =====================================================================
+    // 1. KHỞI TẠO CÁC DROPDOWN (TÁCH RIÊNG ĐỂ GỌI LẠI SAU KHI HTMX SWAP DOM)
+    // =====================================================================
+    function initDropdowns() {
+        // Dropdown Tháng
+        const monthBtn = document.getElementById('month-btn');
+        const monthMenu = document.getElementById('month-menu');
+        const monthLabel = document.getElementById('month-label');
+        const monthInput = document.getElementById('month-input');
+        const monthItems = document.querySelectorAll('.month-item');
 
+        if (monthBtn && monthMenu) {
+            // Xóa sự kiện cũ (nếu có) bằng cách clone node để tránh bind trùng
+            const newMonthBtn = monthBtn.cloneNode(true);
+            monthBtn.replaceWith(newMonthBtn);
+
+            newMonthBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const isOpen = monthMenu.classList.contains('opacity-100');
+                
+                if (isOpen) {
+                    closeMonthMenu();
+                } else {
+                    const rect = newMonthBtn.getBoundingClientRect();
+                    monthMenu.style.top = (rect.bottom + 4) + 'px';
+                    monthMenu.style.left = rect.left + 'px';
+                    
+                    monthMenu.classList.remove('hidden');
+                    void monthMenu.offsetWidth;
+                    
+                    monthMenu.classList.remove('opacity-0', '-translate-y-2');
+                    monthMenu.classList.add('opacity-100', 'translate-y-0');
+                }
+            });
+
+            monthItems.forEach(item => {
+                // Clone để xóa sự kiện cũ
+                const newItem = item.cloneNode(true);
+                item.replaceWith(newItem);
+                
+                newItem.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const val = newItem.getAttribute('data-value');
+                    monthInput.value = val;
+                    monthLabel.innerText = newItem.innerText;
+                    
+                    monthItems.forEach(i => {
+                        i.classList.remove('bg-blue-600', 'text-white', 'font-medium');
+                        i.classList.add('text-gray-700', 'dark:text-slate-300', 'hover:bg-gray-100', 'dark:hover:bg-slate-700');
+                    });
+                    newItem.classList.remove('text-gray-700', 'dark:text-slate-300', 'hover:bg-gray-100', 'dark:hover:bg-slate-700');
+                    newItem.classList.add('bg-blue-600', 'text-white', 'font-medium');
+
+                    closeMonthMenu();
+                });
+            });
+
+            function closeMonthMenu() {
+                monthMenu.classList.remove('opacity-100', 'translate-y-0');
+                monthMenu.classList.add('opacity-0', '-translate-y-2');
+                setTimeout(() => {
+                    monthMenu.classList.add('hidden');
+                }, 200);
+            }
+
+            // Đóng menu khi click ra ngoài
+            document.addEventListener('click', (e) => {
+                if (!newMonthBtn.contains(e.target) && !monthMenu.contains(e.target)) {
+                    closeMonthMenu();
+                }
+            });
+            
+            window.addEventListener('scroll', closeMonthMenu, true);
+        }
+
+        // Dropdown Vùng miền
+        const customDropdown = {
+            wrapper: document.getElementById('custom-region-dropdown'),
+            trigger: document.getElementById('dropdown-trigger'),
+            menu: document.getElementById('dropdown-menu'),
+            label: document.getElementById('dropdown-label'),
+            chevron: document.getElementById('dropdown-chevron'),
+            input: document.getElementById('region'),
+            options: document.querySelectorAll('#dropdown-menu li')
+        };
+
+        if (customDropdown.wrapper) {
+            const newTrigger = customDropdown.trigger.cloneNode(true);
+            customDropdown.trigger.replaceWith(newTrigger);
+
+            newTrigger.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const isOpen = customDropdown.menu.classList.contains('opacity-100');
+                
+                if (isOpen) {
+                    closeDropdown();
+                } else {
+                    customDropdown.menu.classList.remove('invisible', 'opacity-0', '-translate-y-2');
+                    customDropdown.menu.classList.add('visible', 'opacity-100', 'translate-y-0');
+                    customDropdown.chevron.classList.add('rotate-180');
+                }
+            });
+
+            customDropdown.options.forEach(option => {
+                const newOpt = option.cloneNode(true);
+                option.replaceWith(newOpt);
+
+                newOpt.addEventListener('click', () => {
+                    customDropdown.label.innerText = newOpt.innerText.trim();
+                    customDropdown.input.value = newOpt.dataset.value;
+                    
+                    customDropdown.options.forEach(opt => opt.querySelector('.check-icon').classList.add('opacity-0'));
+                    newOpt.querySelector('.check-icon').classList.remove('opacity-0');
+                    
+                    customDropdown.options.forEach(opt => opt.classList.remove('font-semibold'));
+                    newOpt.classList.add('font-semibold');
+                    closeDropdown();
+                });
+            });
+
+            function closeDropdown() {
+                customDropdown.menu.classList.remove('visible', 'opacity-100', 'translate-y-0');
+                customDropdown.menu.classList.add('invisible', 'opacity-0', '-translate-y-2');
+                customDropdown.chevron.classList.remove('rotate-180');
+            }
+
+            document.addEventListener('click', (e) => {
+                if (!customDropdown.wrapper.contains(e.target)) {
+                    closeDropdown();
+                }
+            });
+            
+            customDropdown.input.value = 'vn';
+        }
+    }
+
+    // =====================================================================
+    // 2. LOGIC CHÍNH CỦA DASHBOARD
+    // =====================================================================
     window.handleFinancialPlan = async function() {
         const btn = document.getElementById('plan-btn');
         const rawIncome = document.getElementById('monthly_income').value.replace(/\./g, '');
@@ -315,14 +464,6 @@
     (function () {
         'use strict';
         
-        // =====================================================================
-        // TƯ DUY THIẾT KẾ (DEFENSIVE PROGRAMMING):
-        // 1. Chống lỗi bfcache (back/forward cache): Đăng ký pageshow.
-        // 2. Chống treo vô hạn: Dùng AbortController kết hợp setTimeout 10s.
-        // 3. Chống chết script: Bọc từng hàm render trong try/catch riêng biệt.
-        // 4. Chống SPA (Turbo/HTMX): Lắng nghe sự kiện của các thư viện này.
-        // =====================================================================
-
         const CURRENT_MONTH = {{ display_month }};
         const CURRENT_YEAR = {{ display_year }};
         let TODAY = new Date();
@@ -331,29 +472,21 @@
         let forecastChartInstance = null;
         let chartDataState = { budgets: {}, catExp: {}, forecast: [] };
         
-        // Cờ và controller để quản lý việc fetch dữ liệu
         let isInitRunning = false;
         let currentAbortController = null;
 
         const categoryMap = { 'food': 'Ăn uống', 'transport': 'Di chuyển', 'education': 'Học tập', 'entertainment': 'Giải trí', 'shopping': 'Mua sắm', 'bills': 'Hóa đơn', 'other': 'Khác', 'salary': 'Lương' };
 
-        // =====================================================================
-        // HÀM KHỞI TẠO (CORE LOGIC)
-        // =====================================================================
         async function initDashboard(isRetry = false) {
-            if (isInitRunning && !isRetry) return; // Tránh gọi đè
+            if (isInitRunning && !isRetry) return; 
             isInitRunning = true;
             
             TODAY = new Date();
 
-            // Hủy request cũ nếu đang treo
-            if (currentAbortController) {
-                currentAbortController.abort();
-            }
+            if (currentAbortController) currentAbortController.abort();
             currentAbortController = new AbortController();
             const thisController = currentAbortController;
             
-            // Timeout 10s phòng trường hợp mạng chập chờn hoặc server không phản hồi
             const timeoutId = setTimeout(() => thisController.abort(), 10000);
 
             try {
@@ -368,7 +501,22 @@
                 
                 const data = await res.json();
 
-                // Safe Render: Từng phần lỗi không ảnh hưởng phần khác
+                // ✅ XỬ LÝ EMPTY STATE
+                const hasData = data.income > 0 || data.expenses > 0 || data.total_assets > 0 || Object.keys(data.budgets).length > 0;
+                
+                const emptyState = document.getElementById('dashboard-empty-state');
+                const mainContent = document.getElementById('dashboard-main-content');
+                
+                if (!hasData) {
+                    emptyState.classList.remove('hidden');
+                    emptyState.classList.add('flex');
+                    mainContent.classList.add('hidden');
+                } else {
+                    emptyState.classList.add('hidden');
+                    emptyState.classList.remove('flex');
+                    mainContent.classList.remove('hidden');
+                }
+
                 safeRun(renderSummary, data);
                 safeRun(renderWallets, data.wallets);
                 safeRun(renderBurnRate, data.burn_rate);
@@ -384,15 +532,10 @@
 
             } catch (err) {
                 clearTimeout(timeoutId);
-                
-                // Nếu request này bị abort bởi 1 request mới hơn (không phải do timeout), bỏ qua
-                if (err.name === 'AbortError' && thisController !== currentAbortController) {
-                    return;
-                }
+                if (err.name === 'AbortError' && thisController !== currentAbortController) return;
 
                 console.error('[Dashboard] Fetch error:', err);
                 
-                // Nếu bị abort do quá thời gian (timeout) hoặc lỗi mạng
                 if (err.name === 'AbortError') {
                     renderErrorState('Yêu cầu quá thời gian. Vui lòng kiểm tra mạng và thử lại.');
                 } else {
@@ -403,7 +546,6 @@
             }
         }
 
-        // Hàm bọc render an toàn
         function safeRun(fn, ...args) {
             try {
                 fn(...args);
@@ -412,9 +554,6 @@
             }
         }
 
-        // =====================================================================
-        // CÁC HÀM RENDER
-        // =====================================================================
         function renderSummary(data) {
             document.getElementById('title-income').innerText = `Thu nhập (T${data.month}/${data.year})`;
             document.getElementById('title-expense').innerText = `Chi tiêu (T${data.month}/${data.year})`;
@@ -687,7 +826,6 @@
         function renderErrorState(customMsg) {
             const errorMsg = customMsg || 'Không thể tải dữ liệu. Vui lòng kiểm tra kết nối.';
             
-            // Ẩn tất cả skeleton
             document.querySelectorAll('.animate-pulse').forEach(el => el.style.display = 'none');
             const chartSkeleton = document.getElementById('chart-skeleton');
             const forecastSkeleton = document.getElementById('forecast-skeleton');
@@ -717,9 +855,7 @@
             if (grid) grid.innerHTML = `<div class="col-span-full text-center text-red-500 p-4">Không thể tải dữ liệu ví</div>`;
         }
 
-        // Hàm global cho nút "Thử lại"
         window.retryDashboard = function() {
-            // Reset UI về trạng thái loading
             document.getElementById('insights-list').innerHTML = '<li class="animate-pulse h-4 bg-gray-200 dark:bg-slate-700 rounded w-full"></li>';
             document.getElementById('burn-rate-content').innerHTML = '<div class="h-4 bg-gray-200 dark:bg-slate-700 rounded w-3/4 animate-pulse"></div>';
             document.getElementById('task-list').innerHTML = '';
@@ -729,156 +865,45 @@
             });
             if (document.getElementById('chart-skeleton')) document.getElementById('chart-skeleton').style.display = 'flex';
             if (document.getElementById('forecast-skeleton')) document.getElementById('forecast-skeleton').style.display = 'flex';
-            
-            // Gọi lại API
             initDashboard(true);
         };
 
         // =====================================================================
-        // CUSTOM DROPDOWN THÁNG
-        // =====================================================================
-        const monthBtn = document.getElementById('month-btn');
-        const monthMenu = document.getElementById('month-menu');
-        const monthLabel = document.getElementById('month-label');
-        const monthInput = document.getElementById('month-input');
-        const monthItems = document.querySelectorAll('.month-item');
-
-        if (monthBtn && monthMenu) {
-            monthBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const isOpen = monthMenu.classList.contains('opacity-100');
-                
-                if (isOpen) {
-                    closeMonthMenu();
-                } else {
-                    const rect = monthBtn.getBoundingClientRect();
-                    monthMenu.style.top = (rect.bottom + 4) + 'px';
-                    monthMenu.style.left = rect.left + 'px';
-                    
-                    monthMenu.classList.remove('hidden');
-                    void monthMenu.offsetWidth;
-                    
-                    monthMenu.classList.remove('opacity-0', '-translate-y-2');
-                    monthMenu.classList.add('opacity-100', 'translate-y-0');
-                }
-            });
-
-            monthItems.forEach(item => {
-                item.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const val = item.getAttribute('data-value');
-                    monthInput.value = val;
-                    monthLabel.innerText = item.innerText;
-                    
-                    monthItems.forEach(i => {
-                        i.classList.remove('bg-blue-600', 'text-white', 'font-medium');
-                        i.classList.add('text-gray-700', 'dark:text-slate-300', 'hover:bg-gray-100', 'dark:hover:bg-slate-700');
-                    });
-                    item.classList.remove('text-gray-700', 'dark:text-slate-300', 'hover:bg-gray-100', 'dark:hover:bg-slate-700');
-                    item.classList.add('bg-blue-600', 'text-white', 'font-medium');
-
-                    closeMonthMenu();
-                });
-            });
-
-            function closeMonthMenu() {
-                monthMenu.classList.remove('opacity-100', 'translate-y-0');
-                monthMenu.classList.add('opacity-0', '-translate-y-2');
-                setTimeout(() => {
-                    monthMenu.classList.add('hidden');
-                }, 200);
-            }
-
-            document.addEventListener('click', (e) => {
-                if (!monthBtn.contains(e.target) && !monthMenu.contains(e.target)) {
-                    closeMonthMenu();
-                }
-            });
-            
-            window.addEventListener('scroll', closeMonthMenu, true);
-        }
-
-        // =====================================================================
-        // CUSTOM DROPDOWN VÙNG MIỀN
-        // =====================================================================
-        const customDropdown = {
-            wrapper: document.getElementById('custom-region-dropdown'),
-            trigger: document.getElementById('dropdown-trigger'),
-            menu: document.getElementById('dropdown-menu'),
-            label: document.getElementById('dropdown-label'),
-            chevron: document.getElementById('dropdown-chevron'),
-            input: document.getElementById('region'),
-            options: document.querySelectorAll('#dropdown-menu li')
-        };
-
-        if (customDropdown.wrapper) {
-            customDropdown.trigger.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const isOpen = customDropdown.menu.classList.contains('opacity-100');
-                
-                if (isOpen) {
-                    closeDropdown();
-                } else {
-                    customDropdown.menu.classList.remove('invisible', 'opacity-0', '-translate-y-2');
-                    customDropdown.menu.classList.add('visible', 'opacity-100', 'translate-y-0');
-                    customDropdown.chevron.classList.add('rotate-180');
-                }
-            });
-
-            customDropdown.options.forEach(option => {
-                option.addEventListener('click', () => {
-                    customDropdown.label.innerText = option.innerText.trim();
-                    customDropdown.input.value = option.dataset.value;
-                    
-                    customDropdown.options.forEach(opt => opt.querySelector('.check-icon').classList.add('opacity-0'));
-                    option.querySelector('.check-icon').classList.remove('opacity-0');
-                    
-                    customDropdown.options.forEach(opt => opt.classList.remove('font-semibold'));
-                    option.classList.add('font-semibold');
-                    closeDropdown();
-                });
-            });
-
-            function closeDropdown() {
-                customDropdown.menu.classList.remove('visible', 'opacity-100', 'translate-y-0');
-                customDropdown.menu.classList.add('invisible', 'opacity-0', '-translate-y-2');
-                customDropdown.chevron.classList.remove('rotate-180');
-            }
-
-            document.addEventListener('click', (e) => {
-                if (!customDropdown.wrapper.contains(e.target)) {
-                    closeDropdown();
-                }
-            });
-            
-            customDropdown.input.value = 'vn';
-        }
-
-        // =====================================================================
-        // ĐĂNG KÝ SỰ KIỆN LIFECYCLE VÀ KHỞI CHẠY
+        // 3. ĐĂNG KÝ SỰ KIỆN LIFECYCLE & HTMX
         // =====================================================================
         
-        // 1. Xử lý khi trình duyệt khôi phục trang từ bfcache (Back/Forward)
-        // Dùng event.persisted để đảm bảo chỉ chạy lại khi thực sự cần.
+        // Format số tiền khi nhập
+        document.addEventListener('input', function(e) {
+            if (e.target && e.target.id === 'monthly_income') {
+                let rawValue = e.target.value.replace(/\D/g, '');
+                e.target.value = rawValue ? formatMoney(rawValue) : '';
+            }
+        });
+
+        // Lắng nghe sự kiện HTMX để khởi tạo lại Dropdown và Load lại Data
+        document.addEventListener('htmx:afterSettle', function() {
+            initDropdowns();
+            initDashboard(true);
+        });
+
+        // Khởi chạy lần đầu
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                initDropdowns();
+                initDashboard(false);
+            });
+        } else {
+            initDropdowns();
+            initDashboard(false);
+        }
+
         window.addEventListener('pageshow', function (event) {
             if (event.persisted) {
-                console.log('[Dashboard] Restored from bfcache -> re-initializing');
+                initDropdowns();
                 initDashboard(true);
             }
         });
 
-        // 2. Xử lý cho các framework SPA/PJAX (nếu có dùng Turbo hoặc HTMX)
-        document.addEventListener('turbo:load', () => initDashboard(true));
-        document.addEventListener('htmx:afterSettle', () => initDashboard(true));
-
-        // 3. Khởi chạy lần đầu
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', () => initDashboard(false));
-        } else {
-            initDashboard(false);
-        }
-
-        // 4. Tự động vẽ lại Chart khi tab được active lại (tránh lỗi canvas)
         document.addEventListener('visibilitychange', function () {
             if (document.visibilityState === 'visible') {
                 if (budgetChartInstance && typeof budgetChartInstance.resize === 'function') {
