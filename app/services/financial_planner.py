@@ -141,26 +141,50 @@ class FinancialPlanner:
             base_ratios = {cat: self.default_weights.get(cat, 0.05) for cat in self.categories}
             total_base = sum(base_ratios.values())
 
-        # --- 6. Tính toán phân bổ số tiền ---
+        # --- 6. Tính toán phân bổ số tiền (ĐÃ SỬA LỖI LÀM TRÒN) ---
+        # TƯ DUY SỬA LỖI: 
+        # - Code cũ làm tròn về 0 nếu số tiền < 5.000, khiến mục "Khác" biến mất.
+        # - Code cũ dồn toàn bộ sai số (diff) vào "Khác", nếu âm sẽ ép "Khác" = 0.
+        # - Giải pháp: Làm tròn an toàn (tối thiểu 10k nếu >0), và nếu tổng vượt thu nhập
+        #   thì cắt giảm tỷ lệ thuận từ các danh mục lớn nhất.
+
+        # 6.1 Tính số tiền chính xác
+        exact_budgets = {cat: monthly_income * base_ratios[cat] for cat in self.categories}
+
+        # 6.2 Làm tròn an toàn đến 10.000 VNĐ
         rounded_budgets = {}
-        total_spent = 0.0
-        
         for cat in self.categories:
-            raw_amount = monthly_income * base_ratios[cat]
-            rounded = round(raw_amount / 10000) * 10000
-            rounded_budgets[cat] = rounded
-            total_spent += rounded
+            raw = exact_budgets[cat]
+            if 0 < raw < 10000:
+                rounded_budgets[cat] = 10000 # Đảm bảo không bị mất danh mục
+            else:
+                rounded_budgets[cat] = round(raw / 10000) * 10000
 
-        # Tiết kiệm = Thu nhập - Tổng chi tiêu
-        target_savings = max(0.0, monthly_income - total_spent)
+        # 6.3 Cân bằng sai số do làm tròn
+        total_spent = sum(rounded_budgets.values())
+        diff = monthly_income - total_spent
 
-        # Bù sai số làm tròn (nếu có) vào danh mục 'other'
-        diff = monthly_income - (total_spent + target_savings)
-        if diff != 0:
-            rounded_budgets['other'] = rounded_budgets.get('other', 0) + diff
-            if rounded_budgets['other'] < 0:
-                rounded_budgets['food'] += rounded_budgets['other']
-                rounded_budgets['other'] = 0
+        if diff < 0:
+            # Nếu tổng chi vượt thu nhập (do làm tròn lên), ta phải cắt giảm.
+            # Ưu tiên cắt giảm từ các danh mục đang chiếm nhiều tiền nhất.
+            sorted_cats = sorted(self.categories, key=lambda k: rounded_budgets[k], reverse=True)
+            
+            for cat in sorted_cats:
+                if diff >= 0:
+                    break
+                if rounded_budgets[cat] > 0:
+                    # Cắt tối đa bằng số tiền hiện có của danh mục đó
+                    cut = min(rounded_budgets[cat], -diff)
+                    rounded_budgets[cat] -= cut
+                    diff += cut
+
+        # 6.4 Đảm bảo không có danh mục nào bị âm
+        for cat in self.categories:
+            rounded_budgets[cat] = max(0, rounded_budgets[cat])
+
+        # 6.5 Tính toán tiết kiệm
+        final_total_spent = sum(rounded_budgets.values())
+        target_savings = max(0.0, monthly_income - final_total_spent)
 
         return {
             'savings': round(target_savings, 0),
