@@ -13,3 +13,8 @@ preload_app = False
 
 port = int(os.environ.get("PORT", 10000))
 bind = f"0.0.0.0:{port}"
+
+# TƯ DUY LOGGING: Ghi log ra stdout/stderr để Render có thể bắt được và hiển thị trên Dashboard.
+accesslog = "-"
+errorlog = "-"
+loglevel = "info"

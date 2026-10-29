@@ -27,7 +27,13 @@ class Config:
     # =========================================================
     # A. CẤU HÌNH BẢO MẬT CỐT LÕI (CORE SECURITY)
     # =========================================================
-    SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-key-not-for-production-123'
+    SECRET_KEY = os.environ.get('SECRET_KEY')
+    
+    # TƯ DUY BẢO MẬT: Nếu chạy Production mà thiếu SECRET_KEY thì phải chặn ngay lập tức
+    # để tránh việc app chạy với key mặc định (rất dễ bị hack session).
+    if IS_PRODUCTION and not SECRET_KEY:
+        raise ValueError("CRITICAL: SECRET_KEY phải được thiết lập trên môi trường Production!")
+    SECRET_KEY = SECRET_KEY or 'dev-key-not-for-production-123'
 
     # ✅ TƯ DUY BẢO MẬT: Giới hạn dung lượng file upload (VD: tối đa 5MB).
     # Tránh việc kẻ xấu upload file CSV nặng hàng trăm MB làm tràn RAM Server.
@@ -58,6 +64,8 @@ class Config:
         SQLALCHEMY_DATABASE_URI = 'sqlite:///' + os.path.join(basedir, 'app.db')
         SQLALCHEMY_ENGINE_OPTIONS = {
             "pool_pre_ping": True,
+            # TƯ DUY: Bật check_same_thread=False cho phép SQLite xử lý đa luồng (Gunicorn threads)
+            "connect_args": {"check_same_thread": False}
         }
 
     SQLALCHEMY_TRACK_MODIFICATIONS = False
