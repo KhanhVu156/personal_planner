@@ -14,9 +14,7 @@ VN_TZ = ZoneInfo('Asia/Ho_Chi_Minh')
 
 @bp.route('/dashboard-stats', methods=['GET'])
 @login_required
-@cache.cached(timeout=120, query_string=True)
 def get_dashboard_stats():
-    # ... (Giữ nguyên phần này như code cũ của bạn) ...
     try:
         user_id = current_user.id
         today_vn = datetime.now(VN_TZ)
@@ -28,6 +26,7 @@ def get_dashboard_stats():
         last_day = calendar.monthrange(year, month)[1]
         end_date = datetime(year, month, last_day).date()
 
+        # 1. Tính tổng thu/chi (Toàn thời gian)
         totals = db.session.query(
             Transaction.type, func.coalesce(func.sum(Transaction.amount), 0)
         ).filter(Transaction.user_id == user_id).group_by(Transaction.type).all()
@@ -36,6 +35,7 @@ def get_dashboard_stats():
         total_expense = next((float(t[1]) for t in totals if t[0] == 'expense'), 0.0)
         balance = total_income - total_expense
 
+        # 2. Tính thu/chi theo tháng được chọn
         month_totals = db.session.query(
             Transaction.type, func.coalesce(func.sum(Transaction.amount), 0)
         ).filter(
@@ -47,6 +47,7 @@ def get_dashboard_stats():
         income_month = next((float(t[1]) for t in month_totals if t[0] == 'income'), 0.0)
         expense_month = next((float(t[1]) for t in month_totals if t[0] == 'expense'), 0.0)
 
+        # 3. Lấy chi tiêu theo danh mục trong tháng
         cat_exp = db.session.query(
             Transaction.category, func.coalesce(func.sum(Transaction.amount), 0)
         ).filter(
@@ -58,9 +59,11 @@ def get_dashboard_stats():
         
         cat_exp_dict = {str(cat).strip().lower(): float(total) for cat, total in cat_exp}
 
+        # 4. Lấy ngân sách đã thiết lập trong tháng
         budgets = Budget.query.filter_by(user_id=user_id, month=month, year=year).all()
         budget_dict = {str(b.category).strip().lower(): float(b.amount) for b in budgets}
 
+        # 5. Lấy công việc sắp tới
         upcoming_tasks = Task.query.filter_by(user_id=user_id) \
             .filter(Task.status.in_(['pending', 'in_progress'])) \
             .order_by(Task.deadline.asc()).limit(5).all()
@@ -69,6 +72,7 @@ def get_dashboard_stats():
             'id': t.id, 'title': t.title, 'deadline': t.deadline.strftime('%d/%m/%Y'), 'progress': t.progress
         } for t in upcoming_tasks]
 
+        # 6. Phân tích (Insights)
         insights = []
         cat_names = {
             'food': 'Ăn uống', 'transport': 'Di chuyển', 'education': 'Học tập', 
@@ -103,6 +107,7 @@ def get_dashboard_stats():
             elif diff_pct < 0:
                 insights.append(f"Tuyệt vời! Chi tiêu tháng này giảm {abs(diff_pct):.0f}% so với tháng trước.")
 
+        # 7. Burn Rate (Tốc độ chi tiêu)
         _, days_in_month = calendar.monthrange(year, month)
         
         if today_vn.month == month and today_vn.year == year:
@@ -119,12 +124,25 @@ def get_dashboard_stats():
             'days_left': days_in_month - current_day
         }
 
-        start_30 = today_vn.date() - timedelta(days=30)
+        # =====================================================================
+        # ✅ FIX CRITICAL: DỰ BÁO CHI TIÊU (FORECAST)
+        # TƯ DUY: Phải tính toán dựa trên tháng đang xem, không phải ngày hôm nay.
+        # =====================================================================
         
+        # 1. Xác định ngày cơ sở (Base Date) để tính 30 ngày trước đó
+        if today_vn.month == month and today_vn.year == year:
+            forecast_base_date = today_vn.date()
+        else:
+            forecast_base_date = end_date  # Nếu xem tháng khác, lấy ngày cuối tháng đó
+
+        start_30 = forecast_base_date - timedelta(days=30)
+        
+        # 2. Lấy dữ liệu 30 ngày gần nhất (Tính từ Base Date)
         trans_30d = db.session.query(Transaction.date, Transaction.amount).filter(
             Transaction.user_id == user_id,
             Transaction.type == 'expense',
-            Transaction.date >= start_30
+            Transaction.date >= start_30,
+            Transaction.date <= forecast_base_date # Chỉ lấy lùi về quá khứ so với mốc
         ).all()
 
         weekday_sums = {i: 0.0 for i in range(7)}
@@ -139,9 +157,10 @@ def get_dashboard_stats():
 
         avg_daily_30d = total_30d / 30.0 if total_30d > 0 else 0.0
         
+        # 3. Dự báo 7 ngày tiếp theo (Tính từ Base Date + 1)
         forecast_data = []
         for i in range(1, 8):
-            future_date = today_vn.date() + timedelta(days=i)
+            future_date = forecast_base_date + timedelta(days=i)
             wd = future_date.weekday()
             
             if weekday_counts[wd] > 0:
@@ -151,6 +170,7 @@ def get_dashboard_stats():
                 
             forecast_data.append(pred_val)
 
+        # 9. Tài sản & Ví
         active_wallets = Wallet.query.filter_by(user_id=user_id, is_active=True).all()
         total_assets = 0.0
         wallets_data = []
@@ -189,7 +209,9 @@ def get_dashboard_stats():
             'month': month, 'year': year,
             'insights': insights,
             'burn_rate': burn_rate,
-            'forecast': forecast_data
+            'forecast': forecast_data,
+            # ✅ Trả về ngày cơ sở để Frontend tính nhãn trục X
+            'forecast_base_date': forecast_base_date.isoformat()
         }
         
         response = jsonify(data)
@@ -214,15 +236,14 @@ def financial_plan():
         if not monthly_income or float(monthly_income) <= 0: 
             return jsonify({'error': 'Thu nhập không hợp lệ (phải lớn hơn 0)'}), 400
 
-        savings_percent = float(data.get('savings_percent', 20))
+        category_savings = data.get('category_savings', {})
         region = data.get('region', 'vn')
 
         planner = FinancialPlanner(current_user.id, db.session)
         
-        # ✅ FIX: Đã xóa tham số inflation_rate vì Planner mới tự tính từ Region
         suggestion = planner.suggest_budgets(
             monthly_income=float(monthly_income), 
-            savings_percent=savings_percent,
+            category_savings=category_savings,
             region=region
         )
         return jsonify(suggestion)

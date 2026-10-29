@@ -9,9 +9,8 @@ class FinancialPlanner:
     """
     Gợi ý phân bổ ngân sách dựa trên:
     1. Lịch sử chi tiêu TRUNG BÌNH MỖI THÁNG.
-    2. Trọng số ưu tiên người dùng nhập.
-    3. Mục tiêu tiết kiệm.
-    4. Lạm phát cá nhân dựa trên khu vực kinh tế (VN/Global).
+    2. Tỷ lệ tiết kiệm do người dùng thiết lập cho TỪNG DANH MỤC.
+    3. Lạm phát cá nhân dựa trên khu vực kinh tế (VN/Global).
     """
 
     INFLATION_RATES = {
@@ -80,8 +79,15 @@ class FinancialPlanner:
             
         return personal_rate
 
-    def suggest_budgets(self, monthly_income, savings_goal=None,
-                        savings_percent=None, category_weights=None, region='vn'):
+    def suggest_budgets(self, monthly_income, category_savings=None, region='vn', **kwargs):
+        """
+        TƯ DUY THUẬT TOÁN MỚI:
+        1. Tính tỷ lệ chi tiêu cơ sở (dựa trên lịch sử hoặc mặc định).
+        2. Áp dụng tỷ lệ cắt giảm (category_savings) của người dùng.
+        3. Bù trượt giá (Inflation).
+        4. Scale down nếu tổng chi tiêu vượt thu nhập.
+        5. Số tiền dư ra chính là tiết kiệm.
+        """
         # --- 1. Validate input ---
         try:
             monthly_income = float(monthly_income)
@@ -90,28 +96,7 @@ class FinancialPlanner:
         if monthly_income <= 0:
             raise ValueError('Thu nhập phải lớn hơn 0.')
 
-        # --- 2. Xử lý mục tiêu tiết kiệm ---
-        personal_inflation = self.get_personal_inflation_rate(region)
-
-        if savings_goal is not None:
-            try:
-                target_savings = float(savings_goal)
-            except (TypeError, ValueError):
-                target_savings = monthly_income * 0.2
-            target_savings = max(0.0, min(target_savings, monthly_income))
-        elif savings_percent is not None:
-            try:
-                pct = float(savings_percent)
-            except (TypeError, ValueError):
-                pct = 20.0
-            pct = max(0.0, min(pct, 95.0))
-            target_savings = monthly_income * (pct / 100.0)
-        else:
-            target_savings = monthly_income * 0.2
-
-        remaining = max(0.0, monthly_income - target_savings)
-
-        # --- 3. Tỷ lệ cơ sở ---
+        # --- 2. Tỷ lệ cơ sở ---
         total_hist = sum(self.historical_expenses.values())
         if total_hist <= 0:
             base_ratios = {cat: self.default_weights.get(cat, 0.05) for cat in self.categories}
@@ -124,60 +109,55 @@ class FinancialPlanner:
                 else:
                     base_ratios[cat] = self.default_weights.get(cat, 0.05) * 0.5
 
-        # --- 4. Áp trọng số người dùng ---
-        if category_weights:
-            weighted = {}
+        # --- 3. Áp dụng tỷ lệ tiết kiệm từng danh mục ---
+        if category_savings:
             for cat in self.categories:
                 try:
-                    w = float(category_weights.get(cat, 1.0))
+                    rate = float(category_savings.get(cat, 0)) / 100.0
                 except (TypeError, ValueError):
-                    w = 1.0
-                w = max(0.0, w)
-                weighted[cat] = base_ratios[cat] * w
+                    rate = 0.0
+                # Giới hạn tỷ lệ từ 0% đến 95% (để tránh ngân sách bằng 0)
+                rate = max(0.0, min(rate, 0.95))
+                base_ratios[cat] = base_ratios[cat] * (1 - rate)
 
-            total_w = sum(weighted.values())
-            if total_w > 0:
-                base_ratios = {c: weighted[c] / total_w for c in self.categories}
-            else:
-                # Nếu user nhập toàn số 0, fallback về default
-                base_ratios = {cat: self.default_weights.get(cat, 0.05) for cat in self.categories}
-
-        # Chuẩn hóa lần cuối
-        total_base = sum(base_ratios.values())
-        if total_base > 0:
-            base_ratios = {c: v / total_base for c, v in base_ratios.items()}
-
-        # --- 5. TÍNH TOÁN PHÂN BỔ CÓ LẠM PHÁT (FIX LỖI) ---
+        # --- 4. Áp dụng lạm phát (Bù trượt giá) ---
+        personal_inflation = self.get_personal_inflation_rate(region)
         rates = self.INFLATION_RATES.get(region, self.INFLATION_RATES['vn'])
         
-        # Tạo tỷ lệ điều chỉnh dựa trên lạm phát. 
-        # Ví dụ: Food có base 30%, lạm phát 4.5% -> Tỷ lệ điều chỉnh = 30% * 1.045 = 31.35%
-        adjusted_ratios = {}
         for cat in self.categories:
             cat_inf = 1.0 + rates.get(cat, personal_inflation)
-            adjusted_ratios[cat] = base_ratios.get(cat, 0.0) * cat_inf
-            
-        # Chuẩn hóa lại tổng adjusted_ratios = 1 để đảm bảo không vượt quá "remaining"
-        total_adjusted = sum(adjusted_ratios.values())
-        if total_adjusted > 0:
-            adjusted_ratios = {c: v / total_adjusted for c, v in adjusted_ratios.items()}
-        else:
-            adjusted_ratios = base_ratios
+            base_ratios[cat] = base_ratios[cat] * cat_inf
 
-        # Phân bổ tiền
+        # --- 5. Chuẩn hóa & Giới hạn (Cap) ---
+        total_base = sum(base_ratios.values())
+        
+        if total_base > 1.0:
+            # Nếu lạm phát đẩy tổng chi tiêu vượt 100% thu nhập, scale down lại
+            for cat in self.categories:
+                base_ratios[cat] = base_ratios[cat] / total_base
+            total_base = 1.0
+        elif total_base == 0:
+            # Fallback nếu user nhập toàn số 0 gây lỗi chia
+            base_ratios = {cat: self.default_weights.get(cat, 0.05) for cat in self.categories}
+            total_base = sum(base_ratios.values())
+
+        # --- 6. Tính toán phân bổ số tiền ---
         rounded_budgets = {}
-        total_rounded = 0.0
+        total_spent = 0.0
+        
         for cat in self.categories:
-            raw_amount = remaining * adjusted_ratios.get(cat, 0.0)
+            raw_amount = monthly_income * base_ratios[cat]
             rounded = round(raw_amount / 10000) * 10000
             rounded_budgets[cat] = rounded
-            total_rounded += rounded
+            total_spent += rounded
 
-        # Bù sai số làm tròn (luôn đảm bảo số dư cuối cùng không âm)
-        diff = remaining - total_rounded
+        # Tiết kiệm = Thu nhập - Tổng chi tiêu
+        target_savings = max(0.0, monthly_income - total_spent)
+
+        # Bù sai số làm tròn (nếu có) vào danh mục 'other'
+        diff = monthly_income - (total_spent + target_savings)
         if diff != 0:
             rounded_budgets['other'] = rounded_budgets.get('other', 0) + diff
-            # Đề phòng trường hợp 'other' bị âm do làm tròn, ta cộng bù lại
             if rounded_budgets['other'] < 0:
                 rounded_budgets['food'] += rounded_budgets['other']
                 rounded_budgets['other'] = 0

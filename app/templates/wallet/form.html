@@ -3,8 +3,8 @@
 <div class="max-w-lg mx-auto bg-white dark:bg-slate-800 p-6 rounded shadow mt-4 transition-colors duration-300">
     <h2 class="text-2xl font-bold mb-6 text-gray-800 dark:text-slate-100">{{ title }}</h2>
     
-    <!-- Thêm autocomplete="off" để trình duyệt không tự điền lung tung -->
-    <form method="POST" action="" novalidate autocomplete="off">
+    <!-- Form với id để dễ dàng bắt sự kiện submit -->
+    <form method="POST" action="" id="wallet-form" novalidate autocomplete="off">
         {{ form.hidden_tag() }}
         
         <!-- Hàng 1: Tên ví -->
@@ -17,13 +17,14 @@
         </div>
         
         <!-- Hàng 2: Loại ví (Custom Dropdown) -->
-        <div class="mb-4 relative" id="wallet-type-selector-wrapper">
+        <!-- TƯ DUY: z-50 để đảm bảo menu xổ xuống luôn nổi lên trên các phần tử khác -->
+        <div class="mb-4 relative z-50" id="wallet-type-selector-wrapper">
             {{ form.wallet_type.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
             
-            <!-- Ẩn thẻ select gốc đi để form vẫn submit đúng giá trị -->
+            <!-- Ẩn thẻ select gốc, dùng JS đồng bộ value vào đây để form submit chuẩn -->
             {{ form.wallet_type(class="hidden", id="real-wallet-type-select") }}
 
-            <!-- Nút bấm giả lập -->
+            <!-- Nút bấm giả lập (Custom UI) -->
             <button type="button" id="wallet-type-btn" class="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded text-left flex justify-between items-center focus:ring-2 focus:ring-blue-500 outline-none transition-colors text-gray-900 dark:text-white font-medium">
                 <span id="wallet-type-label">
                     {% set selected_type = form.wallet_type.data or 'cash' %}
@@ -52,13 +53,13 @@
         </div>
         
         <!-- Hàng 3: Số dư ban đầu -->
-        <div class="mb-6 relative">
+        <div class="mb-6 relative z-10">
             {{ form.initial_balance.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
             
+            <!-- TƯ DUY: Dùng flex gộp text VND và input, focus-within để highlight cả khối -->
             <div class="flex items-center w-full border border-gray-300 dark:border-slate-600 rounded focus-within:ring-2 focus-within:ring-blue-500 bg-white dark:bg-slate-700 transition-colors overflow-hidden">
                 <span class="pl-3 pr-2 text-gray-700 dark:text-slate-300 font-bold select-none transition-colors">VND</span>
                 
-                <!-- ✅ FIX: Đổi placeholder thành "Nhập số tiền" -->
                 {{ form.initial_balance(class="flex-1 w-full py-2 pr-3 bg-white dark:bg-slate-700 border-0 focus:ring-0 focus:outline-none text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-slate-400 placeholder:font-normal font-semibold transition-colors", id="wallet_balance", placeholder="Nhập số tiền") }}
             </div>
             {% for error in form.initial_balance.errors %}
@@ -67,7 +68,7 @@
         </div>
         
         <!-- Nút bấm -->
-        <div class="flex items-center justify-between space-x-4 relative mt-2">
+        <div class="flex items-center justify-between space-x-4 relative z-10">
             <a href="{{ url_for('wallets.list_wallets') }}" class="w-1/3 text-center bg-gray-200 text-gray-800 dark:bg-slate-600 dark:text-slate-200 py-2 rounded hover:bg-gray-300 dark:hover:bg-slate-500 transition duration-200 font-semibold">Hủy</a>
             {{ form.submit(class="w-2/3 bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition duration-200 cursor-pointer font-semibold shadow-sm", value="Lưu ví") }}
         </div>
@@ -87,10 +88,15 @@
         const realWalletTypeSelect = document.getElementById('real-wallet-type-select');
         const walletTypeArrow = document.getElementById('wallet-type-arrow');
         const walletTypeItems = document.querySelectorAll('.wallet-type-item');
+        const walletTypeWrapper = document.getElementById('wallet-type-selector-wrapper');
 
-        if (walletTypeBtn && walletTypeMenu && realWalletTypeSelect) {
+        // TƯ DUY: Guard flag (dataset.bound) để tránh bind sự kiện nhiều lần nếu HTMX render lại form
+        if (walletTypeBtn && walletTypeMenu && realWalletTypeSelect && walletTypeBtn.dataset.bound !== '1') {
+            walletTypeBtn.dataset.bound = '1'; // Đánh dấu đã bind
+
+            // Toggle Menu
             walletTypeBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
+                e.stopPropagation(); // Ngăn sự kiện click lan ra document
                 
                 const isOpen = walletTypeMenu.classList.contains('opacity-100');
                 
@@ -98,7 +104,7 @@
                     closeWalletTypeMenu();
                 } else {
                     walletTypeMenu.classList.remove('hidden');
-                    void walletTypeMenu.offsetWidth; // Trigger reflow để animation chạy
+                    void walletTypeMenu.offsetWidth; // Trick reflow để animation chạy mượt
                     
                     walletTypeMenu.classList.remove('opacity-0', '-translate-y-2');
                     walletTypeMenu.classList.add('opacity-100', 'translate-y-0');
@@ -106,18 +112,23 @@
                 }
             });
 
+            // Chọn Item
             walletTypeItems.forEach(item => {
                 item.addEventListener('click', (e) => {
                     e.stopPropagation();
                     const val = item.getAttribute('data-value');
                     
-                    realWalletTypeSelect.value = val;
+                    // ĐỒNG BỘ: Cập nhật giá trị vào thẻ select ẩn để form lấy được data
+                    realWalletTypeSelect.value = val; 
+                    // Cập nhật text hiển thị
                     walletTypeLabel.innerText = item.innerText;
                     
+                    // Reset style tất cả item
                     walletTypeItems.forEach(i => {
                         i.classList.remove('bg-blue-600', 'text-white', 'font-medium');
                         i.classList.add('text-gray-700', 'dark:text-slate-300', 'hover:bg-gray-100', 'dark:hover:bg-slate-600');
                     });
+                    // Highlight item được chọn
                     item.classList.remove('text-gray-700', 'dark:text-slate-300', 'hover:bg-gray-100', 'dark:hover:bg-slate-600');
                     item.classList.add('bg-blue-600', 'text-white', 'font-medium');
 
@@ -132,6 +143,7 @@
             walletTypeMenu.classList.add('opacity-0', '-translate-y-2');
             if (walletTypeArrow) walletTypeArrow.classList.remove('rotate-180');
             
+            // Chờ animation kết thúc (200ms) rồi mới ẩn hẳn
             setTimeout(() => {
                 walletTypeMenu.classList.add('hidden');
             }, 200);
@@ -139,36 +151,52 @@
 
         // Đóng menu khi click ra ngoài
         document.addEventListener('click', (e) => {
-            const wrapper = document.getElementById('wallet-type-selector-wrapper');
-            if (wrapper && !wrapper.contains(e.target)) {
+            if (walletTypeWrapper && !walletTypeWrapper.contains(e.target)) {
                 closeWalletTypeMenu();
             }
         });
 
         // ==========================================
-        // 2. TỰ ĐỘNG FORMAT TIỀN TỆ
+        // 2. TỰ ĐỘNG FORMAT TIỀN TỆ (VND) VÀ XỬ LÝ SUBMIT
         // ==========================================
         const amountInput = document.getElementById('wallet_balance');
-        if (amountInput) {
-            if (amountInput.dataset.bound === '1') return;
-            amountInput.dataset.bound = '1';
+        const walletForm = document.getElementById('wallet-form');
 
+        if (amountInput && amountInput.dataset.bound !== '1') {
+            amountInput.dataset.bound = '1'; // Guard flag
+
+            // Hàm format số: 1000000 -> 1.000.000
             const formatValue = (val) => {
-                // Loại bỏ mọi ký tự không phải số
-                let raw = val.replace(/\D/g, '');
-                // Format theo chuẩn VN (dấu chấm phân cách hàng nghìn)
+                let raw = val.replace(/\D/g, ''); // Chỉ giữ lại số
                 return raw ? new Intl.NumberFormat('vi-VN').format(raw) : '';
             };
 
-            // Format ban đầu (khi Sửa)
+            // ✅ FIX CRITICAL: Xử lý dữ liệu ban đầu từ Server (nếu DB lưu số thực .0)
             if (amountInput.value) {
-                amountInput.value = formatValue(amountInput.value);
+                // Parse về số thực, làm tròn để bỏ phần .0 dư thừa
+                let num = parseFloat(amountInput.value);
+                if (!isNaN(num)) {
+                    let cleanVal = Math.round(num).toString();
+                    // Format lại theo chuẩn VN
+                    amountInput.value = new Intl.NumberFormat('vi-VN').format(cleanVal);
+                } else {
+                    amountInput.value = ''; // Trường hợp dữ liệu rác
+                }
             }
 
-            // Lắng nghe sự kiện gõ phím
+            // Bắt sự kiện gõ phím để format realtime
             amountInput.addEventListener('input', function() {
                 this.value = formatValue(this.value);
             });
+
+            // TƯ DUY QUAN TRỌNG: 
+            // Trước khi submit form, phải xóa dấu chấm (.) để Backend nhận được số nguyên (VD: 1000000).
+            // Nếu không xóa, WTForms IntegerField/DecimalField sẽ báo lỗi Parse Error.
+            if (walletForm) {
+                walletForm.addEventListener('submit', function() {
+                    amountInput.value = amountInput.value.replace(/\./g, '');
+                });
+            }
         }
     })();
 </script>

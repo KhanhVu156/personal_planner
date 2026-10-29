@@ -9,33 +9,34 @@ bp = Blueprint('budgets', __name__)
 
 def parse_vnd_amount(amount_val):
     """
-    TƯ DUY XỬ LÝ DỮ LIỆU:
-    - Frontend gửi lên chuỗi đã format (VD: "1.000.000").
-    - Hàm này lọc bỏ mọi ký tự không phải là số, sau đó ép sang float để lưu vào DB.
-    - Tránh lỗi SQLAlchemy không thể lưu chuỗi có dấu chấm vào cột kiểu Float.
+    TƯ DUY XỬ LÝ DỮ LIỆU AN TOÀN (ĐÃ FIX LỖI):
+    - Nếu WTForms đã tự động ép kiểu thành float/int (VD: 10000000.0) thì trả về luôn.
+    - Nếu là chuỗi (VD: "10.000.000") thì mới lọc bỏ ký tự và ép kiểu.
     """
-    if not amount_val:
+    if amount_val is None or amount_val == '':
         return 0.0
+        
+    # Nếu đã là số (float hoặc int) từ WTForms, trả về luôn để tránh lỗi cộng thêm số 0
+    if isinstance(amount_val, (int, float)):
+        return float(amount_val)
+        
     try:
-        # Chuyển về string, lọc chỉ giữ lại các chữ số
+        # Nếu là chuỗi, lọc bỏ mọi ký tự không phải là số
         cleaned_str = ''.join(filter(str.isdigit, str(amount_val)))
         return float(cleaned_str) if cleaned_str else 0.0
     except Exception as e:
-        current_app.logger.error(f"Lỗi parse tiền tệ: {e}")
+        current_app.logger.error(f"Lỗi parse tiền tệ từ giá trị '{amount_val}': {e}")
         return 0.0
 
 @bp.route('/budgets')
 @login_required
 def list_budgets():
-    """
-    Hiển thị danh sách ngân sách, hỗ trợ lọc theo tháng/năm.
-    """
+    """Hiển thị danh sách ngân sách."""
     month_str = request.args.get('month')
     year_str = request.args.get('year')
     
     query = Budget.query.filter_by(user_id=current_user.id)
     
-    # Tư duy: Chỉ lọc khi user truyền CẢ HAI tham số tháng và năm
     if month_str and year_str:
         try:
             query = query.filter_by(month=int(month_str), year=int(year_str))
@@ -43,7 +44,6 @@ def list_budgets():
             flash('Tham số lọc không hợp lệ.', 'warning')
             return redirect(url_for('budgets.list_budgets'))
         
-    # Sắp xếp thông minh: Năm mới nhất, tháng mới nhất lên đầu
     budgets = query.order_by(Budget.year.desc(), Budget.month.desc(), Budget.category).all()
     
     return render_template('budgets/list.html', budgets=budgets, month=month_str, year=year_str)
@@ -52,12 +52,14 @@ def list_budgets():
 @bp.route('/budgets/add', methods=['GET', 'POST'])
 @login_required
 def add_budget():
-    """
-    Thiết lập hoặc Cập nhật ngân sách (Upsert).
-    """
+    """Thiết lập hoặc Cập nhật ngân sách (Upsert)."""
     form = BudgetForm()
     
-    # --- XỬ LÝ LÚC LOAD TRANG (GET) ---
+    # Lấy tháng/năm hiện tại để làm giá trị mặc định cho form
+    now = datetime.now()
+    display_month = now.month
+    display_year = now.year
+    
     if request.method == 'GET':
         req_month = request.args.get('month')
         req_year = request.args.get('year')
@@ -67,6 +69,8 @@ def add_budget():
             form.month.data = str(req_month)
             form.year.data = int(req_year)
             form.category.data = req_cat
+            display_month = req_month
+            display_year = req_year
             
             existing = Budget.query.filter_by(
                 user_id=current_user.id,
@@ -75,16 +79,16 @@ def add_budget():
                 year=int(req_year)
             ).first()
             if existing:
-                # Format lại số tiền cho dễ nhìn (VD: 1000000 -> 1.000.000)
                 form.amount.data = f"{int(existing.amount):,}".replace(',', '.')
 
-    # --- XỬ LÝ KHI SUBMIT FORM (POST) ---
     if form.validate_on_submit():
         month_val = int(form.month.data)
         year_val = int(form.year.data)
         
-        # ✅ FIX: Bắt buộc phải parse số tiền từ chuỗi "1.000.000" thành Float trước khi lưu
+        # Sử dụng hàm parse đã được fix
         amount_val = parse_vnd_amount(form.amount.data)
+        
+        current_app.logger.info(f"[DEBUG] Số tiền lưu vào DB: {amount_val}")
 
         existing = Budget.query.filter_by(
             user_id=current_user.id,
@@ -119,17 +123,15 @@ def add_budget():
         if form.errors:
             current_app.logger.warning(f"Form ngân sách lỗi: {form.errors}")
 
-    return render_template('budgets/form.html', form=form)
+    # Truyền display_month và display_year sang template để tránh lỗi required
+    return render_template('budgets/form.html', form=form, display_month=display_month, display_year=display_year)
 
 
 @bp.route('/budgets/delete/<int:id>', methods=['POST'])
 @login_required
 def delete_budget(id):
-    """
-    Xóa ngân sách.
-    """
+    """Xóa ngân sách."""
     budget = Budget.query.get_or_404(id)
-    
     req_month = request.args.get('month')
     req_year = request.args.get('year')
     

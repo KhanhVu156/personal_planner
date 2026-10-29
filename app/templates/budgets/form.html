@@ -3,14 +3,15 @@
 <div class="max-w-lg mx-auto bg-white dark:bg-slate-800 p-6 rounded shadow mt-4 transition-colors duration-300">
     <h2 class="text-2xl font-bold mb-6 text-gray-800 dark:text-slate-100">Thiết lập Ngân sách</h2>
     
-    <form method="POST" action="" novalidate>
+    <!-- ✅ TƯ DUY FIX: Thêm autocomplete="off" để ngăn trình duyệt tự động điền giá trị rác -->
+    <form method="POST" action="" novalidate id="budget-form" autocomplete="off">
         {{ form.hidden_tag() }}
         
         <!-- Hàng 1: Danh mục -->
         <div class="mb-4 relative" id="category-selector-wrapper">
             {{ form.category.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
             
-            <!-- Ẩn thẻ select gốc đi để form vẫn submit đúng -->
+            <!-- Ẩn thẻ select gốc, dùng JS đồng bộ value -->
             {{ form.category(class="hidden", id="real-category-select") }}
 
             <!-- Nút bấm giả lập -->
@@ -31,7 +32,7 @@
                         <li>
                             <button type="button" class="category-item w-full text-left px-4 py-2.5 text-sm transition-colors duration-150
                                 {% if value == selected_cat %} bg-blue-600 text-white font-medium {% else %} text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-600 {% endif %}" 
-                                    data-value="{{ value }}">{{ label }}</button>
+                                data-value="{{ value }}">{{ label }}</button>
                         </li>
                     {% endfor %}
                 </ul>
@@ -87,7 +88,7 @@
             <div class="flex items-center w-full border border-gray-300 dark:border-slate-600 rounded focus-within:ring-2 focus-within:ring-blue-500 bg-white dark:bg-slate-700 transition-colors overflow-hidden">
                 <span class="pl-3 pr-2 text-gray-700 dark:text-slate-300 font-bold select-none transition-colors">VND</span>
                 
-                {{ form.amount(class="flex-1 w-full py-2 pr-3 bg-white dark:bg-slate-700 border-0 focus:ring-0 focus:outline-none text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-slate-400 placeholder:font-normal font-semibold transition-colors", placeholder="Nhập số tiền...", type="text", id="budget_amount") }}
+                {{ form.amount(class="flex-1 w-full py-2 pr-3 bg-white dark:bg-slate-700 border-0 focus:ring-0 focus:outline-none text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-slate-400 placeholder:font-normal font-semibold transition-colors", placeholder="Nhập số tiền...", type="text", id="budget_amount", autocomplete="off") }}
             </div>
             {% for error in form.amount.errors %}
                 <span class="text-red-500 text-sm mt-1 block">{{ error }}</span>
@@ -107,53 +108,24 @@
         'use strict';
 
         // ==========================================
-        // KHAI BÁO CÁC HÀM ĐÓNG MENU (Khai báo trước để tránh lỗi scope / hoisting)
-        // ==========================================
-        const categoryMenu = document.getElementById('category-menu');
-        const categoryArrow = document.getElementById('category-arrow');
-        const monthMenu = document.getElementById('month-menu');
-        const monthArrow = document.getElementById('month-arrow');
-
-        function closeCategoryMenu() {
-            if (!categoryMenu) return;
-            categoryMenu.classList.remove('opacity-100', 'translate-y-0');
-            categoryMenu.classList.add('opacity-0', '-translate-y-2');
-            if (categoryArrow) categoryArrow.classList.remove('rotate-180');
-            setTimeout(() => {
-                categoryMenu.classList.add('hidden');
-            }, 200);
-        }
-
-        function closeMonthMenu() {
-            if (!monthMenu) return;
-            monthMenu.classList.remove('opacity-100', 'translate-y-0');
-            monthMenu.classList.add('opacity-0', '-translate-y-2');
-            if (monthArrow) monthArrow.classList.remove('rotate-180');
-            setTimeout(() => {
-                monthMenu.classList.add('hidden');
-            }, 200);
-        }
-
-        // ==========================================
         // 1. XỬ LÝ CUSTOM DROPDOWN DANH MỤC
         // ==========================================
         const categoryBtn = document.getElementById('category-btn');
+        const categoryMenu = document.getElementById('category-menu');
         const categoryLabel = document.getElementById('category-label');
         const realCategorySelect = document.getElementById('real-category-select'); 
+        const categoryArrow = document.getElementById('category-arrow');
         const categoryItems = document.querySelectorAll('.category-item');
 
         if (categoryBtn && categoryMenu && realCategorySelect) {
             categoryBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                
                 if (categoryMenu.classList.contains('opacity-100')) {
                     closeCategoryMenu();
                 } else {
-                    closeMonthMenu(); // Đóng menu Tháng nếu đang mở
-                    
+                    if (typeof closeMonthMenu === 'function') closeMonthMenu();
                     categoryMenu.classList.remove('hidden');
-                    void categoryMenu.offsetWidth; // Trigger reflow
-                    
+                    void categoryMenu.offsetWidth;
                     categoryMenu.classList.remove('opacity-0', '-translate-y-2');
                     categoryMenu.classList.add('opacity-100', 'translate-y-0');
                     categoryArrow.classList.add('rotate-180');
@@ -164,7 +136,6 @@
                 item.addEventListener('click', (e) => {
                     e.stopPropagation();
                     const val = item.getAttribute('data-value');
-                    
                     realCategorySelect.value = val; 
                     categoryLabel.innerText = item.innerText;
                     
@@ -180,26 +151,35 @@
             });
         }
 
+        function closeCategoryMenu() {
+            if (!categoryMenu) return;
+            categoryMenu.classList.remove('opacity-100', 'translate-y-0');
+            categoryMenu.classList.add('opacity-0', '-translate-y-2');
+            if (categoryArrow) categoryArrow.classList.remove('rotate-180');
+            setTimeout(() => {
+                categoryMenu.classList.add('hidden');
+            }, 200);
+        }
+
         // ==========================================
         // 2. XỬ LÝ CUSTOM DROPDOWN THÁNG
         // ==========================================
         const monthBtn = document.getElementById('month-btn');
+        const monthMenu = document.getElementById('month-menu');
         const monthLabel = document.getElementById('month-label');
         const monthInput = document.getElementById('month-input');
+        const monthArrow = document.getElementById('month-arrow');
         const monthItems = document.querySelectorAll('.month-item');
 
         if (monthBtn && monthMenu) {
             monthBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                
                 if (monthMenu.classList.contains('opacity-100')) {
                     closeMonthMenu();
                 } else {
-                    closeCategoryMenu(); // Đóng menu Danh mục nếu đang mở
-                    
+                    if (typeof closeCategoryMenu === 'function') closeCategoryMenu();
                     monthMenu.classList.remove('hidden');
                     void monthMenu.offsetWidth; 
-                    
                     monthMenu.classList.remove('opacity-0', '-translate-y-2');
                     monthMenu.classList.add('opacity-100', 'translate-y-0');
                     monthArrow.classList.add('rotate-180');
@@ -225,9 +205,17 @@
             });
         }
 
-        // ==========================================
-        // 3. CLICK RA NGOÀI ĐỂ ĐÓNG MENU
-        // ==========================================
+        function closeMonthMenu() {
+            if (!monthMenu) return;
+            monthMenu.classList.remove('opacity-100', 'translate-y-0');
+            monthMenu.classList.add('opacity-0', '-translate-y-2');
+            if (monthArrow) monthArrow.classList.remove('rotate-180');
+            setTimeout(() => {
+                monthMenu.classList.add('hidden');
+            }, 200);
+        }
+
+        // Đóng tất cả menu khi click ra ngoài
         document.addEventListener('click', (e) => {
             const categoryWrapper = document.getElementById('category-selector-wrapper');
             const monthWrapper = document.getElementById('month-selector-wrapper');
@@ -241,26 +229,39 @@
         });
 
         // ==========================================
-        // 4. TỰ ĐỘNG FORMAT TIỀN TỆ KHI NHẬP
+        // 3. TỰ ĐỘNG FORMAT TIỀN TỆ (ROBUST FIX)
         // ==========================================
         const amountInput = document.getElementById('budget_amount');
-        if (amountInput) {
-            // Chống bind trùng lặp sự kiện nếu script bị gọi 2 lần (VD: do Turbo/PJAX)
-            if (amountInput.dataset.bound === '1') return;
-            amountInput.dataset.bound = '1';
+        const budgetForm = document.getElementById('budget-form');
+
+        if (amountInput && budgetForm) {
+            amountInput.setAttribute('autocomplete', 'off');
 
             const formatValue = (val) => {
-                let raw = val.replace(/\D/g, '');
+                if (!val) return '';
+                // Loại bỏ mọi ký tự không phải số (dấu chấm, phẩy, chữ...)
+                let raw = val.toString().replace(/\D/g, '');
                 return raw ? new Intl.NumberFormat('vi-VN').format(raw) : '';
             };
 
-            // Format dữ liệu ban đầu (nếu có sẵn từ server khi Sửa)
-            if (amountInput.value) {
-                amountInput.value = formatValue(amountInput.value);
-            }
+            // ✅ TƯ DUY FIX LỖI MẤT SỐ 0:
+            // - Lỗi cũ: Dùng parseFloat("100.000") sẽ ra 100 (do JS hiểu dấu chấm là thập phân).
+            // - Giải pháp: Bỏ qua parseFloat, dùng trực tiếp hàm formatValue để lọc sạch chuỗi 
+            //   và format lại. "100.000" -> "100000" -> "100.000".
+            setTimeout(() => {
+                if (amountInput.value) {
+                    amountInput.value = formatValue(amountInput.value);
+                }
+            }, 50);
 
+            // Bắt sự kiện gõ phím để format realtime
             amountInput.addEventListener('input', function() {
                 this.value = formatValue(this.value);
+            });
+
+            // Xóa dấu chấm trước khi submit để Backend nhận được số nguyên
+            budgetForm.addEventListener('submit', function() {
+                amountInput.value = amountInput.value.replace(/\./g, '');
             });
         }
     })();

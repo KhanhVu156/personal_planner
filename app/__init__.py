@@ -21,19 +21,23 @@ def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
 
+    # Khởi tạo các extension
     db.init_app(app)
     login_manager.init_app(app)
     mail.init_app(app)
     csrf.init_app(app)
 
-    # --- REDIS FALLBACK AN TOÀN ---
+    # --- CẤU HÌNH REDIS FALLBACK AN TOÀN ---
+    # TƯ DUY: Ưu tiên dùng Redis để cache. Nếu lỗi (mất mạng, sai pass), 
+    # tự động fallback về SimpleCache (RAM) để app không bị crash.
     redis_url = os.environ.get('REDIS_URL')
     cache_config = {
-        'CACHE_TYPE': 'SimpleCache',
+        'CACHE_TYPE': 'SimpleCache', # Mặc định là RAM
         'CACHE_DEFAULT_TIMEOUT': 10,
     }
     
     if redis_url:
+        # Upstash yêu cầu TLS (rediss://) thay vì redis://
         if redis_url.startswith('redis://'):
             redis_url = redis_url.replace('redis://', 'rediss://', 1)
             
@@ -43,19 +47,20 @@ def create_app(config_class=Config):
                     'CACHE_TYPE': 'RedisCache',
                     'CACHE_REDIS_URL': redis_url,
                     'CACHE_DEFAULT_TIMEOUT': 10,
-                    'CACHE_OPTIONS': { 'ssl_cert_reqs': 'none' }
+                    # Bỏ qua kiểm tra chứng chỉ SSL nghiêm ngặt của Upstash để tránh lỗi timeout
+                    'CACHE_OPTIONS': {'ssl_cert_reqs': 'none'} 
                 }
                 probe = Cache()
                 probe.init_app(app, config=test_cfg)
-                probe.get('__probe__')
+                probe.get('__probe__') # Test kết nối thực tế
                 cache_config = test_cfg
-                print("[Cache] Đang sử dụng Upstash Redis (TLS).")
+                app.logger.info("[Cache] Đang sử dụng Upstash Redis (TLS).")
             except Exception as e:
-                print(f"[Cache] Redis không khả dụng ({e}). Fallback SimpleCache.")
+                app.logger.warning(f"[Cache] Redis không khả dụng ({e}). Fallback SimpleCache.")
         else:
-            print("[Cache] Link Redis không đúng định dạng (phải là rediss://).")
+            app.logger.warning("[Cache] Link Redis không đúng định dạng (phải là rediss://).")
     else:
-        print("[Cache] Không tìm thấy REDIS_URL hợp lệ. Sử dụng SimpleCache.")
+        app.logger.info("[Cache] Không tìm thấy REDIS_URL hợp lệ. Sử dụng SimpleCache.")
         
     cache.init_app(app, config=cache_config)
 
@@ -67,8 +72,9 @@ def create_app(config_class=Config):
 
     Migrate(app, db)
 
+    # Cấu hình Login
     login_manager.login_view = 'auth.login'
-    login_manager.login_message = None
+    login_manager.login_message = None 
     login_manager.login_message_category = 'info'
 
     os.makedirs(os.path.join(app.root_path, 'static', 'models'), exist_ok=True)
@@ -89,7 +95,6 @@ def create_app(config_class=Config):
     from app.routes.tasks import bp as tasks_bp
     app.register_blueprint(tasks_bp)
     
-    # ✅ ĐĂNG KÝ BLUEPRINT WALLET
     from app.routes.wallet import bp as wallets_bp
     app.register_blueprint(wallets_bp)
     
@@ -102,6 +107,11 @@ def create_app(config_class=Config):
 
     @app.after_request
     def add_cache_headers(response):
+        """
+        TƯ DUY: Tối ưu Cache cho trình duyệt.
+        - Static files: Cache dài hạn (1 năm).
+        - API và trang chủ: Không cache để đảm bảo dữ liệu realtime.
+        """
         if request.path.startswith('/static/'):
             if '/css/style.css' in request.path or '/js/main.js' in request.path:
                 response.headers['Cache-Control'] = 'no-cache, must-revalidate'
@@ -114,7 +124,7 @@ def create_app(config_class=Config):
     return app
 
 
-# Load user an toàn
+# Load user an toàn (tránh lỗi crash app nếu user_id không hợp lệ)
 from app.models import User
 
 @login_manager.user_loader

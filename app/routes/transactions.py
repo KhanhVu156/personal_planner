@@ -15,15 +15,28 @@ bp = Blueprint('transactions', __name__)
 def _populate_wallet_choices(form):
     """
     Helper: Nạp danh sách ví đang hoạt động của user vào form.
-    Tư duy: Chỉ lấy ví active, sắp xếp theo tên để dễ chọn.
-    Nếu user chưa có ví nào, thêm một choice rỗng để tránh lỗi validate.
+    TƯ DUY: Dịch các loại ví (cash, bank,...) sang tiếng Việt để đồng bộ với trang Quản lý Ví.
     """
     wallets = current_user.wallets.filter_by(is_active=True).order_by(Wallet.name).all()
-    form.wallet_id.choices = [(w.id, f"{w.name} ({w.wallet_type})") for w in wallets]
     
-    # Nếu không có ví, thêm choice 0 để form không bị lỗi "Not a valid choice"
-    if not form.wallet_id.choices:
-        form.wallet_id.choices = [(0, '--- Chưa có ví, vui lòng tạo ví ---')]
+    # 1. Từ điển map loại ví sang tiếng Việt
+    type_names = {
+        'cash': 'Tiền mặt',
+        'bank': 'Ngân hàng',
+        'ewallet': 'Ví điện tử',
+        'credit': 'Thẻ tín dụng'
+    }
+    
+    # 2. Khởi tạo danh sách với tùy chọn "Không chọn ví" mặc định
+    choices = [(0, '-- Không chọn ví --')]
+    
+    # 3. Thêm các ví đang hoạt động vào danh sách với tên loại đã dịch
+    for w in wallets:
+        # Lấy tên tiếng Việt, nếu không có trong từ điển thì giữ nguyên giá trị gốc
+        type_label = type_names.get(w.wallet_type, w.wallet_type) 
+        choices.append((w.id, f"{w.name} ({type_label})"))
+    
+    form.wallet_id.choices = choices
 
 
 @bp.route('/transactions')
@@ -31,13 +44,11 @@ def _populate_wallet_choices(form):
 def list_transactions():
     """
     Hiển thị danh sách giao dịch có phân trang.
-    Sử dụng server-side pagination để tránh tải toàn bộ dữ liệu vào RAM nếu user có hàng nghìn giao dịch.
     """
     page = request.args.get('page', 1, type=int)
-    per_page = 20 # Số lượng bản ghi mỗi trang
+    per_page = 20 
     
-    # Sắp xếp giảm dần theo ngày để giao dịch mới nhất hiện lên đầu
-    # Tối ưu: Eager load wallet để tránh N+1 query khi template hiển thị tên ví
+    # Tối ưu: Eager load wallet để tránh N+1 query
     pagination = Transaction.query.filter_by(user_id=current_user.id) \
         .options(joinedload(Transaction.wallet)) \
         .order_by(Transaction.date.desc()) \
@@ -51,24 +62,22 @@ def list_transactions():
 def add_transaction():
     """
     Thêm giao dịch mới.
-    Sử dụng Flask-WTF Form để tự động validate dữ liệu đầu vào.
     """
     form = TransactionForm()
     
-    # ✅ Nạp danh sách ví TRƯỚC KHI validate
+    # Nạp danh sách ví TRƯỚC KHI validate
     _populate_wallet_choices(form)
 
     if form.validate_on_submit():
-        # Kiểm tra nếu user chưa có ví (choice 0)
-        if form.wallet_id.data == 0:
-            flash('Vui lòng tạo ít nhất một ví trước khi thêm giao dịch.', 'warning')
-            return render_template('transactions/form.html', form=form, title='Thêm Giao dịch')
-
         try:
-            # Tạo instance và gán dữ liệu từ form
+            # Xử lý wallet_id: 0 thành None
+            wallet_id_val = form.wallet_id.data
+            if wallet_id_val == 0:
+                wallet_id_val = None
+
             trans = Transaction(
                 user_id=current_user.id,
-                wallet_id=form.wallet_id.data, # ✅ Lưu wallet_id
+                wallet_id=wallet_id_val,
                 date=form.date.data,
                 description=form.description.data,
                 amount=form.amount.data,
@@ -106,12 +115,17 @@ def edit_transaction(id):
     _populate_wallet_choices(form)
 
     if form.validate_on_submit():
-        if form.wallet_id.data == 0:
-            flash('Vui lòng tạo ít nhất một ví trước khi lưu giao dịch.', 'warning')
-            return render_template('transactions/form.html', form=form, title='Sửa Giao dịch')
-
         try:
-            form.populate_obj(trans) # Ghi đè dữ liệu mới từ form vào object cũ
+            trans.date = form.date.data
+            trans.description = form.description.data
+            trans.amount = form.amount.data
+            trans.category = form.category.data
+            trans.type = form.type.data
+            
+            # Xử lý wallet_id tương tự hàm Add
+            wallet_id_val = form.wallet_id.data
+            trans.wallet_id = None if wallet_id_val == 0 else wallet_id_val
+
             db.session.commit()
             flash('Đã cập nhật giao dịch.', 'success')
             return redirect(url_for('transactions.list_transactions'))
@@ -206,7 +220,6 @@ def import_csv():
             flash(f'File CSV thiếu cột. Yêu cầu: date, description, amount, category, type.', 'danger')
             return redirect(url_for('transactions.list_transactions'))
 
-        # ✅ Tìm ví mặc định
         default_wallet = current_user.wallets.filter_by(is_active=True).order_by(Wallet.id).first()
         default_wallet_id = default_wallet.id if default_wallet else None
 

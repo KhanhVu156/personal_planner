@@ -23,6 +23,7 @@ def parse_vnd_amount(value):
     if isinstance(value, (int, float)):
         return value
     try:
+        # Loại bỏ dấu chấm (phân cách hàng nghìn) và dấu phẩy
         clean_val = str(value).replace('.', '').replace(',', '').strip()
         return float(clean_val)
     except ValueError:
@@ -66,7 +67,6 @@ class WalletForm(FlaskForm):
         ('credit', 'Thẻ tín dụng')
     ], validators=[DataRequired()])
     
-    # ✅ FIX: Bỏ default="0" và đổi placeholder thành "Nhập số tiền"
     initial_balance = StringField(
         'Số dư ban đầu (VNĐ)', 
         validators=[
@@ -90,11 +90,12 @@ EXPENSE_CATEGORIES = {'food', 'transport', 'education', 'entertainment', 'shoppi
 
 
 class TransactionForm(FlaskForm):
-    """Form Thêm/Sửa Giao dịch (Đã tích hợp chọn Ví)."""
+    """Form Thêm/Sửa Giao dịch."""
     date = DateField('Ngày', validators=[DataRequired()], format=['%Y-%m-%d', '%m/%d/%Y'])
     
+    # ✅ FIX: Chuyển DataRequired thành Optional để cho phép không chọn ví
     wallet_id = SelectField('Thanh toán bằng', coerce=int, validators=[
-        DataRequired(message='Vui lòng chọn nguồn tiền (Ví).')
+        Optional() 
     ])
     
     description = StringField('Mô tả', validators=[DataRequired(), Length(max=200)])
