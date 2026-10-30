@@ -91,9 +91,9 @@
         <a href="{{ url_for('transactions.add_transaction') }}" class="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 transition font-semibold shadow-md text-center">
             Thêm giao dịch
         </a>
-        <a href="{{ url_for('budgets.add_budget') }}" class="bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 text-gray-700 dark:text-slate-200 px-8 py-3 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-600 transition font-semibold shadow-sm text-center">
-            Thiết lập ngân sách
-        </a>
+        <button onclick="window.retryDashboard()" class="bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 text-gray-700 dark:text-slate-200 px-8 py-3 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-600 transition font-semibold shadow-sm text-center">
+            Tải lại dữ liệu
+        </button>
     </div>
 </div>
 
@@ -566,19 +566,18 @@
             other: parseFloat(document.getElementById('saving_other').value) || 0,
         };
 
-        // ✅ TƯ DUY FIX UX: Reset khối kết quả (ẩn hoàn toàn, ko chiếm không gian)
+        // Reset khối kết quả
         const resultBox = document.getElementById('plan-result');
         resultBox.classList.add('hidden');
         resultBox.classList.remove('animate-slide-up');
 
-        // Hiệu ứng loading cho nút
+        // Hiệu ứng loading
         btn.disabled = true;
         btnText.innerText = 'Đang tính toán...';
         btnIcon.classList.remove('hidden');
         btnIcon.classList.add('animate-spin');
 
         try {
-            // ✅ TƯ DUY FIX CACHE: Thêm Cache-Control headers và _t vào body để buộc Backend tính toán lại
             const res = await fetch(`/api/financial-plan`, {
                 method: 'POST',
                 headers: { 
@@ -591,7 +590,7 @@
                     monthly_income: incomeVal, 
                     category_savings: categorySavings, 
                     region: regionVal,
-                    _t: Date.now() // Timestamp để tránh cache
+                    _t: Date.now()
                 })
             });
 
@@ -608,21 +607,24 @@
             
             const catMap = { 'food': 'Ăn uống', 'transport': 'Di chuyển', 'education': 'Học tập', 'entertainment': 'Giải trí', 'shopping': 'Mua sắm', 'bills': 'Hóa đơn', 'other': 'Khác', 'salary': 'Lương' };
             
-            // Cập nhật nội dung bên trong khi khối đang bị ẩn (tránh reflow)
+            // Hiển thị TẤT CẢ danh mục để không bị mất dòng
             const budgetsHtml = Object.entries(data.budgets)
                 .map(([cat, amount]) => {
                     const catName = catMap[cat] || cat;
-                    const formattedAmount = new Intl.NumberFormat('vi-VN').format(amount);
+                    const numAmount = Number(amount) || 0;
+                    const formattedAmount = new Intl.NumberFormat('vi-VN').format(numAmount);
+                    const textColor = numAmount > 0 ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-slate-500';
+                    
                     return `
                         <li class="flex justify-between items-center py-3 px-4 border-b border-gray-100 dark:border-slate-700/50 hover:bg-slate-100 dark:hover:bg-slate-700/60 transition-colors">
                             <span class="font-medium text-gray-700 dark:text-slate-300">${catName}</span>
-                            <strong class="text-blue-600 dark:text-blue-400 whitespace-nowrap shrink-0">${formattedAmount} VND</strong>
+                            <strong class="${textColor} whitespace-nowrap shrink-0">${formattedAmount} VND</strong>
                         </li>`;
                 }).join('');
 
             document.getElementById('budgets-list').innerHTML = budgetsHtml || '<li class="p-4 text-center text-gray-500">Không có ngân sách nào được tạo.</li>';
 
-            const formattedSavings = new Intl.NumberFormat('vi-VN').format(data.savings);
+            const formattedSavings = new Intl.NumberFormat('vi-VN').format(Number(data.savings) || 0);
             document.getElementById('savings-container').innerHTML = `
                 <div class="flex justify-between items-center gap-4 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/50 rounded-xl mt-2 shadow-sm">
                     <span class="flex items-center gap-2 font-bold text-green-700 dark:text-green-400">
@@ -632,9 +634,9 @@
                     <span class="text-lg font-black text-green-700 dark:text-green-400 whitespace-nowrap shrink-0">${formattedSavings} VND</span>
                 </div>`;
 
-            // ✅ KÍCH HOẠT HIỆU ỨNG MƯỢT MÀ
+            // Kích hoạt hiệu ứng hiển thị
             resultBox.classList.remove('hidden');
-            void resultBox.offsetWidth; // Force reflow để reset animation
+            void resultBox.offsetWidth; 
             resultBox.classList.add('animate-slide-up');
 
         } catch (err) {
@@ -727,9 +729,14 @@
                 data.budgets = normBudgets;
                 data.cat_expenses = normCatExpenses;
 
+                // Kiểm tra dữ liệu an toàn
+                const incomeVal = safeParseNumber(data.income);
+                const expensesVal = safeParseNumber(data.expenses);
+                const totalAssetsVal = safeParseNumber(data.total_assets);
+                
                 const hasValidBudgets = Object.values(normBudgets).some(val => val > 0);
                 const hasValidExpenses = Object.values(normCatExpenses).some(val => val > 0);
-                const hasFinancialData = Number(data.income) > 0 || Number(data.expenses) > 0 || Number(data.total_assets) > 0 || hasValidBudgets || hasValidExpenses || (data.wallets && data.wallets.length > 0);
+                const hasFinancialData = incomeVal > 0 || expensesVal > 0 || totalAssetsVal > 0 || hasValidBudgets || hasValidExpenses || (data.wallets && data.wallets.length > 0);
                 
                 if (loadingState) { loadingState.classList.add('hidden'); loadingState.classList.remove('flex'); }
                 
@@ -795,6 +802,8 @@
                     renderErrorState();
                 }
             } finally {
+                // ✅ ĐẢM BẢO LUÔN MỞ KHOÁ VÀ TẮT LOADING DÙ API THÀNH CÔNG HAY THẤT BẠI
+                if (loadingState) { loadingState.classList.add('hidden'); loadingState.classList.remove('flex'); }
                 isInitRunning = false;
             }
         }
@@ -808,8 +817,12 @@
         }
 
         function renderSummary(data) {
-            document.getElementById('title-income').innerText = `Thu nhập (T${data.month}/${data.year})`;
-            document.getElementById('title-expense').innerText = `Chi tiêu (T${data.month}/${data.year})`;
+            // ✅ FIX LỖI HIỂN THỊ SAI THÁNG: 
+            // Thay vì tin tưởng data.month từ API (có thể bị kẹt cache), 
+            // ta dùng chính CURRENT_MONTH/YEAR mà người dùng đang chọn trên thanh lọc.
+            document.getElementById('title-income').innerText = `Thu nhập (T${CURRENT_MONTH}/${CURRENT_YEAR})`;
+            document.getElementById('title-expense').innerText = `Chi tiêu (T${CURRENT_MONTH}/${CURRENT_YEAR})`;
+            
             document.getElementById('val-income').innerHTML = `+${formatMoney(data.income)} <span class="text-lg">VND</span>`;
             document.getElementById('val-expense').innerHTML = `-${formatMoney(data.expenses)} <span class="text-lg">VND</span>`;
             
