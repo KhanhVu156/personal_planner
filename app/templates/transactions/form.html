@@ -1,8 +1,14 @@
 {% extends "base.html" %}
 {% block content %}
+<!-- 
+    TƯ DUY THIẾT KẾ:
+    - Giao diện form giao dịch (Transaction) đồng bộ với form công việc.
+    - Sử dụng Custom Dropdown cho Loại, Danh mục và Ví để tăng tính thẩm mỹ.
+    - Các trường nhập liệu được chia thành các cột hợp lý để tối ưu không gian.
+-->
 <div class="max-w-2xl mx-auto bg-white dark:bg-slate-800 p-6 rounded shadow mt-4 transition-colors duration-300">
     <h2 class="text-2xl font-bold mb-6 text-gray-800 dark:text-slate-100">
-        {% if 'Add' in title %}Thêm Công việc{% else %}Sửa Công việc{% endif %}
+        {% if 'Add' in title %}Thêm Giao dịch{% else %}Sửa Giao dịch{% endif %}
     </h2>
 
     <!-- KHUNG HIỂN THỊ LỖI TỔNG QUÁT -->
@@ -22,109 +28,138 @@
     <form method="POST" action="" novalidate>
         {{ form.hidden_tag() }}
         
-        <!-- Hàng 1: Tiêu đề -->
+        <!-- Hàng 1: Ngày & Loại -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+                {{ form.date.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
+                {{ form.date(class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white transition-colors", type="date") }}
+                {% for error in form.date.errors %}
+                    <span class="text-red-500 text-sm mt-1 block">{{ error }}</span>
+                {% endfor %}
+            </div>
+            
+            <!-- ✅ CUSTOM DROPDOWN: LOẠI GIAO DỊCH -->
+            <div class="relative" id="type-selector-wrapper">
+                {{ form.type.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
+                
+                <!-- Thẻ select gốc bị ẩn đi để form vẫn submit đúng -->
+                {{ form.type(class="hidden", id="real-type-select") }}
+
+                <button type="button" id="type-btn" class="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded text-left flex justify-between items-center focus:ring-2 focus:ring-blue-500 outline-none transition-colors text-gray-900 dark:text-white font-medium">
+                    <span id="type-label">
+                        {% set selected_type = form.type.data or 'expense' %}
+                        {% for value, label in form.type.choices %}
+                            {% if value == selected_type %}{{ label }}{% endif %}
+                        {% endfor %}
+                    </span>
+                    <svg class="w-4 h-4 text-gray-500 dark:text-slate-400 transition-transform duration-200" id="type-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </button>
+                
+                <div id="type-menu" class="absolute top-full left-0 mt-1 w-full bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg shadow-2xl hidden opacity-0 transform -translate-y-2 transition-all duration-200 overflow-hidden z-50">
+                    <ul class="max-h-60 overflow-y-auto py-1" id="type-list">
+                        {% for value, label in form.type.choices %}
+                            <li>
+                                <button type="button" class="type-item w-full text-left px-4 py-2.5 text-sm transition-colors duration-150
+                                    {% if value == selected_type %} bg-blue-600 text-white font-medium {% else %} text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-600 {% endif %}" 
+                                    data-value="{{ value }}">{{ label }}</button>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% for error in form.type.errors %}
+                    <span class="text-red-500 text-sm mt-1 block">{{ error }}</span>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Hàng 2: Số tiền & Danh mục -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+                {{ form.amount.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
+                <div class="relative">
+                    <!-- Giữ type="number" để HTML5 validation hoạt động tốt, hoặc dùng text với JS format -->
+                    {{ form.amount(class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white transition-colors pr-12", placeholder="Nhập số tiền...") }}
+                    <span class="absolute right-3 top-2 text-gray-500 dark:text-slate-400 font-bold">VND</span>
+                </div>
+                {% for error in form.amount.errors %}
+                    <span class="text-red-500 text-sm mt-1 block">{{ error }}</span>
+                {% endfor %}
+            </div>
+            
+            <!-- ✅ CUSTOM DROPDOWN: DANH MỤC -->
+            <div class="relative" id="category-selector-wrapper">
+                {{ form.category.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
+                
+                <!-- Thẻ select gốc bị ẩn đi -->
+                {{ form.category(class="hidden", id="real-category-select") }}
+
+                <button type="button" id="category-btn" class="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded text-left flex justify-between items-center focus:ring-2 focus:ring-blue-500 outline-none transition-colors text-gray-900 dark:text-white font-medium">
+                    <span id="category-label">
+                        {% set selected_category = form.category.data or 'other' %}
+                        {% for value, label in form.category.choices %}
+                            {% if value == selected_category %}{{ label }}{% endif %}
+                        {% endfor %}
+                    </span>
+                    <svg class="w-4 h-4 text-gray-500 dark:text-slate-400 transition-transform duration-200" id="category-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </button>
+                
+                <div id="category-menu" class="absolute top-full left-0 mt-1 w-full bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg shadow-2xl hidden opacity-0 transform -translate-y-2 transition-all duration-200 overflow-hidden z-50">
+                    <ul class="max-h-60 overflow-y-auto py-1" id="category-list">
+                        {% for value, label in form.category.choices %}
+                            <li>
+                                <button type="button" class="category-item w-full text-left px-4 py-2.5 text-sm transition-colors duration-150
+                                    {% if value == selected_category %} bg-blue-600 text-white font-medium {% else %} text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-600 {% endif %}" 
+                                    data-value="{{ value }}">{{ label }}</button>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% for error in form.category.errors %}
+                    <span class="text-red-500 text-sm mt-1 block">{{ error }}</span>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Hàng 3: Mô tả -->
         <div class="mb-4">
-            {{ form.title.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
-            {{ form.title(class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white placeholder:text-gray-400 dark:placeholder:text-slate-500 transition-colors", placeholder="Nhập tên công việc...") }}
-            {% for error in form.title.errors %}
+            {{ form.description.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
+            {{ form.description(class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white placeholder:text-gray-400 dark:placeholder:text-slate-500 transition-colors", rows="2", placeholder="Nhập mô tả (không bắt buộc)...") }}
+            {% for error in form.description.errors %}
                 <span class="text-red-500 text-sm mt-1 block">{{ error }}</span>
             {% endfor %}
         </div>
 
-        <!-- Hàng 2: Mô tả -->
-        <div class="mb-4">
-            {{ form.description.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
-            {{ form.description(class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white placeholder:text-gray-400 dark:placeholder:text-slate-500 transition-colors", rows="3", placeholder="Mô tả chi tiết (không bắt buộc)...") }}
-        </div>
-
-        <!-- Hàng 3: Hạn chót & Trạng thái -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <div>
-                {{ form.deadline.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
-                {{ form.deadline(class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white transition-colors", type="date") }}
-                {% for error in form.deadline.errors %}
-                    <span class="text-red-500 text-sm mt-1 block">{{ error }}</span>
-                {% endfor %}
-            </div>
-            
-            <!-- ✅ CUSTOM DROPDOWN: TRẠNG THÁI -->
-            <div class="relative" id="status-selector-wrapper">
-                {{ form.status.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
-                
-                <!-- Thẻ select gốc bị ẩn đi để form vẫn submit đúng -->
-                {{ form.status(class="hidden", id="real-status-select") }}
-
-                <button type="button" id="status-btn" class="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded text-left flex justify-between items-center focus:ring-2 focus:ring-blue-500 outline-none transition-colors text-gray-900 dark:text-white font-medium">
-                    <span id="status-label">
-                        {% set selected_status = form.status.data or 'pending' %}
-                        {% for value, label in form.status.choices %}
-                            {% if value == selected_status %}{{ label }}{% endif %}
-                        {% endfor %}
-                    </span>
-                    <svg class="w-4 h-4 text-gray-500 dark:text-slate-400 transition-transform duration-200" id="status-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                </button>
-                
-                <div id="status-menu" class="absolute top-full left-0 mt-1 w-full bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg shadow-2xl hidden opacity-0 transform -translate-y-2 transition-all duration-200 overflow-hidden z-50">
-                    <ul class="max-h-60 overflow-y-auto py-1" id="status-list">
-                        {% for value, label in form.status.choices %}
-                            <li>
-                                <button type="button" class="status-item w-full text-left px-4 py-2.5 text-sm transition-colors duration-150
-                                    {% if value == selected_status %} bg-blue-600 text-white font-medium {% else %} text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-600 {% endif %}" 
-                                    data-value="{{ value }}">{{ label }}</button>
-                            </li>
-                        {% endfor %}
-                    </ul>
-                </div>
-                {% for error in form.status.errors %}
-                    <span class="text-red-500 text-sm mt-1 block">{{ error }}</span>
-                {% endfor %}
-            </div>
-        </div>
-
-        <!-- Hàng 4: Tiến độ & Cột mốc -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            <div>
-                {{ form.progress.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
-                <div class="flex items-center space-x-2">
-                    {{ form.progress(class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white transition-colors", type="number", min="0", max="100") }}
-                    <span class="text-gray-500 dark:text-slate-400 font-bold">%</span>
-                </div>
-                {% for error in form.progress.errors %}
-                    <span class="text-red-500 text-sm mt-1 block">{{ error }}</span>
-                {% endfor %}
-            </div>
-            
-            <!-- ✅ CUSTOM DROPDOWN: CỘT MỐC QUAN TRỌNG -->
-            <div class="relative" id="milestone-selector-wrapper">
-                <!-- Tư duy Ma trận Eisenhower: Đổi nhãn để người dùng hiểu đây là trục "Quan trọng" -->
-                <label class="block text-gray-700 dark:text-slate-300 font-semibold mb-1">Mức độ Quan trọng (Ma trận)</label>
-                <p class="text-xs text-gray-500 dark:text-slate-400 mb-2">Đánh dấu "Có" nếu công việc này đóng góp trực tiếp vào mục tiêu lớn.</p>
+        <!-- Hàng 4: Ví -->
+        <div class="mb-6">
+            <!-- ✅ CUSTOM DROPDOWN: VÍ -->
+            <div class="relative" id="wallet-selector-wrapper">
+                {{ form.wallet_id.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
                 
                 <!-- Thẻ select gốc bị ẩn đi -->
-                {{ form.milestone(class="hidden", id="real-milestone-select") }}
+                {{ form.wallet_id(class="hidden", id="real-wallet-select") }}
 
-                <button type="button" id="milestone-btn" class="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded text-left flex justify-between items-center focus:ring-2 focus:ring-blue-500 outline-none transition-colors text-gray-900 dark:text-white font-medium">
-                    <span id="milestone-label">
-                        {% set selected_milestone = form.milestone.data if form.milestone.data is not none else 0 %}
-                        {% for value, label in form.milestone.choices %}
-                            {% if value == selected_milestone %}{{ label }}{% endif %}
+                <button type="button" id="wallet-btn" class="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded text-left flex justify-between items-center focus:ring-2 focus:ring-blue-500 outline-none transition-colors text-gray-900 dark:text-white font-medium">
+                    <span id="wallet-label">
+                        {% set selected_wallet = form.wallet_id.data if form.wallet_id.data is not none else 0 %}
+                        {% for value, label in form.wallet_id.choices %}
+                            {% if value == selected_wallet %}{{ label }}{% endif %}
                         {% endfor %}
                     </span>
-                    <svg class="w-4 h-4 text-gray-500 dark:text-slate-400 transition-transform duration-200" id="milestone-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    <svg class="w-4 h-4 text-gray-500 dark:text-slate-400 transition-transform duration-200" id="wallet-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                 </button>
                 
-                <div id="milestone-menu" class="absolute top-full left-0 mt-1 w-full bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg shadow-2xl hidden opacity-0 transform -translate-y-2 transition-all duration-200 overflow-hidden z-50">
-                    <ul class="max-h-60 overflow-y-auto py-1" id="milestone-list">
-                        {% for value, label in form.milestone.choices %}
+                <div id="wallet-menu" class="absolute top-full left-0 mt-1 w-full bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg shadow-2xl hidden opacity-0 transform -translate-y-2 transition-all duration-200 overflow-hidden z-50">
+                    <ul class="max-h-60 overflow-y-auto py-1" id="wallet-list">
+                        {% for value, label in form.wallet_id.choices %}
                             <li>
-                                <button type="button" class="milestone-item w-full text-left px-4 py-2.5 text-sm transition-colors duration-150
-                                    {% if value == selected_milestone %} bg-blue-600 text-white font-medium {% else %} text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-600 {% endif %}" 
+                                <button type="button" class="wallet-item w-full text-left px-4 py-2.5 text-sm transition-colors duration-150
+                                    {% if value == selected_wallet %} bg-blue-600 text-white font-medium {% else %} text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-600 {% endif %}" 
                                     data-value="{{ value }}">{{ label }}</button>
                             </li>
                         {% endfor %}
                     </ul>
                 </div>
-                {% for error in form.milestone.errors %}
+                {% for error in form.wallet_id.errors %}
                     <span class="text-red-500 text-sm mt-1 block">{{ error }}</span>
                 {% endfor %}
             </div>
@@ -132,7 +167,7 @@
 
         <!-- Nút bấm -->
         <div class="flex items-center justify-end space-x-4 border-t border-gray-200 dark:border-slate-700 pt-4">
-            <a href="{{ url_for('tasks.list_tasks') }}" class="bg-gray-200 text-gray-800 dark:bg-slate-600 dark:text-slate-100 py-2 px-6 rounded hover:bg-gray-300 dark:hover:bg-slate-500 transition duration-200 font-semibold">Hủy</a>
+            <a href="{{ url_for('transactions.list_transactions') }}" class="bg-gray-200 text-gray-800 dark:bg-slate-600 dark:text-slate-100 py-2 px-6 rounded hover:bg-gray-300 dark:hover:bg-slate-500 transition duration-200 font-semibold">Hủy</a>
             {{ form.submit(class="bg-blue-600 text-white py-2 px-6 rounded hover:bg-blue-700 transition duration-200 cursor-pointer font-semibold shadow", value="Lưu") }}
         </div>
     </form>
@@ -226,53 +261,71 @@
         // KHỞI TẠO CÁC DROPDOWN
         // ==========================================
         
-        // 1. Trạng thái
+        // 1. Loại giao dịch
         setupDropdown({
-            btnId: 'status-btn',
-            menuId: 'status-menu',
-            labelId: 'status-label',
-            selectId: 'real-status-select',
-            arrowId: 'status-arrow',
-            itemClass: 'status-item'
+            btnId: 'type-btn',
+            menuId: 'type-menu',
+            labelId: 'type-label',
+            selectId: 'real-type-select',
+            arrowId: 'type-arrow',
+            itemClass: 'type-item'
         });
-        
-        // Gắn class chung để dễ quản lý (đóng khi mở cái khác)
-        const statusMenu = document.getElementById('status-menu');
-        const statusArrow = document.getElementById('status-arrow');
-        if (statusMenu) statusMenu.classList.add('custom-dropdown-menu');
-        if (statusArrow) statusArrow.classList.add('custom-dropdown-arrow');
+        const typeMenu = document.getElementById('type-menu');
+        const typeArrow = document.getElementById('type-arrow');
+        if (typeMenu) typeMenu.classList.add('custom-dropdown-menu');
+        if (typeArrow) typeArrow.classList.add('custom-dropdown-arrow');
 
-        // 2. Cột mốc
+        // 2. Danh mục
         setupDropdown({
-            btnId: 'milestone-btn',
-            menuId: 'milestone-menu',
-            labelId: 'milestone-label',
-            selectId: 'real-milestone-select',
-            arrowId: 'milestone-arrow',
-            itemClass: 'milestone-item'
+            btnId: 'category-btn',
+            menuId: 'category-menu',
+            labelId: 'category-label',
+            selectId: 'real-category-select',
+            arrowId: 'category-arrow',
+            itemClass: 'category-item'
         });
+        const categoryMenu = document.getElementById('category-menu');
+        const categoryArrow = document.getElementById('category-arrow');
+        if (categoryMenu) categoryMenu.classList.add('custom-dropdown-menu');
+        if (categoryArrow) categoryArrow.classList.add('custom-dropdown-arrow');
 
-        const milestoneMenu = document.getElementById('milestone-menu');
-        const milestoneArrow = document.getElementById('milestone-arrow');
-        if (milestoneMenu) milestoneMenu.classList.add('custom-dropdown-menu');
-        if (milestoneArrow) milestoneArrow.classList.add('custom-dropdown-arrow');
+        // 3. Ví
+        setupDropdown({
+            btnId: 'wallet-btn',
+            menuId: 'wallet-menu',
+            labelId: 'wallet-label',
+            selectId: 'real-wallet-select',
+            arrowId: 'wallet-arrow',
+            itemClass: 'wallet-item'
+        });
+        const walletMenu = document.getElementById('wallet-menu');
+        const walletArrow = document.getElementById('wallet-arrow');
+        if (walletMenu) walletMenu.classList.add('custom-dropdown-menu');
+        if (walletArrow) walletArrow.classList.add('custom-dropdown-arrow');
 
         // ==========================================
         // ĐÓNG MENU KHI CLICK RA NGOÀI
         // ==========================================
         document.addEventListener('click', (e) => {
-            const statusWrapper = document.getElementById('status-selector-wrapper');
-            const milestoneWrapper = document.getElementById('milestone-selector-wrapper');
+            const typeWrapper = document.getElementById('type-selector-wrapper');
+            const categoryWrapper = document.getElementById('category-selector-wrapper');
+            const walletWrapper = document.getElementById('wallet-selector-wrapper');
 
-            if (statusWrapper && !statusWrapper.contains(e.target)) {
-                const menu = document.getElementById('status-menu');
-                const arrow = document.getElementById('status-arrow');
+            if (typeWrapper && !typeWrapper.contains(e.target)) {
+                const menu = document.getElementById('type-menu');
+                const arrow = document.getElementById('type-arrow');
                 if (menu && menu.classList.contains('opacity-100')) closeDropdown(menu, arrow);
             }
             
-            if (milestoneWrapper && !milestoneWrapper.contains(e.target)) {
-                const menu = document.getElementById('milestone-menu');
-                const arrow = document.getElementById('milestone-arrow');
+            if (categoryWrapper && !categoryWrapper.contains(e.target)) {
+                const menu = document.getElementById('category-menu');
+                const arrow = document.getElementById('category-arrow');
+                if (menu && menu.classList.contains('opacity-100')) closeDropdown(menu, arrow);
+            }
+
+            if (walletWrapper && !walletWrapper.contains(e.target)) {
+                const menu = document.getElementById('wallet-menu');
+                const arrow = document.getElementById('wallet-arrow');
                 if (menu && menu.classList.contains('opacity-100')) closeDropdown(menu, arrow);
             }
         });
