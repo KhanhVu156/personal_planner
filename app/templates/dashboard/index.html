@@ -29,7 +29,9 @@
     <!-- ✅ ID để JS cập nhật tiêu đề ngay lập tức -->
     <h2 id="page-title" class="text-xl font-bold text-gray-800 dark:text-slate-100">Tổng quan tháng {{ display_month }}/{{ display_year }}</h2>
     
+    <!-- ✅ FIX CACHE: Thêm input _t để chống cache trình duyệt khi submit form -->
     <form method="GET" action="{{ url_for('dashboard.index') }}" class="flex items-center w-full md:w-auto" id="filter-form">
+        <input type="hidden" name="_t" id="form-cache-buster" value="">
         <div class="flex items-center bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl shadow-sm overflow-hidden h-12 w-full md:w-auto">
             
             <!-- Custom Dropdown Tháng -->
@@ -362,6 +364,16 @@
     const formatMoney = (amount) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 }).format(amount || 0);
 
     // =====================================================================
+    // ✅ TƯ DUY FIX CACHE FORM: Thêm timestamp vào form submit để trình duyệt không cache lại kết quả.
+    // =====================================================================
+    const filterForm = document.getElementById('filter-form');
+    if (filterForm) {
+        filterForm.addEventListener('submit', function() {
+            document.getElementById('form-cache-buster').value = Date.now();
+        });
+    }
+
+    // =====================================================================
     // 1. HÀM CHUẨN HÓA DỮ LIỆU TỪ BACKEND (ROBUST FIX)
     // =====================================================================
     function safeParseNumber(val) {
@@ -653,8 +665,13 @@
     (function () {
         'use strict';
         
-        const CURRENT_MONTH = {{ display_month }};
-        const CURRENT_YEAR = {{ display_year }};
+        // =====================================================================
+        // ✅ FIX LỖI CACHE HTML: Đọc trực tiếp tháng/năm từ URL.
+        // =====================================================================
+        const urlParams = new URLSearchParams(window.location.search);
+        const CURRENT_MONTH = parseInt(urlParams.get('month')) || {{ display_month }};
+        const CURRENT_YEAR = parseInt(urlParams.get('year')) || {{ display_year }};
+        
         let TODAY = new Date();
         let FORECAST_BASE_DATE = new Date();
         
