@@ -319,7 +319,7 @@
         </div>
 
         <div class="md:col-span-2 mt-2">
-            <button type="button" id="plan-btn" onclick="handleFinancialPlan()" class="bg-blue-600 text-white px-6 py-2.5 rounded-lg hover:bg-blue-700 transition-all font-semibold shadow-sm disabled:opacity-50 disabled:cursor-not-allowed w-full md:w-auto flex items-center justify-center">
+            <button type="button" id="plan-btn" onclick="window.handleFinancialPlan()" class="bg-blue-600 text-white px-6 py-2.5 rounded-lg hover:bg-blue-700 transition-all font-semibold shadow-sm disabled:opacity-50 disabled:cursor-not-allowed w-full md:w-auto flex items-center justify-center">
                 <svg class="w-5 h-5 mr-2 hidden" id="plan-btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
                 <span id="plan-btn-text">Lập kế hoạch</span>
             </button>
@@ -361,317 +361,202 @@
 
 {% block scripts %}
 <script>
-    const formatMoney = (amount) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 }).format(amount || 0);
+    // =========================================================
+    // ✅ TƯ DUY FIX LỖI CỐT LÕI (HTMX & Biến toàn cục):
+    // - Bọc TOÀN BỘ script trong IIFE (Hàm tự thực thi) để cô lập biến.
+    // - Khi HTMX swap DOM (chuyển trang không load lại), trình duyệt sẽ cố chạy lại script này.
+    // - Nếu không có IIFE, các biến `const formatMoney` sẽ bị khai báo trùng, gây SyntaxError 
+    //   khiến script bị dừng giữa chừng và không thể cập nhật dữ liệu mới.
+    // =========================================================
+    (function() {
+        'use strict';
 
-    // =====================================================================
-    // ✅ TƯ DUY FIX CACHE FORM: Thêm timestamp vào form submit để trình duyệt không cache lại kết quả.
-    // =====================================================================
-    const filterForm = document.getElementById('filter-form');
-    if (filterForm) {
-        filterForm.addEventListener('submit', function() {
-            document.getElementById('form-cache-buster').value = Date.now();
-        });
-    }
+        // ---------------------------------------------------------
+        // 1. CÁC HÀM TIỆN ÍCH (HELPERS) - ĐÃ ĐƯỢC CÔ LẬP
+        // ---------------------------------------------------------
+        const formatMoney = (amount) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 }).format(amount || 0);
 
-    // =====================================================================
-    // 1. HÀM CHUẨN HÓA DỮ LIỆU TỪ BACKEND (ROBUST FIX)
-    // =====================================================================
-    function safeParseNumber(val) {
-        if (typeof val === 'number') return val;
-        if (!val) return 0;
-        const cleaned = val.toString().replace(/[^0-9.-]+/g, "");
-        return parseFloat(cleaned) || 0;
-    }
+        function safeParseNumber(val) {
+            if (typeof val === 'number') return val;
+            if (!val) return 0;
+            const cleaned = val.toString().replace(/[^0-9.-]+/g, "");
+            return parseFloat(cleaned) || 0;
+        }
 
-    function normalizeCategoryData(rawData) {
-        if (!rawData) return {};
-        const normalized = {};
-        
-        if (Array.isArray(rawData)) {
-            rawData.forEach(item => {
-                const cat = item.category || item.category_id || item.name;
-                const amount = item.amount || item.total || item.value || 0;
-                if (cat) {
+        function normalizeCategoryData(rawData) {
+            if (!rawData) return {};
+            const normalized = {};
+            if (Array.isArray(rawData)) {
+                rawData.forEach(item => {
+                    const cat = item.category || item.category_id || item.name;
+                    const amount = item.amount || item.total || item.value || 0;
+                    if (cat) normalized[cat] = safeParseNumber(amount);
+                });
+                return normalized;
+            }
+            for (const [key, val] of Object.entries(rawData)) {
+                if (typeof val === 'object' && val !== null) {
+                    const cat = val.category || val.category_id || val.name || key;
+                    const amount = val.amount || val.total || val.value || 0;
                     normalized[cat] = safeParseNumber(amount);
+                } else {
+                    normalized[key] = safeParseNumber(val);
                 }
-            });
+            }
             return normalized;
         }
-        
-        for (const [key, val] of Object.entries(rawData)) {
-            if (typeof val === 'object' && val !== null) {
-                const cat = val.category || val.category_id || val.name || key;
-                const amount = val.amount || val.total || val.value || 0;
-                normalized[cat] = safeParseNumber(amount);
-            } else {
-                normalized[key] = safeParseNumber(val);
-            }
-        }
-        return normalized;
-    }
 
-    // =====================================================================
-    // 2. KHỞI TẠO CÁC DROPDOWN & SỰ KIỆN
-    // =====================================================================
-    function initDropdowns() {
-        const monthBtn = document.getElementById('month-btn');
-        const monthMenu = document.getElementById('month-menu');
-        const monthLabel = document.getElementById('month-label');
-        const monthInput = document.getElementById('month-input');
-        const yearInput = document.getElementById('year-input');
-        const pageTitle = document.getElementById('page-title');
+        // ---------------------------------------------------------
+        // 2. KHỞI TẠO DROPDOWN & SỰ KIỆN
+        // ---------------------------------------------------------
+        function initDropdowns() {
+            const monthBtn = document.getElementById('month-btn');
+            const monthMenu = document.getElementById('month-menu');
+            const monthLabel = document.getElementById('month-label');
+            const monthInput = document.getElementById('month-input');
+            const yearInput = document.getElementById('year-input');
+            const pageTitle = document.getElementById('page-title');
 
-        if (!monthBtn || !monthMenu || !monthLabel || !monthInput) return;
+            if (!monthBtn || !monthMenu || !monthLabel || !monthInput) return;
 
-        const updatePageTitle = () => {
-            if (pageTitle && monthInput && yearInput) {
-                pageTitle.innerText = `Tổng quan tháng ${monthInput.value}/${yearInput.value}`;
-            }
-        };
-
-        const closeMonthMenu = () => {
-            monthMenu.classList.remove('opacity-100', 'translate-y-0');
-            monthMenu.classList.add('opacity-0', '-translate-y-2');
-            setTimeout(() => monthMenu.classList.add('hidden'), 200);
-        };
-
-        monthBtn.onclick = (e) => {
-            e.stopPropagation();
-            const isOpen = monthMenu.classList.contains('opacity-100');
-            
-            if (isOpen) {
-                closeMonthMenu();
-            } else {
-                const rect = monthBtn.getBoundingClientRect();
-                monthMenu.style.top = (rect.bottom + 4) + 'px';
-                monthMenu.style.left = rect.left + 'px';
-                monthMenu.classList.remove('hidden');
-                void monthMenu.offsetWidth; 
-                monthMenu.classList.remove('opacity-0', '-translate-y-2');
-                monthMenu.classList.add('opacity-100', 'translate-y-0');
-            }
-        };
-
-        monthMenu.onclick = (e) => {
-            const item = e.target.closest('.month-item');
-            if (!item) return;
-
-            e.stopPropagation();
-            const val = item.getAttribute('data-value');
-            
-            if (monthInput.value === val) {
-                closeMonthMenu();
-                return;
-            }
-            
-            monthInput.value = val;
-            monthLabel.innerText = item.innerText;
-            updatePageTitle();
-
-            const items = monthMenu.querySelectorAll('.month-item');
-            items.forEach(i => {
-                i.classList.remove('bg-blue-600', 'text-white', 'font-medium');
-                i.classList.add('text-gray-700', 'dark:text-slate-300', 'hover:bg-gray-100', 'dark:hover:bg-slate-700');
-            });
-            item.classList.remove('text-gray-700', 'dark:text-slate-300', 'hover:bg-gray-100', 'dark:hover:bg-slate-700');
-            item.classList.add('bg-blue-600', 'text-white', 'font-medium');
-
-            closeMonthMenu();
-        };
-
-        if (yearInput) {
-            yearInput.oninput = updatePageTitle;
-            yearInput.onchange = updatePageTitle;
-        }
-
-        const regionWrapper = document.getElementById('custom-region-dropdown');
-        const regionTrigger = document.getElementById('dropdown-trigger');
-        const regionMenu = document.getElementById('dropdown-menu');
-        const regionLabel = document.getElementById('dropdown-label');
-        const regionChevron = document.getElementById('dropdown-chevron');
-        const regionInput = document.getElementById('region');
-
-        if (regionWrapper && regionTrigger && regionMenu) {
-            const closeRegionMenu = () => {
-                regionMenu.classList.remove('visible', 'opacity-100', 'translate-y-0');
-                regionMenu.classList.add('invisible', 'opacity-0', '-translate-y-2');
-                regionChevron.classList.remove('rotate-180');
-            };
-
-            regionTrigger.onclick = (e) => {
-                e.stopPropagation();
-                const isOpen = regionMenu.classList.contains('opacity-100');
-                if (isOpen) {
-                    closeRegionMenu();
-                } else {
-                    regionMenu.classList.remove('invisible', 'opacity-0', '-translate-y-2');
-                    regionMenu.classList.add('visible', 'opacity-100', 'translate-y-0');
-                    regionChevron.classList.add('rotate-180');
+            const updatePageTitle = () => {
+                if (pageTitle && monthInput && yearInput) {
+                    pageTitle.innerText = `Tổng quan tháng ${monthInput.value}/${yearInput.value}`;
                 }
             };
 
-            regionMenu.onclick = (e) => {
-                const option = e.target.closest('li');
-                if (!option) return;
-
-                e.stopPropagation();
-                regionLabel.innerText = option.innerText.trim();
-                regionInput.value = option.dataset.value;
-
-                const options = regionMenu.querySelectorAll('li');
-                options.forEach(opt => {
-                    opt.querySelector('.check-icon').classList.add('opacity-0');
-                    opt.classList.remove('font-semibold');
-                });
-                option.querySelector('.check-icon').classList.remove('opacity-0');
-                option.classList.add('font-semibold');
-                closeRegionMenu();
+            const closeMonthMenu = () => {
+                monthMenu.classList.remove('opacity-100', 'translate-y-0');
+                monthMenu.classList.add('opacity-0', '-translate-y-2');
+                setTimeout(() => monthMenu.classList.add('hidden'), 200);
             };
+
+            // ✅ TƯ DUY FIX: Dùng .onclick thay vì .addEventListener
+            // Để tránh việc sự kiện bị cộng dồn (multiple binding) khi HTMX render lại HTML.
+            monthBtn.onclick = (e) => {
+                e.stopPropagation();
+                const isOpen = monthMenu.classList.contains('opacity-100');
+                if (isOpen) {
+                    closeMonthMenu();
+                } else {
+                    const rect = monthBtn.getBoundingClientRect();
+                    monthMenu.style.top = (rect.bottom + 4) + 'px';
+                    monthMenu.style.left = rect.left + 'px';
+                    monthMenu.classList.remove('hidden');
+                    void monthMenu.offsetWidth; 
+                    monthMenu.classList.remove('opacity-0', '-translate-y-2');
+                    monthMenu.classList.add('opacity-100', 'translate-y-0');
+                }
+            };
+
+            monthMenu.onclick = (e) => {
+                const item = e.target.closest('.month-item');
+                if (!item) return;
+                e.stopPropagation();
+                const val = item.getAttribute('data-value');
+                if (monthInput.value === val) {
+                    closeMonthMenu();
+                    return;
+                }
+                monthInput.value = val;
+                monthLabel.innerText = item.innerText;
+                updatePageTitle();
+
+                const items = monthMenu.querySelectorAll('.month-item');
+                items.forEach(i => {
+                    i.classList.remove('bg-blue-600', 'text-white', 'font-medium');
+                    i.classList.add('text-gray-700', 'dark:text-slate-300', 'hover:bg-gray-100', 'dark:hover:bg-slate-700');
+                });
+                item.classList.remove('text-gray-700', 'dark:text-slate-300', 'hover:bg-gray-100', 'dark:hover:bg-slate-700');
+                item.classList.add('bg-blue-600', 'text-white', 'font-medium');
+                closeMonthMenu();
+            };
+
+            if (yearInput) {
+                yearInput.oninput = updatePageTitle;
+                yearInput.onchange = updatePageTitle;
+            }
+
+            // Region Dropdown (Dành cho form Lập kế hoạch)
+            const regionWrapper = document.getElementById('custom-region-dropdown');
+            const regionTrigger = document.getElementById('dropdown-trigger');
+            const regionMenu = document.getElementById('dropdown-menu');
+            const regionLabel = document.getElementById('dropdown-label');
+            const regionChevron = document.getElementById('dropdown-chevron');
+            const regionInput = document.getElementById('region');
+
+            if (regionWrapper && regionTrigger && regionMenu) {
+                const closeRegionMenu = () => {
+                    regionMenu.classList.remove('visible', 'opacity-100', 'translate-y-0');
+                    regionMenu.classList.add('invisible', 'opacity-0', '-translate-y-2');
+                    regionChevron.classList.remove('rotate-180');
+                };
+
+                regionTrigger.onclick = (e) => {
+                    e.stopPropagation();
+                    const isOpen = regionMenu.classList.contains('opacity-100');
+                    if (isOpen) {
+                        closeRegionMenu();
+                    } else {
+                        regionMenu.classList.remove('invisible', 'opacity-0', '-translate-y-2');
+                        regionMenu.classList.add('visible', 'opacity-100', 'translate-y-0');
+                        regionChevron.classList.add('rotate-180');
+                    }
+                };
+
+                regionMenu.onclick = (e) => {
+                    const option = e.target.closest('li');
+                    if (!option) return;
+                    e.stopPropagation();
+                    regionLabel.innerText = option.innerText.trim();
+                    regionInput.value = option.dataset.value;
+
+                    const options = regionMenu.querySelectorAll('li');
+                    options.forEach(opt => {
+                        opt.querySelector('.check-icon').classList.add('opacity-0');
+                        opt.classList.remove('font-semibold');
+                    });
+                    option.querySelector('.check-icon').classList.remove('opacity-0');
+                    option.classList.add('font-semibold');
+                    closeRegionMenu();
+                };
+            }
         }
-    }
 
-    document.addEventListener('click', (e) => {
-        const monthMenu = document.getElementById('month-menu');
-        const monthBtn = document.getElementById('month-btn');
-        if (monthMenu && monthBtn && !monthBtn.contains(e.target) && !monthMenu.contains(e.target)) {
-            monthMenu.classList.remove('opacity-100', 'translate-y-0');
-            monthMenu.classList.add('opacity-0', '-translate-y-2');
-            setTimeout(() => monthMenu.classList.add('hidden'), 200);
-        }
+        // Sự kiện click ra ngoài để đóng menu (Gắn 1 lần duy nhất)
+        if (!window.dashboardDocEventsAttached) {
+            document.addEventListener('click', (e) => {
+                const monthMenu = document.getElementById('month-menu');
+                const monthBtn = document.getElementById('month-btn');
+                if (monthMenu && monthBtn && !monthBtn.contains(e.target) && !monthMenu.contains(e.target)) {
+                    monthMenu.classList.remove('opacity-100', 'translate-y-0');
+                    monthMenu.classList.add('opacity-0', '-translate-y-2');
+                    setTimeout(() => monthMenu.classList.add('hidden'), 200);
+                }
 
-        const regionWrapper = document.getElementById('custom-region-dropdown');
-        const regionMenu = document.getElementById('dropdown-menu');
-        const regionChevron = document.getElementById('dropdown-chevron');
-        if (regionWrapper && regionMenu && !regionWrapper.contains(e.target)) {
-            regionMenu.classList.remove('visible', 'opacity-100', 'translate-y-0');
-            regionMenu.classList.add('invisible', 'opacity-0', '-translate-y-2');
-            if(regionChevron) regionChevron.classList.remove('rotate-180');
-        }
-    });
-
-    // =====================================================================
-    // 3. LOGIC CHÍNH CỦA DASHBOARD & LẬP KẾ HOẠCH
-    // =====================================================================
-    window.handleFinancialPlan = async function() {
-        const btn = document.getElementById('plan-btn');
-        const btnText = document.getElementById('plan-btn-text');
-        const btnIcon = document.getElementById('plan-btn-icon');
-        
-        const rawIncome = document.getElementById('monthly_income').value.replace(/\./g, '');
-        const incomeVal = parseFloat(rawIncome);
-        const regionVal = document.getElementById('region').value;
-
-        if (!incomeVal || incomeVal <= 0) {
-            alert('Vui lòng nhập thu nhập hợp lệ (lớn hơn 0).');
-            document.getElementById('monthly_income').focus();
-            return;
-        }
-
-        // Thu thập dữ liệu mới nhất từ DOM
-        const categorySavings = {
-            food: parseFloat(document.getElementById('saving_food').value) || 0,
-            transport: parseFloat(document.getElementById('saving_transport').value) || 0,
-            education: parseFloat(document.getElementById('saving_education').value) || 0,
-            entertainment: parseFloat(document.getElementById('saving_entertainment').value) || 0,
-            shopping: parseFloat(document.getElementById('saving_shopping').value) || 0,
-            bills: parseFloat(document.getElementById('saving_bills').value) || 0,
-            other: parseFloat(document.getElementById('saving_other').value) || 0,
-        };
-
-        // Reset khối kết quả
-        const resultBox = document.getElementById('plan-result');
-        resultBox.classList.add('hidden');
-        resultBox.classList.remove('animate-slide-up');
-
-        // Hiệu ứng loading
-        btn.disabled = true;
-        btnText.innerText = 'Đang tính toán...';
-        btnIcon.classList.remove('hidden');
-        btnIcon.classList.add('animate-spin');
-
-        try {
-            const res = await fetch(`/api/financial-plan`, {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json', 
-                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content,
-                    'Cache-Control': 'no-cache, no-store, must-revalidate',
-                    'Pragma': 'no-cache'
-                },
-                body: JSON.stringify({ 
-                    monthly_income: incomeVal, 
-                    category_savings: categorySavings, 
-                    region: regionVal,
-                    _t: Date.now()
-                })
+                const regionWrapper = document.getElementById('custom-region-dropdown');
+                const regionMenu = document.getElementById('dropdown-menu');
+                const regionChevron = document.getElementById('dropdown-chevron');
+                if (regionWrapper && regionMenu && !regionWrapper.contains(e.target)) {
+                    regionMenu.classList.remove('visible', 'opacity-100', 'translate-y-0');
+                    regionMenu.classList.add('invisible', 'opacity-0', '-translate-y-2');
+                    if(regionChevron) regionChevron.classList.remove('rotate-180');
+                }
             });
 
-            if (!res.ok) {
-                const errData = await res.json().catch(() => ({}));
-                throw new Error(errData.error || 'Lỗi gọi API lập kế hoạch');
-            }
+            document.addEventListener('input', function(e) {
+                if (e.target && e.target.id === 'monthly_income') {
+                    let rawValue = e.target.value.replace(/\D/g, '');
+                    e.target.value = rawValue ? formatMoney(rawValue) : '';
+                }
+            });
             
-            const data = await res.json();
-            
-            if (!data.budgets) throw new Error('Dữ liệu ngân sách trả về không hợp lệ.');
-
-            document.getElementById('inflation_rate').innerText = data.inflation_rate || 0;
-            
-            const catMap = { 'food': 'Ăn uống', 'transport': 'Di chuyển', 'education': 'Học tập', 'entertainment': 'Giải trí', 'shopping': 'Mua sắm', 'bills': 'Hóa đơn', 'other': 'Khác', 'salary': 'Lương' };
-            
-            // Hiển thị TẤT CẢ danh mục để không bị mất dòng
-            const budgetsHtml = Object.entries(data.budgets)
-                .map(([cat, amount]) => {
-                    const catName = catMap[cat] || cat;
-                    const numAmount = Number(amount) || 0;
-                    const formattedAmount = new Intl.NumberFormat('vi-VN').format(numAmount);
-                    const textColor = numAmount > 0 ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-slate-500';
-                    
-                    return `
-                        <li class="flex justify-between items-center py-3 px-4 border-b border-gray-100 dark:border-slate-700/50 hover:bg-slate-100 dark:hover:bg-slate-700/60 transition-colors">
-                            <span class="font-medium text-gray-700 dark:text-slate-300">${catName}</span>
-                            <strong class="${textColor} whitespace-nowrap shrink-0">${formattedAmount} VND</strong>
-                        </li>`;
-                }).join('');
-
-            document.getElementById('budgets-list').innerHTML = budgetsHtml || '<li class="p-4 text-center text-gray-500">Không có ngân sách nào được tạo.</li>';
-
-            const formattedSavings = new Intl.NumberFormat('vi-VN').format(Number(data.savings) || 0);
-            document.getElementById('savings-container').innerHTML = `
-                <div class="flex justify-between items-center gap-4 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/50 rounded-xl mt-2 shadow-sm">
-                    <span class="flex items-center gap-2 font-bold text-green-700 dark:text-green-400">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                        Mục tiêu tiết kiệm:
-                    </span>
-                    <span class="text-lg font-black text-green-700 dark:text-green-400 whitespace-nowrap shrink-0">${formattedSavings} VND</span>
-                </div>`;
-
-            // Kích hoạt hiệu ứng hiển thị
-            resultBox.classList.remove('hidden');
-            void resultBox.offsetWidth; 
-            resultBox.classList.add('animate-slide-up');
-
-        } catch (err) {
-            console.error('[Plan Error]', err);
-            alert(`Có lỗi xảy ra: ${err.message}`);
-        } finally {
-            btn.disabled = false;
-            btnText.innerText = 'Lập kế hoạch';
-            btnIcon.classList.add('hidden');
-            btnIcon.classList.remove('animate-spin');
+            window.dashboardDocEventsAttached = true;
         }
-    };
 
-    (function () {
-        'use strict';
-        
-        // =====================================================================
-        // ✅ FIX LỖI CACHE HTML: Đọc trực tiếp tháng/năm từ URL.
-        // =====================================================================
-        const urlParams = new URLSearchParams(window.location.search);
-        const CURRENT_MONTH = parseInt(urlParams.get('month')) || {{ display_month }};
-        const CURRENT_YEAR = parseInt(urlParams.get('year')) || {{ display_year }};
-        
+        // ---------------------------------------------------------
+        // 3. BIẾN TRẠNG THÁI VÀ ĐỒNG BỘ FILTER
+        // ---------------------------------------------------------
         let TODAY = new Date();
         let FORECAST_BASE_DATE = new Date();
         
@@ -686,6 +571,17 @@
 
         let budgetChartObserver = null;
         let forecastChartObserver = null;
+
+        // ✅ TƯ DUY FIX LỖI "KẸT" THÁNG: 
+        // Khi HTMX swap DOM, URL thay đổi nhưng biến JS có thể không cập nhật kịp.
+        // Hàm này sẽ đọc lại giá trị thực tế đang hiển thị trên thẻ input để gọi API.
+        function syncFiltersFromDOM() {
+            const monthInput = document.getElementById('month-input');
+            const yearInput = document.getElementById('year-input');
+            const currentMonth = monthInput && monthInput.value ? parseInt(monthInput.value) : {{ display_month }};
+            const currentYear = yearInput && yearInput.value ? parseInt(yearInput.value) : {{ display_year }};
+            return { month: currentMonth, year: currentYear };
+        }
 
         function setupChartResizeObservers() {
             if (typeof ResizeObserver === 'undefined') return;
@@ -708,11 +604,15 @@
             }
         }
 
+        // ---------------------------------------------------------
+        // 4. LUỒNG XỬ LÝ CHÍNH (FETCH DASHBOARD)
+        // ---------------------------------------------------------
         async function initDashboard(isRetry = false) {
             if (isInitRunning && !isRetry) return; 
             isInitRunning = true;
             
             TODAY = new Date();
+            const filters = syncFiltersFromDOM(); // ✅ Lấy tháng/năm mới nhất từ DOM
 
             if (currentAbortController) currentAbortController.abort();
             currentAbortController = new AbortController();
@@ -729,7 +629,7 @@
             if (financialEmptyState) { financialEmptyState.classList.add('hidden'); financialEmptyState.classList.remove('flex'); }
 
             try {
-                const res = await fetch(`/api/dashboard-stats?month=${CURRENT_MONTH}&year=${CURRENT_YEAR}&t=${Date.now()}`, {
+                const res = await fetch(`/api/dashboard-stats?month=${filters.month}&year=${filters.year}&t=${Date.now()}`, {
                     signal: thisController.signal,
                     headers: { 'Accept': 'application/json' }
                 });
@@ -774,9 +674,9 @@
                     }
                 }
 
-                safeRun(renderSummary, data);
+                safeRun(renderSummary, data, filters);
                 safeRun(renderWallets, data.wallets);
-                safeRun(renderBurnRate, data.burn_rate);
+                safeRun(renderBurnRate, data.burn_rate, filters);
                 safeRun(renderInsights, data.insights);
                 safeRun(renderTasks, data.tasks);
                 
@@ -794,7 +694,7 @@
                 const forecastTitle = document.getElementById('forecast-title');
                 if (forecastTitle) {
                     const today = new Date();
-                    const isCurrentMonth = (CURRENT_MONTH === today.getMonth() + 1) && (CURRENT_YEAR === today.getFullYear());
+                    const isCurrentMonth = (filters.month === today.getMonth() + 1) && (filters.year === today.getFullYear());
                     forecastTitle.innerText = isCurrentMonth 
                         ? 'Dự báo chi tiêu (7 ngày tới)' 
                         : 'Dự báo chi tiêu (7 ngày kế tiếp)';
@@ -819,7 +719,6 @@
                     renderErrorState();
                 }
             } finally {
-                // ✅ ĐẢM BẢO LUÔN MỞ KHOÁ VÀ TẮT LOADING DÙ API THÀNH CÔNG HAY THẤT BẠI
                 if (loadingState) { loadingState.classList.add('hidden'); loadingState.classList.remove('flex'); }
                 isInitRunning = false;
             }
@@ -833,12 +732,12 @@
             }
         }
 
-        function renderSummary(data) {
-            // ✅ FIX LỖI HIỂN THỊ SAI THÁNG: 
-            // Thay vì tin tưởng data.month từ API (có thể bị kẹt cache), 
-            // ta dùng chính CURRENT_MONTH/YEAR mà người dùng đang chọn trên thanh lọc.
-            document.getElementById('title-income').innerText = `Thu nhập (T${CURRENT_MONTH}/${CURRENT_YEAR})`;
-            document.getElementById('title-expense').innerText = `Chi tiêu (T${CURRENT_MONTH}/${CURRENT_YEAR})`;
+        // ---------------------------------------------------------
+        // 5. CÁC HÀM RENDER GIAO DIỆN
+        // ---------------------------------------------------------
+        function renderSummary(data, filters) {
+            document.getElementById('title-income').innerText = `Thu nhập (T${filters.month}/${filters.year})`;
+            document.getElementById('title-expense').innerText = `Chi tiêu (T${filters.month}/${filters.year})`;
             
             document.getElementById('val-income').innerHTML = `+${formatMoney(data.income)} <span class="text-lg">VND</span>`;
             document.getElementById('val-expense').innerHTML = `-${formatMoney(data.expenses)} <span class="text-lg">VND</span>`;
@@ -905,8 +804,8 @@
             }).join('');
         }
 
-        function renderBurnRate(burn) {
-            const isCurrentMonth = (CURRENT_MONTH === TODAY.getMonth() + 1) && (CURRENT_YEAR === TODAY.getFullYear());
+        function renderBurnRate(burn, filters) {
+            const isCurrentMonth = (filters.month === TODAY.getMonth() + 1) && (filters.year === TODAY.getFullYear());
             const monthText = isCurrentMonth ? 'tháng này' : 'tháng đã chọn';
 
             document.getElementById('burn-rate-content').innerHTML = `
@@ -1254,6 +1153,9 @@
             if (financialSections) financialSections.classList.remove('hidden');
         }
 
+        // ---------------------------------------------------------
+        // 6. CÁC HÀM GLOBAL (Gắn vào window để HTML có thể gọi)
+        // ---------------------------------------------------------
         window.retryDashboard = function() {
             const loadingState = document.getElementById('dashboard-loading-state');
             const financialSections = document.getElementById('financial-sections');
@@ -1276,18 +1178,138 @@
             initDashboard(true);
         };
 
-        document.addEventListener('input', function(e) {
-            if (e.target && e.target.id === 'monthly_income') {
-                let rawValue = e.target.value.replace(/\D/g, '');
-                e.target.value = rawValue ? formatMoney(rawValue) : '';
+        window.handleFinancialPlan = async function() {
+            const btn = document.getElementById('plan-btn');
+            const btnText = document.getElementById('plan-btn-text');
+            const btnIcon = document.getElementById('plan-btn-icon');
+            
+            const rawIncome = document.getElementById('monthly_income').value.replace(/\./g, '');
+            const incomeVal = parseFloat(rawIncome);
+            const regionVal = document.getElementById('region').value;
+
+            if (!incomeVal || incomeVal <= 0) {
+                alert('Vui lòng nhập thu nhập hợp lệ (lớn hơn 0).');
+                document.getElementById('monthly_income').focus();
+                return;
             }
-        });
 
-        document.addEventListener('htmx:afterSettle', function() {
-            initDropdowns();
-            initDashboard(true);
-        });
+            const categorySavings = {
+                food: parseFloat(document.getElementById('saving_food').value) || 0,
+                transport: parseFloat(document.getElementById('saving_transport').value) || 0,
+                education: parseFloat(document.getElementById('saving_education').value) || 0,
+                entertainment: parseFloat(document.getElementById('saving_entertainment').value) || 0,
+                shopping: parseFloat(document.getElementById('saving_shopping').value) || 0,
+                bills: parseFloat(document.getElementById('saving_bills').value) || 0,
+                other: parseFloat(document.getElementById('saving_other').value) || 0,
+            };
 
+            const resultBox = document.getElementById('plan-result');
+            resultBox.classList.add('hidden');
+            resultBox.classList.remove('animate-slide-up');
+
+            btn.disabled = true;
+            btnText.innerText = 'Đang tính toán...';
+            btnIcon.classList.remove('hidden');
+            btnIcon.classList.add('animate-spin');
+
+            try {
+                const res = await fetch(`/api/financial-plan`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json', 
+                        'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content,
+                        'Cache-Control': 'no-cache, no-store, must-revalidate',
+                        'Pragma': 'no-cache'
+                    },
+                    body: JSON.stringify({ 
+                        monthly_income: incomeVal, 
+                        category_savings: categorySavings, 
+                        region: regionVal,
+                        _t: Date.now()
+                    })
+                });
+
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}));
+                    throw new Error(errData.error || 'Lỗi gọi API lập kế hoạch');
+                }
+                
+                const data = await res.json();
+                
+                if (!data.budgets) throw new Error('Dữ liệu ngân sách trả về không hợp lệ.');
+
+                document.getElementById('inflation_rate').innerText = data.inflation_rate || 0;
+                
+                const catMap = { 'food': 'Ăn uống', 'transport': 'Di chuyển', 'education': 'Học tập', 'entertainment': 'Giải trí', 'shopping': 'Mua sắm', 'bills': 'Hóa đơn', 'other': 'Khác', 'salary': 'Lương' };
+                
+                const budgetsHtml = Object.entries(data.budgets)
+                    .map(([cat, amount]) => {
+                        const catName = catMap[cat] || cat;
+                        const numAmount = Number(amount) || 0;
+                        const formattedAmount = new Intl.NumberFormat('vi-VN').format(numAmount);
+                        const textColor = numAmount > 0 ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-slate-500';
+                        
+                        return `
+                            <li class="flex justify-between items-center py-3 px-4 border-b border-gray-100 dark:border-slate-700/50 hover:bg-slate-100 dark:hover:bg-slate-700/60 transition-colors">
+                                <span class="font-medium text-gray-700 dark:text-slate-300">${catName}</span>
+                                <strong class="${textColor} whitespace-nowrap shrink-0">${formattedAmount} VND</strong>
+                            </li>`;
+                    }).join('');
+
+                document.getElementById('budgets-list').innerHTML = budgetsHtml || '<li class="p-4 text-center text-gray-500">Không có ngân sách nào được tạo.</li>';
+
+                const formattedSavings = new Intl.NumberFormat('vi-VN').format(Number(data.savings) || 0);
+                document.getElementById('savings-container').innerHTML = `
+                    <div class="flex justify-between items-center gap-4 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/50 rounded-xl mt-2 shadow-sm">
+                        <span class="flex items-center gap-2 font-bold text-green-700 dark:text-green-400">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            Mục tiêu tiết kiệm:
+                        </span>
+                        <span class="text-lg font-black text-green-700 dark:text-green-400 whitespace-nowrap shrink-0">${formattedSavings} VND</span>
+                    </div>`;
+
+                resultBox.classList.remove('hidden');
+                void resultBox.offsetWidth; 
+                resultBox.classList.add('animate-slide-up');
+
+            } catch (err) {
+                console.error('[Plan Error]', err);
+                alert(`Có lỗi xảy ra: ${err.message}`);
+            } finally {
+                btn.disabled = false;
+                btnText.innerText = 'Lập kế hoạch';
+                btnIcon.classList.add('hidden');
+                btnIcon.classList.remove('animate-spin');
+            }
+        };
+
+        // ---------------------------------------------------------
+        // 7. LẮNG NGHE SỰ KIỆN HTMX VÀ KHỞI CHẠY LẦN ĐẦU
+        // ---------------------------------------------------------
+        // Đảm bảo sự kiện HTMX không bị gắn nhiều lần
+        if (!window.dashboardHtmxAttached) {
+            document.addEventListener('htmx:afterSettle', function() {
+                // Khi HTMX tải lại HTML (đổi tháng), ta phải khởi tạo lại dropdown 
+                // và tải lại API (vì DOM mới đã thay thế hoàn toàn).
+                initDropdowns();
+                initDashboard(true); 
+            });
+            window.dashboardHtmxAttached = true;
+        }
+
+        // Bắt sự kiện submit form lọc để chống cache (chỉ gắn 1 lần)
+        if (!window.dashboardFilterFormAttached) {
+            const filterForm = document.getElementById('filter-form');
+            if (filterForm) {
+                filterForm.addEventListener('submit', function() {
+                    const buster = document.getElementById('form-cache-buster');
+                    if (buster) buster.value = Date.now();
+                });
+                window.dashboardFilterFormAttached = true;
+            }
+        }
+
+        // Khởi chạy lần đầu
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', () => {
                 initDropdowns();
@@ -1322,6 +1344,7 @@
                 renderBudgetChart(chartDataState.budgets, chartDataState.catExp);
             }
         };
-    })();
+
+    })(); // Kết thúc IIFE
 </script>
 {% endblock %}
