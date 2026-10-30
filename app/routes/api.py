@@ -225,7 +225,7 @@ def get_dashboard_stats():
             'budgets': budget_dict,
             'cat_expenses': cat_exp_dict,
             'tasks': tasks_data,
-            'month': month, 'year': year,
+            'month': month, 'year': year, # ✅ Trả về đúng tháng/năm được request
             'insights': insights,
             'burn_rate': burn_rate,
             'forecast': forecast_data,
@@ -233,7 +233,10 @@ def get_dashboard_stats():
         }
         
         response = jsonify(data)
+        # ✅ Bọc thép chống Cache: Ép mọi trình duyệt/Proxy không được lưu kết quả này
         response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
         return response
 
     except Exception as e:
