@@ -47,19 +47,20 @@
 </style>
 
 <!-- PHẦN 1: HEADER & BỘ LỌC THÁNG/NĂM -->
-<div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 bg-white dark:bg-slate-800 p-4 rounded-lg shadow transition-colors duration-300 gap-4">
+<!-- ✅ TƯ DUY FIX UI: Thêm relative z-50 để tạo Stacking Context, đảm bảo dropdown luôn nổi lên trên -->
+<div class="relative z-50 flex flex-col md:flex-row justify-between items-start md:items-center mb-6 bg-white dark:bg-slate-800 p-4 rounded-lg shadow transition-colors duration-300 gap-4">
     <h2 id="page-title" class="text-xl font-bold text-gray-800 dark:text-slate-100">Tổng quan tháng {{ display_month }}/{{ display_year }}</h2>
     
     <!-- ✅ FIX CACHE: Thêm input _t để chống cache trình duyệt khi submit form -->
     <form method="GET" action="{{ url_for('dashboard.index') }}" class="flex items-center w-full md:w-auto" id="filter-form">
         <input type="hidden" name="_t" id="form-cache-buster" value="">
-        <div class="flex items-center bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl shadow-sm overflow-hidden h-12 w-full md:w-auto">
+        <div class="flex items-center bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl shadow-sm overflow-visible h-12 w-full md:w-auto">
             
             <!-- Custom Dropdown Tháng -->
             <div class="relative flex items-center h-full flex-1 md:flex-none" id="month-selector-wrapper">
                 <input type="hidden" name="month" id="month-input" value="{{ display_month }}">
                 
-                <button type="button" id="month-btn" class="appearance-none bg-transparent pl-5 pr-10 h-full text-sm md:text-base font-semibold text-gray-700 dark:text-slate-200 focus:outline-none cursor-pointer flex items-center w-full text-left">
+                <button type="button" id="month-btn" class="appearance-none bg-transparent pl-5 pr-10 h-full text-sm md:text-base font-semibold text-gray-700 dark:text-slate-200 focus:outline-none cursor-pointer flex items-center w-full text-left rounded-l-xl">
                     <span id="month-label">Tháng {{ display_month }}</span>
                 </button>
                 
@@ -67,7 +68,9 @@
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                 </div>
 
-                <div id="month-menu" class="fixed z-[999] w-40 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl shadow-2xl hidden opacity-0 transform -translate-y-2 transition-all duration-200 overflow-hidden">
+                <!-- ✅ TƯ DUY FIX LỖI: Đổi từ 'fixed' sang 'absolute top-full left-0 mt-2'.
+                     Giúp menu tự động bám dính ngay dưới nút bấm, không cần JS tính tọa độ, không bao giờ bị che khuất. -->
+                <div id="month-menu" class="absolute top-full left-0 mt-2 z-[100] w-40 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl shadow-2xl hidden opacity-0 transform -translate-y-2 transition-all duration-200 overflow-hidden">
                     <ul class="max-h-60 overflow-y-auto py-1" id="month-list">
                         {% for m in range(1, 13) %}
                             <li>
@@ -86,7 +89,7 @@
             
             <div class="w-px h-6 bg-gray-300 dark:bg-slate-700"></div>
             
-            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-6 md:px-8 h-full text-sm md:text-base font-bold transition-all duration-200 whitespace-nowrap">
+            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-6 md:px-8 h-full text-sm md:text-base font-bold transition-all duration-200 whitespace-nowrap rounded-r-xl">
                 Xem
             </button>
         </div>
@@ -472,15 +475,13 @@
 
             // ✅ TƯ DUY FIX: Dùng .onclick thay vì .addEventListener
             // Để tránh việc sự kiện bị cộng dồn (multiple binding) khi HTMX render lại HTML.
+            // ✅ TƯ DUY FIX MENU BỊ CHE: Không cần tính toán top/left bằng JS nữa vì đã dùng absolute.
             monthBtn.onclick = (e) => {
                 e.stopPropagation();
                 const isOpen = monthMenu.classList.contains('opacity-100');
                 if (isOpen) {
                     closeMonthMenu();
                 } else {
-                    const rect = monthBtn.getBoundingClientRect();
-                    monthMenu.style.top = (rect.bottom + 4) + 'px';
-                    monthMenu.style.left = rect.left + 'px';
                     monthMenu.classList.remove('hidden');
                     void monthMenu.offsetWidth; 
                     monthMenu.classList.remove('opacity-0', '-translate-y-2');
