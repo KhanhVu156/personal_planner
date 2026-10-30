@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app
+from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app, send_file
 from flask_login import login_required, current_user
 from app import db
 from app.forms import TransactionForm
@@ -55,6 +55,33 @@ def list_transactions():
         .paginate(page=page, per_page=per_page, error_out=False)
         
     return render_template('transactions/list.html', transactions=pagination)
+
+
+@bp.route('/transactions/download_template')
+@login_required
+def download_template():
+    """
+    Tạo và trả về file CSV mẫu.
+    TƯ DUY FIX LỖI EXCEL: 
+    Sử dụng cú pháp ="YYYY-MM-DD" cho cột Ngày để ép Excel hiểu đây là chuỗi Text.
+    Điều này ngăn chặn việc Excel tự động format ngày và hiển thị lỗi ##### do cột quá hẹp.
+    """
+    csv_content = (
+        "\ufeffNgày,Mô tả,Số tiền,Danh mục,Loại\r\n"
+        '="2024-05-20",Ăn sáng,50000,food,expense\r\n'
+        '="2024-05-21",Lương tháng 5,15000000,salary,income\r\n'
+    )
+    
+    buffer = io.BytesIO()
+    buffer.write(csv_content.encode('utf-8'))
+    buffer.seek(0)
+    
+    return send_file(
+        buffer,
+        mimetype='text/csv',
+        as_attachment=True,
+        download_name='template_giao_dich.csv'
+    )
 
 
 @bp.route('/transactions/add', methods=['GET', 'POST'])
@@ -173,11 +200,11 @@ def import_csv():
     TƯ DUY GIẢI THUẬT XỬ LÝ FILE CSV ĐA NGÔN NGỮ:
     1. Đọc file: Ưu tiên utf-8-sig để tự động xóa ký tự BOM (\ufeff) thường gặp ở file Excel. Có fallback cho các bảng mã cũ.
     2. Đọc Header: Dùng csv.Sniffer() để tự động nhận diện dấu phân cách (phẩy, chấm phẩy).
-    3. Chuẩn hóa Header: Thay vì xóa ký tự không phải chữ (gây lỗi mất dấu tiếng Việt), ta xây dựng 
-       một từ điển Ánh xạ (Mapping) từ tiếng Việt (có dấu/không dấu) sang chuẩn tiếng Anh nội bộ.
+    3. Chuẩn hóa Header: Xây dựng từ điển ánh xạ từ tiếng Việt (có dấu/không dấu) sang chuẩn tiếng Anh nội bộ.
     4. Xử lý Row (Dòng dữ liệu): 
        - Ngày: Dùng Regex tìm định dạng YYYY-MM-DD.
        - Số tiền: Làm sạch dấu phẩy/chấm phân cách (VD: "40,000" -> "40000") trước khi ép kiểu float.
+       - Danh mục & Loại: Ánh xạ từ tiếng Việt sang tiếng Anh chuẩn để đồng bộ với Database và Dashboard.
     5. Lưu trữ: Dùng bulk_save_objects để tối ưu hiệu suất (chèn theo lô 500 dòng) thay vì commit từng dòng.
     """
     if 'csv_file' not in request.files:
@@ -223,8 +250,6 @@ def import_csv():
             flash('File CSV trống hoặc không có dòng tiêu đề.', 'danger')
             return redirect(url_for('transactions.list_transactions'))
 
-        # Từ điển ánh xạ: Key là tên cột (đã lower, strip), Value là tên chuẩn (tiếng Anh)
-        # Hỗ trợ cả tiếng Việt có dấu, không dấu và tiếng Anh.
         column_mapping = {
             'ngày': 'date', 'ngay': 'date', 'date': 'date',
             'mô tả': 'description', 'mo ta': 'description', 'description': 'description',
@@ -233,12 +258,9 @@ def import_csv():
             'loại': 'type', 'loai': 'type', 'type': 'type'
         }
         
-        # Tạo danh sách tên cột mới đã được chuẩn hóa
         normalized_fieldnames = []
         for f in csv_input.fieldnames:
-            # Xóa BOM nếu còn sót, xóa khoảng trắng, chuyển về chữ thường
             clean_name = str(f).replace('\ufeff', '').strip().lower()
-            # Ánh xạ sang tiếng Anh, nếu không có trong từ điển thì giữ nguyên
             mapped_name = column_mapping.get(clean_name, clean_name)
             normalized_fieldnames.append(mapped_name)
             
@@ -248,10 +270,38 @@ def import_csv():
         required_fields = {'date', 'description', 'amount', 'category', 'type'}
         if not required_fields.issubset(set(csv_input.fieldnames)):
             missing = required_fields - set(csv_input.fieldnames)
-            flash(f'File CSV thiếu cột: {", ".join(missing)}. Yêu cầu: date, description, amount, category, type.', 'danger')
+            
+            field_vn_names = {
+                'date': 'Ngày',
+                'description': 'Mô tả',
+                'amount': 'Số tiền',
+                'category': 'Danh mục',
+                'type': 'Loại'
+            }
+            missing_vn = [field_vn_names.get(f, f) for f in missing]
+            
+            flash(f'File CSV thiếu các cột bắt buộc: {", ".join(missing_vn)}. Vui lòng tải file mẫu để xem lại cấu trúc.', 'danger')
             return redirect(url_for('transactions.list_transactions'))
 
-        # Lấy ví mặc định để gán cho các giao dịch import
+        # TƯ DUY FIX LỖI MAP TIẾNG VIỆT:
+        # Xây dựng từ điển ánh xạ cả tiếng Việt (có dấu, không dấu) và tiếng Anh về chuẩn nội bộ.
+        # Giúp người dùng không cần biết tiếng Anh vẫn có thể import file chính xác.
+        category_map = {
+            'ăn uống': 'food', 'an uong': 'food', 'food': 'food',
+            'di chuyển': 'transport', 'di chuyen': 'transport', 'transport': 'transport',
+            'học tập': 'education', 'hoc tap': 'education', 'education': 'education',
+            'giải trí': 'entertainment', 'giai tri': 'entertainment', 'entertainment': 'entertainment',
+            'mua sắm': 'shopping', 'mua sam': 'shopping', 'shopping': 'shopping',
+            'hóa đơn': 'bills', 'hoa don': 'bills', 'bills': 'bills',
+            'lương': 'salary', 'luong': 'salary', 'salary': 'salary',
+            'khác': 'other', 'khac': 'other', 'other': 'other'
+        }
+        
+        type_map = {
+            'chi tiêu': 'expense', 'chi tieu': 'expense', 'chi': 'expense', 'expense': 'expense',
+            'thu nhập': 'income', 'thu nhap': 'income', 'thu': 'income', 'income': 'income'
+        }
+
         default_wallet = current_user.wallets.filter_by(is_active=True).order_by(Wallet.id).first()
         default_wallet_id = default_wallet.id if default_wallet else None
 
@@ -265,31 +315,34 @@ def import_csv():
                 date_str = row.get('date', '').strip()
                 amount_str = row.get('amount', '').strip()
                 desc_str = row.get('description', '').strip()
-                cat_str = row.get('category', 'other').strip()
-                type_str = row.get('type', 'expense').strip()
                 
-                # 4.1. Xử lý Ngày tháng (Tìm chuỗi có định dạng YYYY-MM-DD)
+                # 4.1. Xử lý Ngày tháng
                 date_match = re.search(r'\d{4}-\d{2}-\d{2}', date_str)
                 if not date_match:
                     count_error += 1
-                    continue # Bỏ qua dòng lỗi, đếm số lượng
+                    continue 
                 date_obj = datetime.strptime(date_match.group(), '%Y-%m-%d').date()
 
-                # 4.2. Xử lý Số tiền (Loại bỏ dấu phẩy, chấm phân cách hàng nghìn nếu có)
-                # VD: "40,000" -> "40000" | "40.000" -> "40000"
+                # 4.2. Xử lý Số tiền
                 clean_amount_str = amount_str.replace(',', '').replace('.', '')
-                # Regex chỉ bắt các chữ số
                 amount_match = re.search(r'\d+', clean_amount_str)
                 if not amount_match:
                     count_error += 1
                     continue
                 amount_val = float(amount_match.group())
+
+                # 4.3. Xử lý Danh mục (Ánh xạ sang tiếng Anh)
+                cat_raw = str(row.get('category', '')).strip().lower()
+                cat_str = category_map.get(cat_raw, 'other') # Mặc định là other nếu không khớp
+                
+                # 4.4. Xử lý Loại (Ánh xạ sang tiếng Anh)
+                type_raw = str(row.get('type', '')).strip().lower()
+                type_str = type_map.get(type_raw, 'expense') # Mặc định là expense nếu không khớp
                     
             except Exception as e:
-                # Ghi log lỗi từng dòng ở mức debug để không làm rác log chính
                 current_app.logger.debug(f"Lỗi parse dòng CSV: {row} - Error: {str(e)}")
                 count_error += 1
-                continue # Bỏ qua dòng bị lỗi dữ liệu
+                continue 
                 
             trans = Transaction(
                 user_id=current_user.id,
@@ -297,30 +350,27 @@ def import_csv():
                 date=date_obj,
                 description=desc_str,
                 amount=amount_val,
-                category=cat_str if cat_str else 'other',
-                type=type_str if type_str else 'expense'
+                category=cat_str,
+                type=type_str
             )
             batch.append(trans)
             count_success += 1
             
-            # Chèn theo lô 500 dòng để tránh treo RAM/DB nếu file quá lớn
             if len(batch) >= 500:
                 db.session.bulk_save_objects(batch)
                 db.session.commit()
                 batch = []
                 
-        # Chèn nốt số dòng còn lại trong lô cuối cùng
         if batch:
             db.session.bulk_save_objects(batch)
             db.session.commit()
             
-        # Thông báo kết quả
         msg = f'Đã nhập thành công {count_success} giao dịch.'
         if count_error > 0:
             msg += f' Có {count_error} dòng bị bỏ qua do sai định dạng dữ liệu.'
-            flash(msg, 'warning') # Dùng warning màu vàng để người dùng chú ý
+            flash(msg, 'warning') 
         else:
-            flash(msg, 'success') # Dùng success màu xanh nếu hoàn hảo
+            flash(msg, 'success') 
         
     except Exception as e:
         db.session.rollback()

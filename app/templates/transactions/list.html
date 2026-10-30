@@ -1,77 +1,113 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-    <h2 class="text-2xl font-bold text-gray-800 dark:text-slate-100">Lịch sử Giao dịch</h2>
-    <div class="flex gap-2 w-full md:w-auto">
-        <!-- 
-            ✅ FIX (3.4): Đã xóa hx-boost="false". 
-            Form upload file vẫn hoạt động bình thường vì chúng ta dùng submit truyền thống.
-        -->
-        <form method="POST" action="{{ url_for('transactions.import_csv') }}" enctype="multipart/form-data" class="flex-1 md:flex-none">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-            <input type="file" name="csv_file" accept=".csv" class="hidden" id="csvInput"
-                   onchange="if (this.files.length) this.form.submit();">
-            <button type="button" id="csvSubmitBtn" onclick="document.getElementById('csvInput').click()" class="w-full bg-green-600 text-white px-4 py-2 rounded shadow hover:bg-green-700 transition duration-200 flex items-center justify-center">
-                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
-                Nhập CSV
-            </button>
-        </form>
-        
-        <a href="{{ url_for('transactions.add_transaction') }}" class="flex-1 md:flex-none bg-blue-600 text-white px-4 py-2 rounded shadow hover:bg-blue-700 transition duration-200 flex items-center justify-center">
-            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-            Thêm mới
-        </a>
-    </div>
+    <h2 class="text-2xl font-bold text-gray-800 dark:text-slate-100">Quản lý Công việc (Ma trận Eisenhower)</h2>
+    <a href="{{ url_for('tasks.add_task') }}" class="bg-blue-600 text-white px-4 py-2 rounded shadow hover:bg-blue-700 transition duration-200 flex items-center font-semibold">
+        <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+        Thêm Công việc
+    </a>
 </div>
 
-<div class="overflow-x-auto bg-white dark:bg-slate-800 rounded shadow mb-6 transition-colors duration-300">
+<div class="overflow-x-auto bg-white dark:bg-slate-800 rounded shadow transition-colors duration-300">
     <table class="min-w-full">
         <thead>
             <tr class="bg-gray-50 dark:bg-slate-700 border-b border-gray-200 dark:border-slate-600">
-                <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600 dark:text-slate-300 uppercase tracking-wider">Ngày</th>
-                <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600 dark:text-slate-300 uppercase tracking-wider">Mô tả</th>
-                <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600 dark:text-slate-300 uppercase tracking-wider">Danh mục</th>
-                <th class="py-3 px-4 text-center text-sm font-semibold text-gray-600 dark:text-slate-300 uppercase tracking-wider">Loại</th>
-                <th class="py-3 px-4 text-right text-sm font-semibold text-gray-600 dark:text-slate-300 uppercase tracking-wider">Số tiền</th>
-                <th class="py-3 px-4 text-center text-sm font-semibold text-gray-600 dark:text-slate-300 uppercase tracking-wider">Thao tác</th>
+                <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600 dark:text-slate-300 uppercase tracking-wider">Công việc</th>
+                <th class="py-3 px-4 text-center text-sm font-semibold text-gray-600 dark:text-slate-300 uppercase tracking-wider">Phân loại (Ma trận)</th>
+                <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600 dark:text-slate-300 uppercase tracking-wider">Hạn chót</th>
+                <th class="py-3 px-4 text-center text-sm font-semibold text-gray-600 dark:text-slate-300 uppercase tracking-wider">Trạng thái</th>
+                <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600 dark:text-slate-300 uppercase tracking-wider">Tiến độ</th>
+                <th class="py-3 px-4 text-center text-sm font-semibold text-gray-600 dark:text-slate-300 uppercase tracking-wider">Hành động</th>
             </tr>
         </thead>
         <tbody class="divide-y divide-gray-200 dark:divide-slate-700">
-            {% for trans in transactions.items %}
-            <tr class="hover:bg-gray-50 dark:hover:bg-slate-700 transition duration-150">
-                <td class="py-3 px-4 text-sm text-gray-700 dark:text-slate-300 whitespace-nowrap">{{ trans.date.strftime('%d/%m/%Y') }}</td>
-                <td class="py-3 px-4 text-sm text-gray-800 dark:text-slate-100 font-medium">{{ trans.description }}</td>
-                <td class="py-3 px-4">
-                    <span class="px-2 py-1 bg-gray-100 text-gray-700 dark:bg-slate-600 dark:text-slate-200 text-xs font-semibold rounded-md border border-gray-200 dark:border-slate-500">
-                        <!-- TƯ DUY: Mapping đầy đủ các danh mục thay vì chỉ hiện 3 cái như bản cũ -->
-                        {% set cat_names = {
-                            'food': 'Ăn uống', 'transport': 'Di chuyển', 'education': 'Học tập',
-                            'entertainment': 'Giải trí', 'shopping': 'Mua sắm', 'bills': 'Hóa đơn',
-                            'salary': 'Lương', 'other': 'Khác'
-                        } %}
-                        {{ cat_names.get(trans.category, trans.category) }}
-                    </span>
+            {% for task in tasks %}
+            
+            <!-- 
+                TƯ DUY GIẢI THUẬT (Tính toán Ma trận Eisenhower):
+                1. Tính số ngày còn lại (days_left).
+                2. Xác định Khẩn cấp (Urgent): days_left <= 3.
+                3. Xác định Quan trọng (Important): task.milestone == True.
+            -->
+            {% set days_left = (task.deadline.date() - today).days %}
+            {% set is_urgent = days_left <= 3 %}
+            {% set is_important = task.milestone %}
+
+            <!-- 
+                Gắn màu viền trái (border-l-4) cho hàng (tr) để phân loại trực quan:
+                - Làm ngay (Quan trọng + Khẩn cấp): Đỏ
+                - Lên lịch (Quan trọng + Không khẩn cấp): Xanh dương
+                - Nhanh gọn (Không quan trọng + Khẩn cấp): Cam
+                - Bình thường (Không quan trọng + Không khẩn cấp): Xám
+            -->
+            <tr class="hover:bg-gray-50 dark:hover:bg-slate-700 transition duration-150 
+                {% if is_urgent and is_important %} border-l-4 border-red-500 
+                {% elif not is_urgent and is_important %} border-l-4 border-blue-500
+                {% elif is_urgent and not is_important %} border-l-4 border-orange-500
+                {% else %} border-l-4 border-gray-300 dark:border-slate-600 {% endif %}">
+                
+                <!-- Cột 1: Tên & Mô tả -->
+                <td class="py-4 px-4">
+                    <div class="flex items-center">
+                        {% if task.milestone %}
+                            <svg class="w-5 h-5 text-yellow-500 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-label="Cột mốc quan trọng"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path></svg>
+                        {% endif %}
+                        <div>
+                            <div class="font-semibold text-gray-800 dark:text-slate-100">{{ task.title }}</div>
+                            <div class="text-sm text-gray-500 dark:text-slate-400 truncate max-w-xs" title="{{ task.description }}">{{ task.description or 'Không có mô tả' }}</div>
+                        </div>
+                    </div>
                 </td>
-                <td class="py-3 px-4 text-center">
-                    {% if trans.type == 'income' %}
-                        <span class="px-2 py-1 bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300 text-xs font-bold rounded-full">THU NHẬP</span>
+
+                <!-- Cột 2: Phân loại Ma trận -->
+                <td class="py-4 px-4 text-center whitespace-nowrap">
+                    {% if is_urgent and is_important %}
+                        <span class="px-2.5 py-1 bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300 text-xs font-bold rounded-full">Làm ngay</span>
+                    {% elif not is_urgent and is_important %}
+                        <span class="px-2.5 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 text-xs font-bold rounded-full">Lên lịch</span>
+                    {% elif is_urgent and not is_important %}
+                        <span class="px-2.5 py-1 bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300 text-xs font-bold rounded-full">Nhanh gọn</span>
                     {% else %}
-                        <span class="px-2 py-1 bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300 text-xs font-bold rounded-full">CHI TIÊU</span>
+                        <span class="px-2.5 py-1 bg-gray-100 text-gray-800 dark:bg-slate-600 dark:text-slate-300 text-xs font-bold rounded-full">Bình thường</span>
                     {% endif %}
                 </td>
-                <td class="py-3 px-4 text-right whitespace-nowrap font-bold {% if trans.type == 'income' %}text-green-600 dark:text-green-400{% else %}text-red-600 dark:text-red-400{% endif %}">
-                    {% if trans.type == 'income' %}+{% else %}-{% endif %}{{ "{:,.0f}".format(trans.amount) }}
+
+                <!-- Cột 3: Hạn chót -->
+                <td class="py-4 px-4 text-sm text-gray-700 dark:text-slate-300 whitespace-nowrap">
+                    {{ task.deadline.strftime('%d/%m/%Y') }}
+                    {% if is_urgent and days_left >= 0 %}
+                        <span class="block text-xs text-red-500 font-medium mt-1">Còn {{ days_left }} ngày</span>
+                    {% elif days_left < 0 %}
+                        <span class="block text-xs text-gray-400 font-medium mt-1">Đã quá hạn</span>
+                    {% endif %}
                 </td>
-                <td class="py-3 px-4 text-center space-x-3 whitespace-nowrap">
-                    <a href="{{ url_for('transactions.edit_transaction', id=trans.id) }}" class="text-blue-600 dark:text-blue-400 hover:text-blue-800 font-medium text-sm">Sửa</a>
+
+                <!-- Cột 4: Trạng thái (Có ID để JS cập nhật) -->
+                <td class="py-4 px-4 text-center" id="task-status-{{ task.id }}">
+                    {% if task.status == 'pending' %}
+                        <span class="px-2 py-1 bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300 text-xs font-semibold rounded-full">Chờ xử lý</span>
+                    {% elif task.status == 'in_progress' %}
+                        <span class="px-2 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 text-xs font-semibold rounded-full">Đang làm</span>
+                    {% elif task.status == 'done' %}
+                        <span class="px-2 py-1 bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300 text-xs font-semibold rounded-full">Đã xong</span>
+                    {% else %}
+                        <span class="px-2 py-1 bg-gray-100 text-gray-800 dark:bg-slate-600 dark:text-slate-200 text-xs font-semibold rounded-full">{{ task.status }}</span>
+                    {% endif %}
+                </td>
+
+                <!-- Cột 5: Tiến độ -->
+                <td class="py-4 px-4">
+                    <div class="flex items-center space-x-3">
+                        <input type="range" aria-label="Cập nhật tiến độ công việc" class="task-progress-slider w-24 h-2 bg-gray-200 dark:bg-slate-600 rounded-lg appearance-none cursor-pointer" data-id="{{ task.id }}" value="{{ task.progress }}" min="0" max="100">
+                        <span id="task-progress-{{ task.id }}" class="text-sm font-semibold text-gray-700 dark:text-slate-300 w-10 text-right">{{ task.progress }}%</span>
+                    </div>
+                </td>
+
+                <!-- Cột 6: Hành động -->
+                <td class="py-4 px-4 text-center space-x-3 whitespace-nowrap">
+                    <a href="{{ url_for('tasks.edit_task', id=task.id) }}" class="text-blue-600 dark:text-blue-400 hover:text-blue-800 font-medium text-sm">Sửa</a>
                     
-                    <!-- 
-                        ✅ FIX (2.1): CHUYỂN TỪ GET SANG POST.
-                        Thay vì dùng thẻ <a> (phương thức GET dễ bị bot quét và kích hoạt),
-                        ta bọc nút Xóa trong một form POST có kèm CSRF Token.
-                        JS (main.js) sẽ bắt sự kiện click vào class .delete-confirm để mở Modal.
-                    -->
-                    <form action="{{ url_for('transactions.delete_transaction', id=trans.id) }}" method="POST" class="inline delete-form">
+                    <form action="{{ url_for('tasks.delete_task', id=task.id) }}" method="POST" class="inline delete-form">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <button type="button" class="delete-confirm text-red-600 dark:text-red-400 hover:text-red-800 font-medium text-sm">
                             Xóa
@@ -83,32 +119,13 @@
             <tr>
                 <td colspan="6" class="py-12 text-center text-gray-500 dark:text-slate-400">
                     <div class="flex flex-col items-center justify-center">
-                        <p class="text-lg">Chưa có giao dịch nào.</p>
-                        <a href="{{ url_for('transactions.add_transaction') }}" class="text-blue-600 mt-2 hover:underline">Thêm giao dịch đầu tiên</a>
+                        <p class="text-lg">Chưa có công việc nào.</p>
+                        <a href="{{ url_for('tasks.add_task') }}" class="text-blue-600 mt-2 hover:underline">Tạo công việc đầu tiên</a>
                     </div>
                 </td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
-</div>
-
-<div class="flex justify-between items-center text-sm text-gray-600 dark:text-slate-400">
-    <div>
-        Trang <span class="font-bold">{{ transactions.page }}</span> / <span class="font-bold">{{ transactions.pages }}</span>
-    </div>
-    <div class="flex space-x-2">
-        {% if transactions.has_prev %}
-            <a href="{{ url_for('transactions.list_transactions', page=transactions.prev_num) }}" class="px-4 py-2 bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-600 rounded-md font-medium hover:bg-gray-50 dark:hover:bg-slate-700 transition duration-150">&larr; Trước</a>
-        {% else %}
-            <span class="px-4 py-2 bg-gray-100 dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 rounded-md font-medium text-gray-400 dark:text-slate-600 cursor-not-allowed">&larr; Trước</span>
-        {% endif %}
-        
-        {% if transactions.has_next %}
-            <a href="{{ url_for('transactions.list_transactions', page=transactions.next_num) }}" class="px-4 py-2 bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-600 rounded-md font-medium hover:bg-gray-50 dark:hover:bg-slate-700 transition duration-150">Sau &rarr;</a>
-        {% else %}
-            <span class="px-4 py-2 bg-gray-100 dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 rounded-md font-medium text-gray-400 dark:text-slate-600 cursor-not-allowed">Sau &rarr;</span>
-        {% endif %}
-    </div>
 </div>
 {% endblock %}

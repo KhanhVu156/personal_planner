@@ -81,14 +81,13 @@ class FinancialPlanner:
 
     def suggest_budgets(self, monthly_income, category_savings=None, region='vn', **kwargs):
         """
-        TƯ DUY THUẬT TOÁN MỚI:
-        1. Tính tỷ lệ chi tiêu cơ sở (dựa trên lịch sử hoặc mặc định).
-        2. Áp dụng tỷ lệ cắt giảm (category_savings) của người dùng.
-        3. Bù trượt giá (Inflation).
-        4. Scale down nếu tổng chi tiêu vượt thu nhập.
-        5. Số tiền dư ra chính là tiết kiệm.
+        Thuật toán phân bổ ngân sách:
+        1. Tính tỷ lệ chi tiêu cơ sở (kết hợp lịch sử và mặc định).
+        2. Áp dụng tỷ lệ cắt giảm để dành tiền tiết kiệm.
+        3. Cộng thêm lạm phát vào chi phí.
+        4. Đảm bảo tổng chi tiêu không vượt quá thu nhập.
+        5. Làm tròn an toàn và tính toán tiền tiết kiệm thực tế.
         """
-        # --- 1. Validate input ---
         try:
             monthly_income = float(monthly_income)
         except (TypeError, ValueError):
@@ -96,93 +95,83 @@ class FinancialPlanner:
         if monthly_income <= 0:
             raise ValueError('Thu nhập phải lớn hơn 0.')
 
-        # --- 2. Tỷ lệ cơ sở ---
+        # Buoc 1: Ty le co so co Lam min (Smoothing) de khang Outlier
         total_hist = sum(self.historical_expenses.values())
+        base_ratios = {}
+        
         if total_hist <= 0:
             base_ratios = {cat: self.default_weights.get(cat, 0.05) for cat in self.categories}
         else:
-            base_ratios = {}
             for cat in self.categories:
-                h = self.historical_expenses.get(cat, 0.0)
-                if h > 0:
-                    base_ratios[cat] = h / total_hist
-                else:
-                    base_ratios[cat] = self.default_weights.get(cat, 0.05) * 0.5
+                hist_weight = self.historical_expenses.get(cat, 0) / total_hist
+                default_weight = self.default_weights.get(cat, 0.05)
+                # Tron 70% lich su va 30% mac dinh de triet tieu cac giao dich khung
+                base_ratios[cat] = (hist_weight * 0.7) + (default_weight * 0.3)
 
-        # --- 3. Áp dụng tỷ lệ tiết kiệm từng danh mục ---
+        # Buoc 2: Ap dung ty le tiet kiem tung danh muc (KHONG CHUAN HOA LAI TONG)
         if category_savings:
             for cat in self.categories:
                 try:
                     rate = float(category_savings.get(cat, 0)) / 100.0
                 except (TypeError, ValueError):
                     rate = 0.0
-                # Giới hạn tỷ lệ từ 0% đến 95% (để tránh ngân sách bằng 0)
                 rate = max(0.0, min(rate, 0.95))
                 base_ratios[cat] = base_ratios[cat] * (1 - rate)
 
-        # --- 4. Áp dụng lạm phát (Bù trượt giá) ---
+        # Buoc 3 & 4: Tinh so tien va Ap dung lam phat
         personal_inflation = self.get_personal_inflation_rate(region)
         rates = self.INFLATION_RATES.get(region, self.INFLATION_RATES['vn'])
         
+        exact_budgets = {}
         for cat in self.categories:
-            cat_inf = 1.0 + rates.get(cat, personal_inflation)
-            base_ratios[cat] = base_ratios[cat] * cat_inf
+            # Tien goc = Thu nhap * Ty le (sau khi tru tiet kiem)
+            base_amount = monthly_income * base_ratios[cat]
+            # Tien lam phat = Tien goc * Ty le lam phat cua danh muc do
+            inflation_amount = base_amount * rates.get(cat, personal_inflation)
+            exact_budgets[cat] = base_amount + inflation_amount
 
-        # --- 5. Chuẩn hóa & Giới hạn (Cap) ---
-        total_base = sum(base_ratios.values())
+        # Buoc 5: Can bang neu tong chi vuot thu nhap
+        total_spent = sum(exact_budgets.values())
         
-        if total_base > 1.0:
-            # Nếu lạm phát đẩy tổng chi tiêu vượt 100% thu nhập, scale down lại
-            for cat in self.categories:
-                base_ratios[cat] = base_ratios[cat] / total_base
-            total_base = 1.0
-        elif total_base == 0:
-            # Fallback nếu user nhập toàn số 0 gây lỗi chia
-            base_ratios = {cat: self.default_weights.get(cat, 0.05) for cat in self.categories}
-            total_base = sum(base_ratios.values())
+        if total_spent > monthly_income:
+            # Phai cat giam, uu tien cat tu cac muc dang chiem nhieu tien nhat
+            diff = monthly_income - total_spent
+            sorted_cats = sorted(self.categories, key=lambda k: exact_budgets[k], reverse=True)
+            for cat in sorted_cats:
+                if diff >= 0:
+                    break
+                if exact_budgets[cat] > 0:
+                    cut = min(exact_budgets[cat], -diff)
+                    exact_budgets[cat] -= cut
+                    diff += cut
 
-        # --- 6. Tính toán phân bổ số tiền (ĐÃ SỬA LỖI LÀM TRÒN) ---
-        # TƯ DUY SỬA LỖI: 
-        # - Code cũ làm tròn về 0 nếu số tiền < 5.000, khiến mục "Khác" biến mất.
-        # - Code cũ dồn toàn bộ sai số (diff) vào "Khác", nếu âm sẽ ép "Khác" = 0.
-        # - Giải pháp: Làm tròn an toàn (tối thiểu 10k nếu >0), và nếu tổng vượt thu nhập
-        #   thì cắt giảm tỷ lệ thuận từ các danh mục lớn nhất.
-
-        # 6.1 Tính số tiền chính xác
-        exact_budgets = {cat: monthly_income * base_ratios[cat] for cat in self.categories}
-
-        # 6.2 Làm tròn an toàn đến 10.000 VNĐ
+        # Buoc 6: Lam tron an toan den 10.000 VND
         rounded_budgets = {}
         for cat in self.categories:
             raw = exact_budgets[cat]
             if 0 < raw < 10000:
-                rounded_budgets[cat] = 10000 # Đảm bảo không bị mất danh mục
+                rounded_budgets[cat] = 10000
             else:
                 rounded_budgets[cat] = round(raw / 10000) * 10000
 
-        # 6.3 Cân bằng sai số do làm tròn
-        total_spent = sum(rounded_budgets.values())
-        diff = monthly_income - total_spent
-
-        if diff < 0:
-            # Nếu tổng chi vượt thu nhập (do làm tròn lên), ta phải cắt giảm.
-            # Ưu tiên cắt giảm từ các danh mục đang chiếm nhiều tiền nhất.
+        # Can bang lai sai so lam tron lan cuoi
+        final_total_spent = sum(rounded_budgets.values())
+        if final_total_spent > monthly_income:
+            # Neu van vuot, cat bot tu cac muc lon
+            diff = monthly_income - final_total_spent
             sorted_cats = sorted(self.categories, key=lambda k: rounded_budgets[k], reverse=True)
-            
             for cat in sorted_cats:
                 if diff >= 0:
                     break
                 if rounded_budgets[cat] > 0:
-                    # Cắt tối đa bằng số tiền hiện có của danh mục đó
                     cut = min(rounded_budgets[cat], -diff)
                     rounded_budgets[cat] -= cut
                     diff += cut
 
-        # 6.4 Đảm bảo không có danh mục nào bị âm
+        # Dam bao khong co danh muc nao bi am
         for cat in self.categories:
             rounded_budgets[cat] = max(0, rounded_budgets[cat])
 
-        # 6.5 Tính toán tiết kiệm
         final_total_spent = sum(rounded_budgets.values())
         target_savings = max(0.0, monthly_income - final_total_spent)
 

@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="max-w-3xl mx-auto bg-white dark:bg-slate-800 p-6 rounded shadow mt-4 transition-colors duration-300">
+<div class="max-w-2xl mx-auto bg-white dark:bg-slate-800 p-6 rounded shadow mt-4 transition-colors duration-300">
     <h2 class="text-2xl font-bold mb-6 text-gray-800 dark:text-slate-100">
-        {% if 'Add' in title %}Thêm Giao dịch{% else %}Sửa Giao dịch{% endif %}
+        {% if 'Add' in title %}Thêm Công việc{% else %}Sửa Công việc{% endif %}
     </h2>
 
     <!-- KHUNG HIỂN THỊ LỖI TỔNG QUÁT -->
@@ -12,207 +12,128 @@
         <ul class="list-disc pl-5 mt-2">
             {% for field_name, errors in form.errors.items() %}
                 {% for error in errors %}
-                    <!-- ✅ Dịch lỗi mặc định của WTForms sang tiếng Việt -->
-                    {% set translated_error = error %}
-                    {% if error == 'This field is required.' %}
-                        {% set translated_error = 'Vui lòng nhập/chọn thông tin này.' %}
-                    {% elif 'Not a valid date' in error %}
-                        {% set translated_error = 'Ngày không hợp lệ.' %}
-                    {% elif 'Number must be between' in error %}
-                        {% set translated_error = 'Giá trị nằm ngoài phạm vi cho phép.' %}
-                    {% elif 'Not a valid integer value' in error %}
-                        {% set translated_error = 'Vui lòng nhập số nguyên hợp lệ.' %}
-                    {% endif %}
-                    <li><b>{{ form[field_name].label.text }}:</b> {{ translated_error }}</li>
+                    <li><b>{{ form[field_name].label.text }}:</b> {{ error }}</li>
                 {% endfor %}
             {% endfor %}
         </ul>
     </div>
     {% endif %}
 
-    <form method="POST" action="" novalidate id="transaction-form">
+    <form method="POST" action="" novalidate>
         {{ form.hidden_tag() }}
         
-        <!-- Hàng 1: Ngày & Loại -->
+        <!-- Hàng 1: Tiêu đề -->
+        <div class="mb-4">
+            {{ form.title.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
+            {{ form.title(class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white placeholder:text-gray-400 dark:placeholder:text-slate-500 transition-colors", placeholder="Nhập tên công việc...") }}
+            {% for error in form.title.errors %}
+                <span class="text-red-500 text-sm mt-1 block">{{ error }}</span>
+            {% endfor %}
+        </div>
+
+        <!-- Hàng 2: Mô tả -->
+        <div class="mb-4">
+            {{ form.description.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
+            {{ form.description(class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white placeholder:text-gray-400 dark:placeholder:text-slate-500 transition-colors", rows="3", placeholder="Mô tả chi tiết (không bắt buộc)...") }}
+        </div>
+
+        <!-- Hàng 3: Hạn chót & Trạng thái -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
-                {{ form.date.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
-                {{ form.date(class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white cursor-pointer transition-colors h-[42px]", type="date") }}
-                {% for error in form.date.errors %}
-                    <span class="text-red-500 text-sm mt-1 block">
-                        {% if error == 'This field is required.' %}Vui lòng chọn ngày.{% else %}{{ error }}{% endif %}
-                    </span>
+                {{ form.deadline.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
+                {{ form.deadline(class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white transition-colors", type="date") }}
+                {% for error in form.deadline.errors %}
+                    <span class="text-red-500 text-sm mt-1 block">{{ error }}</span>
                 {% endfor %}
             </div>
             
-            <!-- CUSTOM DROPDOWN: LOẠI -->
-            <div class="relative" id="type-selector-wrapper">
-                {{ form.type.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
+            <!-- ✅ CUSTOM DROPDOWN: TRẠNG THÁI -->
+            <div class="relative" id="status-selector-wrapper">
+                {{ form.status.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
                 
-                {{ form.type(class="hidden", id="real-trans-type") }}
+                <!-- Thẻ select gốc bị ẩn đi để form vẫn submit đúng -->
+                {{ form.status(class="hidden", id="real-status-select") }}
 
-                <button type="button" id="type-btn" class="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded text-left flex justify-between items-center focus:ring-2 focus:ring-blue-500 outline-none transition-colors text-gray-900 dark:text-white font-medium h-[42px]">
-                    <span id="type-label">
-                        {% set selected_type = form.type.data or 'expense' %}
-                        {% for value, label in form.type.choices %}
-                            {% if value == selected_type %}{{ label }}{% endif %}
+                <button type="button" id="status-btn" class="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded text-left flex justify-between items-center focus:ring-2 focus:ring-blue-500 outline-none transition-colors text-gray-900 dark:text-white font-medium">
+                    <span id="status-label">
+                        {% set selected_status = form.status.data or 'pending' %}
+                        {% for value, label in form.status.choices %}
+                            {% if value == selected_status %}{{ label }}{% endif %}
                         {% endfor %}
                     </span>
-                    <svg class="w-4 h-4 text-gray-500 dark:text-slate-400 transition-transform duration-200" id="type-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    <svg class="w-4 h-4 text-gray-500 dark:text-slate-400 transition-transform duration-200" id="status-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                 </button>
                 
-                <div id="type-menu" class="absolute top-full left-0 mt-1 w-full bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg shadow-2xl hidden opacity-0 transform -translate-y-2 transition-all duration-200 overflow-hidden z-50">
-                    <ul class="max-h-60 overflow-y-auto py-1" id="type-list">
-                        {% for value, label in form.type.choices %}
+                <div id="status-menu" class="absolute top-full left-0 mt-1 w-full bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg shadow-2xl hidden opacity-0 transform -translate-y-2 transition-all duration-200 overflow-hidden z-50">
+                    <ul class="max-h-60 overflow-y-auto py-1" id="status-list">
+                        {% for value, label in form.status.choices %}
                             <li>
-                                <button type="button" class="type-item w-full text-left px-4 py-2.5 text-sm transition-colors duration-150
-                                    {% if value == selected_type %} bg-blue-600 text-white font-medium {% else %} text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-600 {% endif %}" 
+                                <button type="button" class="status-item w-full text-left px-4 py-2.5 text-sm transition-colors duration-150
+                                    {% if value == selected_status %} bg-blue-600 text-white font-medium {% else %} text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-600 {% endif %}" 
                                     data-value="{{ value }}">{{ label }}</button>
                             </li>
                         {% endfor %}
                     </ul>
                 </div>
-                {% for error in form.type.errors %}
+                {% for error in form.status.errors %}
                     <span class="text-red-500 text-sm mt-1 block">{{ error }}</span>
                 {% endfor %}
             </div>
         </div>
 
-        <!-- Hàng 2: Số tiền & Thanh toán bằng (Ví) -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            
-            <!-- Ô nhập số tiền -->
-            <div>
-                {{ form.amount.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
-                <div class="flex items-center w-full border border-gray-300 dark:border-slate-600 rounded focus-within:ring-2 focus-within:ring-blue-500 bg-white dark:bg-slate-700 transition-colors overflow-hidden h-[42px]">
-                    <span class="pl-3 pr-2 text-gray-700 dark:text-slate-300 font-bold select-none transition-colors">VND</span>
-                    {{ form.amount(class="flex-1 w-full py-2 pr-3 bg-white dark:bg-slate-700 border-0 focus:ring-0 focus:outline-none text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-slate-400 font-semibold text-lg transition-colors", placeholder="Nhập số tiền...", id="trans-amount") }}
-                </div>
-                {% for error in form.amount.errors %}
-                    <span class="text-red-500 text-sm mt-1 block">
-                        {% if error == 'This field is required.' %}Vui lòng nhập số tiền.{% else %}{{ error }}{% endif %}
-                    </span>
-                {% endfor %}
-            </div>
-
-            <!-- CUSTOM DROPDOWN: THANH TOÁN BẰNG (VÍ) - KHÔNG BẮT BUỘC -->
-            <div class="relative" id="wallet-selector-wrapper">
-                <label class="block text-gray-700 dark:text-slate-300 font-semibold mb-1">
-                    Thanh toán bằng <span class="text-xs font-normal text-gray-400">(Không bắt buộc)</span>
-                </label>
-                
-                {{ form.wallet_id(class="hidden", id="real-trans-wallet") }}
-
-                <button type="button" id="wallet-btn" class="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded text-left flex justify-between items-center focus:ring-2 focus:ring-blue-500 outline-none transition-colors text-gray-900 dark:text-white font-medium h-[42px]">
-                    <span id="wallet-label">
-                        {% set selected_wallet = form.wallet_id.data %}
-                        {% set has_wallet = false %}
-                        
-                        {% for value, label in form.wallet_id.choices %}
-                            {% if value == selected_wallet and value != 0 %}
-                                {{ label }}
-                                {% set has_wallet = true %}
-                            {% endif %}
-                        {% endfor %}
-                        
-                        {% if not has_wallet %}
-                            <span class="text-gray-500 italic">-- Không chọn ví --</span>
-                        {% endif %}
-                    </span>
-                    <svg class="w-4 h-4 text-gray-500 dark:text-slate-400 transition-transform duration-200" id="wallet-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                </button>
-                
-                <div id="wallet-menu" class="absolute top-full left-0 mt-1 w-full bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg shadow-2xl hidden opacity-0 transform -translate-y-2 transition-all duration-200 overflow-hidden z-50">
-                    <ul class="max-h-60 overflow-y-auto py-1" id="wallet-list">
-                        <li>
-                            <button type="button" class="wallet-item w-full text-left px-4 py-2.5 text-sm transition-colors duration-150
-                                {% if selected_wallet == 0 or selected_wallet == None %} bg-blue-600 text-white font-medium {% else %} text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-600 {% endif %}" 
-                                data-value="0">-- Không chọn ví --</button>
-                        </li>
-                        {% for value, label in form.wallet_id.choices %}
-                            {% if value != 0 %}
-                            <li>
-                                <button type="button" class="wallet-item w-full text-left px-4 py-2.5 text-sm transition-colors duration-150
-                                    {% if value == selected_wallet %} bg-blue-600 text-white font-medium {% else %} text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-600 {% endif %}" 
-                                    data-value="{{ value }}">{{ label }}</button>
-                            </li>
-                            {% endif %}
-                        {% endfor %}
-                    </ul>
-                </div>
-                {% for error in form.wallet_id.errors %}
-                    <span class="text-red-500 text-sm mt-1 block">{{ error }}</span>
-                {% endfor %}
-            </div>
-        </div>
-
-        <!-- Hàng 3: Danh mục & Mô tả -->
+        <!-- Hàng 4: Tiến độ & Cột mốc -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div>
+                {{ form.progress.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
+                <div class="flex items-center space-x-2">
+                    {{ form.progress(class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white transition-colors", type="number", min="0", max="100") }}
+                    <span class="text-gray-500 dark:text-slate-400 font-bold">%</span>
+                </div>
+                {% for error in form.progress.errors %}
+                    <span class="text-red-500 text-sm mt-1 block">{{ error }}</span>
+                {% endfor %}
+            </div>
             
-            <!-- CUSTOM DROPDOWN: DANH MỤC -->
-            <div class="relative" id="category-selector-wrapper">
-                {{ form.category.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
+            <!-- ✅ CUSTOM DROPDOWN: CỘT MỐC QUAN TRỌNG -->
+            <div class="relative" id="milestone-selector-wrapper">
+                <!-- Tư duy Ma trận Eisenhower: Đổi nhãn để người dùng hiểu đây là trục "Quan trọng" -->
+                <label class="block text-gray-700 dark:text-slate-300 font-semibold mb-1">Mức độ Quan trọng (Ma trận)</label>
+                <p class="text-xs text-gray-500 dark:text-slate-400 mb-2">Đánh dấu "Có" nếu công việc này đóng góp trực tiếp vào mục tiêu lớn.</p>
                 
-                {{ form.category(class="hidden", id="real-trans-category") }}
+                <!-- Thẻ select gốc bị ẩn đi -->
+                {{ form.milestone(class="hidden", id="real-milestone-select") }}
 
-                <button type="button" id="category-btn" class="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded text-left flex justify-between items-center focus:ring-2 focus:ring-blue-500 outline-none transition-colors text-gray-900 dark:text-white font-medium h-[42px]">
-                    <span id="category-label">
-                        {% set selected_cat = form.category.data or 'food' %}
-                        {% for value, label in form.category.choices %}
-                            {% if value == selected_cat %}{{ label }}{% endif %}
+                <button type="button" id="milestone-btn" class="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded text-left flex justify-between items-center focus:ring-2 focus:ring-blue-500 outline-none transition-colors text-gray-900 dark:text-white font-medium">
+                    <span id="milestone-label">
+                        {% set selected_milestone = form.milestone.data if form.milestone.data is not none else 0 %}
+                        {% for value, label in form.milestone.choices %}
+                            {% if value == selected_milestone %}{{ label }}{% endif %}
                         {% endfor %}
                     </span>
-                    <svg class="w-4 h-4 text-gray-500 dark:text-slate-400 transition-transform duration-200" id="category-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    <svg class="w-4 h-4 text-gray-500 dark:text-slate-400 transition-transform duration-200" id="milestone-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                 </button>
                 
-                <div id="category-menu" class="absolute top-full left-0 mt-1 w-full bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg shadow-2xl hidden opacity-0 transform -translate-y-2 transition-all duration-200 overflow-hidden z-50">
-                    <ul class="max-h-60 overflow-y-auto py-1" id="category-list">
-                        {% for value, label in form.category.choices %}
+                <div id="milestone-menu" class="absolute top-full left-0 mt-1 w-full bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg shadow-2xl hidden opacity-0 transform -translate-y-2 transition-all duration-200 overflow-hidden z-50">
+                    <ul class="max-h-60 overflow-y-auto py-1" id="milestone-list">
+                        {% for value, label in form.milestone.choices %}
                             <li>
-                                <button type="button" class="category-item w-full text-left px-4 py-2.5 text-sm transition-colors duration-150
-                                    {% if value == selected_cat %} bg-blue-600 text-white font-medium {% else %} text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-600 {% endif %}" 
+                                <button type="button" class="milestone-item w-full text-left px-4 py-2.5 text-sm transition-colors duration-150
+                                    {% if value == selected_milestone %} bg-blue-600 text-white font-medium {% else %} text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-600 {% endif %}" 
                                     data-value="{{ value }}">{{ label }}</button>
                             </li>
                         {% endfor %}
                     </ul>
                 </div>
-                {% for error in form.category.errors %}
+                {% for error in form.milestone.errors %}
                     <span class="text-red-500 text-sm mt-1 block">{{ error }}</span>
-                {% endfor %}
-            </div>
-
-            <!-- Mô tả -->
-            <div>
-                {{ form.description.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
-                {{ form.description(class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white transition-colors h-[42px]", placeholder="Nhập mô tả giao dịch...", id="trans-desc") }}
-                
-                <!-- ✅ Dịch lỗi cho trường Mô tả -->
-                {% for error in form.description.errors %}
-                    <span class="text-red-500 text-sm mt-1 block">
-                        {% if error == 'This field is required.' %}
-                            Vui lòng nhập mô tả giao dịch.
-                        {% elif 'Length must be' in error %}
-                            Mô tả quá dài, vui lòng nhập dưới 200 ký tự.
-                        {% else %}
-                            {{ error }}
-                        {% endif %}
-                    </span>
                 {% endfor %}
             </div>
         </div>
 
-        <!-- Footer chứa Hint và Nút bấm -->
-        <div class="flex items-center justify-between border-t border-gray-200 dark:border-slate-700 pt-4">
-            
-            <div class="text-xs text-gray-400 dark:text-slate-500 hidden md:block">
-                <span class="bg-gray-100 dark:bg-slate-700 px-1.5 py-0.5 rounded border border-gray-300 dark:border-slate-600 font-mono text-[10px]">Enter</span> để Lưu nhanh. 
-                <span class="bg-gray-100 dark:bg-slate-700 px-1.5 py-0.5 rounded border border-gray-300 dark:border-slate-600 font-mono text-[10px]">Ctrl+Enter</span> để Lưu từ Mô tả.
-            </div>
-            
-            <div class="flex items-center space-x-4 w-full md:w-auto justify-end">
-                <a href="{{ url_for('transactions.list_transactions') }}" class="bg-gray-200 text-gray-800 dark:bg-slate-600 dark:text-slate-100 py-2 px-6 rounded hover:bg-gray-300 dark:hover:bg-slate-500 transition duration-200 font-semibold">Hủy</a>
-                {{ form.submit(class="bg-blue-600 text-white py-2 px-8 rounded hover:bg-blue-700 transition duration-200 cursor-pointer font-semibold shadow", value="Lưu", id="submit-btn") }}
-            </div>
+        <!-- Nút bấm -->
+        <div class="flex items-center justify-end space-x-4 border-t border-gray-200 dark:border-slate-700 pt-4">
+            <a href="{{ url_for('tasks.list_tasks') }}" class="bg-gray-200 text-gray-800 dark:bg-slate-600 dark:text-slate-100 py-2 px-6 rounded hover:bg-gray-300 dark:hover:bg-slate-500 transition duration-200 font-semibold">Hủy</a>
+            {{ form.submit(class="bg-blue-600 text-white py-2 px-6 rounded hover:bg-blue-700 transition duration-200 cursor-pointer font-semibold shadow", value="Lưu") }}
         </div>
     </form>
 </div>
@@ -222,218 +143,140 @@
         'use strict';
 
         // ==========================================
-        // 1. XỬ LÝ SỐ TIỀN (AUTO FORMAT & FIX LỖI THÊM SỐ 0)
+        // HÀM DÙNG CHUNG: XỬ LÝ ĐÓNG/MỞ DROPDOWN
         // ==========================================
-        const amountInput = document.getElementById('trans-amount');
-        if (amountInput) {
-            // 1.1. Dọn dẹp dữ liệu rác (nếu có chữ VND)
-            if (amountInput.value && amountInput.value.toUpperCase().includes('VND')) {
-                amountInput.value = amountInput.value.replace(/[^\d]/g, '');
-            }
+        function setupDropdown(config) {
+            const btn = document.getElementById(config.btnId);
+            const menu = document.getElementById(config.menuId);
+            const label = document.getElementById(config.labelId);
+            const realSelect = document.getElementById(config.selectId);
+            const arrow = document.getElementById(config.arrowId);
+            const items = document.querySelectorAll(`.${config.itemClass}`);
 
-            // 1.2. Auto focus
-            amountInput.focus();
-            if (amountInput.value) {
-                amountInput.select();
-            }
+            if (!btn || !menu || !realSelect) return;
 
-            // 1.3. Format tiền tệ
-            if (amountInput.dataset.bound !== '1') {
-                amountInput.dataset.bound = '1';
-
-                const formatValue = (val) => {
-                    let raw = val.replace(/\D/g, '');
-                    return raw ? new Intl.NumberFormat('vi-VN').format(raw) : '';
-                };
-
-                // ✅ FIX LỖI SỐ 0: Xử lý dữ liệu ban đầu từ Server (nếu DB lưu số thực .0)
-                if (amountInput.value) {
-                    let num = parseFloat(amountInput.value);
-                    if (!isNaN(num)) {
-                        let cleanVal = Math.round(num).toString();
-                        amountInput.value = new Intl.NumberFormat('vi-VN').format(cleanVal);
-                    }
-                }
-
-                amountInput.addEventListener('input', function() {
-                    this.value = formatValue(this.value);
-                });
-
-                // 1.4. Xóa dấu chấm trước khi submit để Backend nhận số nguyên
-                const form = document.getElementById('transaction-form');
-                if (form) {
-                    form.addEventListener('submit', function() {
-                        amountInput.value = amountInput.value.replace(/\./g, '');
-                    });
-                }
-            }
-        }
-
-        // ==========================================
-        // 2. HÀM DÙNG CHUNG ĐỂ KHỞI TẠO CUSTOM DROPDOWN
-        // ==========================================
-        function setupCustomDropdown(wrapperId, btnId, menuId, labelId, realSelectId, arrowId, itemClass) {
-            const wrapper = document.getElementById(wrapperId);
-            const btn = document.getElementById(btnId);
-            const menu = document.getElementById(menuId);
-            const label = document.getElementById(labelId);
-            const realSelect = document.getElementById(realSelectId);
-            const arrow = document.getElementById(arrowId);
-            const items = document.querySelectorAll(itemClass);
-
-            if (!btn || !menu || !realSelect) return null;
-
+            // 1. Sự kiện click vào nút để mở/đóng
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                
-                // Đóng các menu khác đang mở
+                const isOpen = menu.classList.contains('opacity-100');
+
+                // Đóng các menu khác trước khi mở menu hiện tại
                 document.querySelectorAll('.custom-dropdown-menu').forEach(m => {
-                    if (m.id !== menuId) {
-                        m.classList.add('hidden', 'opacity-0', '-translate-y-2');
+                    if (m !== menu) {
                         m.classList.remove('opacity-100', 'translate-y-0');
+                        m.classList.add('opacity-0', '-translate-y-2');
+                        setTimeout(() => m.classList.add('hidden'), 200);
                     }
                 });
+                // Reset tất cả các mũi tên khác
                 document.querySelectorAll('.custom-dropdown-arrow').forEach(a => {
-                    if (a.id !== arrowId) a.classList.remove('rotate-180');
+                    if (a !== arrow) a.classList.remove('rotate-180');
                 });
 
-                const isOpen = menu.classList.contains('opacity-100');
-                
                 if (isOpen) {
-                    closeMenu();
+                    closeDropdown(menu, arrow);
                 } else {
-                    menu.classList.remove('hidden');
-                    void menu.offsetWidth; 
-                    menu.classList.remove('opacity-0', '-translate-y-2');
-                    menu.classList.add('opacity-100', 'translate-y-0');
-                    if(arrow) arrow.classList.add('rotate-180');
+                    openDropdown(menu, arrow);
                 }
             });
 
+            // 2. Sự kiện chọn item
             items.forEach(item => {
                 item.addEventListener('click', (e) => {
                     e.stopPropagation();
                     const val = item.getAttribute('data-value');
                     
+                    // Cập nhật giá trị thẻ select gốc
                     realSelect.value = val;
-                    // Cập nhật label hiển thị
-                    if (val === '0') {
-                        label.innerHTML = `<span class="text-gray-500 italic">-- Không chọn ví --</span>`;
-                    } else {
-                        label.innerText = item.innerText;
-                    }
-                    
-                    updateActiveState(val);
-                    closeMenu();
+                    // Cập nhật text hiển thị
+                    label.innerText = item.innerText;
 
-                    // Trigger sự kiện change để kích hoạt logic tự đổi danh mục (nếu có)
-                    realSelect.dispatchEvent(new Event('change'));
-                });
-            });
-
-            function closeMenu() {
-                menu.classList.remove('opacity-100', 'translate-y-0');
-                menu.classList.add('opacity-0', '-translate-y-2');
-                if (arrow) arrow.classList.remove('rotate-180');
-                setTimeout(() => {
-                    menu.classList.add('hidden');
-                }, 200);
-            }
-
-            function updateActiveState(val) {
-                items.forEach(i => {
-                    if (i.getAttribute('data-value') === val) {
-                        i.classList.remove('text-gray-700', 'dark:text-slate-300', 'hover:bg-gray-100', 'dark:hover:bg-slate-600');
-                        i.classList.add('bg-blue-600', 'text-white', 'font-medium');
-                    } else {
+                    // Reset class active
+                    items.forEach(i => {
                         i.classList.remove('bg-blue-600', 'text-white', 'font-medium');
                         i.classList.add('text-gray-700', 'dark:text-slate-300', 'hover:bg-gray-100', 'dark:hover:bg-slate-600');
-                    }
-                });
-            }
+                    });
+                    // Set class active cho item vừa chọn
+                    item.classList.remove('text-gray-700', 'dark:text-slate-300', 'hover:bg-gray-100', 'dark:hover:bg-slate-600');
+                    item.classList.add('bg-blue-600', 'text-white', 'font-medium');
 
-            return { updateActiveState, label, realSelect };
+                    closeDropdown(menu, arrow);
+                });
+            });
         }
 
-        // Khởi tạo 3 dropdown
-        const typeDropdown = setupCustomDropdown('type-selector-wrapper', 'type-btn', 'type-menu', 'type-label', 'real-trans-type', 'type-arrow', '.type-item');
-        const categoryDropdown = setupCustomDropdown('category-selector-wrapper', 'category-btn', 'category-menu', 'category-label', 'real-trans-category', 'category-arrow', '.category-item');
-        const walletDropdown = setupCustomDropdown('wallet-selector-wrapper', 'wallet-btn', 'wallet-menu', 'wallet-label', 'real-trans-wallet', 'wallet-arrow', '.wallet-item');
+        function openDropdown(menu, arrow) {
+            menu.classList.remove('hidden');
+            void menu.offsetWidth; // Trigger reflow
+            menu.classList.remove('opacity-0', '-translate-y-2');
+            menu.classList.add('opacity-100', 'translate-y-0');
+            if (arrow) arrow.classList.add('rotate-180');
+        }
 
-        // Thêm class để dễ dàng đóng tất cả menu khi click ra ngoài
-        document.getElementById('type-menu')?.classList.add('custom-dropdown-menu');
-        document.getElementById('category-menu')?.classList.add('custom-dropdown-menu');
-        document.getElementById('wallet-menu')?.classList.add('custom-dropdown-menu');
+        function closeDropdown(menu, arrow) {
+            menu.classList.remove('opacity-100', 'translate-y-0');
+            menu.classList.add('opacity-0', '-translate-y-2');
+            if (arrow) arrow.classList.remove('rotate-180');
+            setTimeout(() => {
+                menu.classList.add('hidden');
+            }, 200);
+        }
 
-        document.getElementById('type-arrow')?.classList.add('custom-dropdown-arrow');
-        document.getElementById('category-arrow')?.classList.add('custom-dropdown-arrow');
-        document.getElementById('wallet-arrow')?.classList.add('custom-dropdown-arrow');
+        // ==========================================
+        // KHỞI TẠO CÁC DROPDOWN
+        // ==========================================
+        
+        // 1. Trạng thái
+        setupDropdown({
+            btnId: 'status-btn',
+            menuId: 'status-menu',
+            labelId: 'status-label',
+            selectId: 'real-status-select',
+            arrowId: 'status-arrow',
+            itemClass: 'status-item'
+        });
+        
+        // Gắn class chung để dễ quản lý (đóng khi mở cái khác)
+        const statusMenu = document.getElementById('status-menu');
+        const statusArrow = document.getElementById('status-arrow');
+        if (statusMenu) statusMenu.classList.add('custom-dropdown-menu');
+        if (statusArrow) statusArrow.classList.add('custom-dropdown-arrow');
 
-        // Đóng tất cả menu khi click ra ngoài
-        document.addEventListener('click', (e) => {
-            const wrappers = ['type-selector-wrapper', 'category-selector-wrapper', 'wallet-selector-wrapper'];
-            wrappers.forEach(id => {
-                const el = document.getElementById(id);
-                if (el && !el.contains(e.target)) {
-                    const menu = el.querySelector('.custom-dropdown-menu');
-                    const arrow = el.querySelector('.custom-dropdown-arrow');
-                    if (menu && menu.classList.contains('opacity-100')) {
-                        menu.classList.remove('opacity-100', 'translate-y-0');
-                        menu.classList.add('opacity-0', '-translate-y-2');
-                        if (arrow) arrow.classList.remove('rotate-180');
-                        setTimeout(() => menu.classList.add('hidden'), 200);
-                    }
-                }
-            });
+        // 2. Cột mốc
+        setupDropdown({
+            btnId: 'milestone-btn',
+            menuId: 'milestone-menu',
+            labelId: 'milestone-label',
+            selectId: 'real-milestone-select',
+            arrowId: 'milestone-arrow',
+            itemClass: 'milestone-item'
         });
 
-        // ==========================================
-        // 3. LOGIC TỰ ĐỘNG ĐỔI DANH MỤC KHI ĐỔI LOẠI
-        // ==========================================
-        const realTypeSelect = document.getElementById('real-trans-type');
-        if (realTypeSelect && categoryDropdown) {
-            realTypeSelect.addEventListener('change', function() {
-                const newType = this.value;
-                let defaultCat = 'food';
-                let defaultLabel = 'Ăn uống';
-
-                if (newType === 'income') {
-                    defaultCat = 'salary';
-                    defaultLabel = 'Lương';
-                }
-
-                categoryDropdown.realSelect.value = defaultCat;
-                categoryDropdown.label.innerText = defaultLabel;
-                categoryDropdown.updateActiveState(defaultCat);
-            });
-        }
+        const milestoneMenu = document.getElementById('milestone-menu');
+        const milestoneArrow = document.getElementById('milestone-arrow');
+        if (milestoneMenu) milestoneMenu.classList.add('custom-dropdown-menu');
+        if (milestoneArrow) milestoneArrow.classList.add('custom-dropdown-arrow');
 
         // ==========================================
-        // 4. XỬ LÝ PHÍM TẮT (KEYBOARD SHORTCUTS)
+        // ĐÓNG MENU KHI CLICK RA NGOÀI
         // ==========================================
-        const form = document.getElementById('transaction-form');
-        const submitBtn = document.getElementById('submit-btn');
+        document.addEventListener('click', (e) => {
+            const statusWrapper = document.getElementById('status-selector-wrapper');
+            const milestoneWrapper = document.getElementById('milestone-selector-wrapper');
 
-        if (form && submitBtn) {
-            form.addEventListener('keydown', function(e) {
-                if (e.target.tagName === 'TEXTAREA') {
-                    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-                        e.preventDefault();
-                        submitBtn.click();
-                    }
-                    return;
-                }
+            if (statusWrapper && !statusWrapper.contains(e.target)) {
+                const menu = document.getElementById('status-menu');
+                const arrow = document.getElementById('status-arrow');
+                if (menu && menu.classList.contains('opacity-100')) closeDropdown(menu, arrow);
+            }
+            
+            if (milestoneWrapper && !milestoneWrapper.contains(e.target)) {
+                const menu = document.getElementById('milestone-menu');
+                const arrow = document.getElementById('milestone-arrow');
+                if (menu && menu.classList.contains('opacity-100')) closeDropdown(menu, arrow);
+            }
+        });
 
-                if (e.target.tagName === 'BUTTON') {
-                    return;
-                }
-
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    submitBtn.click();
-                }
-            });
-        }
     })();
 </script>
 {% endblock %}

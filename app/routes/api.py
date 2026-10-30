@@ -83,7 +83,11 @@ def get_dashboard_stats():
                 formatted_deadline = t.deadline.strftime('%d/%m/%Y')
 
             tasks_data.append({
-                'id': t.id, 'title': t.title, 'deadline': formatted_deadline, 'progress': t.progress
+                'id': t.id, 
+                'title': t.title, 
+                'deadline': formatted_deadline, 
+                'progress': t.progress,
+                'milestone': bool(t.milestone) # ✅ FIX: Bổ sung trường Quan trọng (Ma trận)
             })
 
         # 6. Phân tích (Insights)

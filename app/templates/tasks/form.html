@@ -47,7 +47,7 @@
                 {% endfor %}
             </div>
             
-            <!-- ✅ CUSTOM DROPDOWN: TRẠNG THÁI -->
+            <!-- CUSTOM DROPDOWN: TRẠNG THÁI -->
             <div class="relative" id="status-selector-wrapper">
                 {{ form.status.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
                 
@@ -94,9 +94,11 @@
                 {% endfor %}
             </div>
             
-            <!-- ✅ CUSTOM DROPDOWN: CỘT MỐC QUAN TRỌNG -->
+            <!-- CUSTOM DROPDOWN: TRỤC QUAN TRỌNG (EISENHOWER MATRIX) -->
             <div class="relative" id="milestone-selector-wrapper">
-                {{ form.milestone.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
+                <!-- Tư duy Ma trận Eisenhower: Trường milestone chính là trục "Quan trọng" -->
+                <label class="block text-gray-700 dark:text-slate-300 font-semibold mb-1">Mức độ Quan trọng (Trục Quan trọng)</label>
+                <p class="text-xs text-gray-500 dark:text-slate-400 mb-2">Đánh dấu "Quan trọng" nếu công việc đóng góp trực tiếp vào mục tiêu lớn của bạn.</p>
                 
                 <!-- Thẻ select gốc bị ẩn đi -->
                 {{ form.milestone(class="hidden", id="real-milestone-select") }}
@@ -240,7 +242,7 @@
         if (statusMenu) statusMenu.classList.add('custom-dropdown-menu');
         if (statusArrow) statusArrow.classList.add('custom-dropdown-arrow');
 
-        // 2. Cột mốc
+        // 2. Cột mốc (Trục Quan trọng)
         setupDropdown({
             btnId: 'milestone-btn',
             menuId: 'milestone-menu',

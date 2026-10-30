@@ -37,7 +37,7 @@ class User(UserMixin, db.Model):
 
 class Wallet(db.Model):
     """
-    BẢNG MỚI: Quản lý Đa Ví (Nguồn tiền).
+    Bảng quản lý Đa Ví (Nguồn tiền).
     Ví dụ: Tiền mặt, VietinBank, Momo, Thẻ tín dụng...
     """
     __tablename__ = 'wallet'
@@ -82,7 +82,7 @@ class Transaction(db.Model):
     type = db.Column(db.String(10), nullable=False, index=True)
     created_at = db.Column(db.DateTime, default=utc_now, nullable=False)
 
-    # ✅ FIX QUAN TRỌNG: Khai báo relationship để Transaction có thể truy cập thuộc tính .wallet
+    # FIX QUAN TRONG: Khai báo relationship để Transaction có thể truy cập thuộc tính .wallet
     wallet = db.relationship('Wallet', backref=db.backref('transactions', lazy='dynamic'))
 
     __table_args__ = (
@@ -121,10 +121,20 @@ class Task(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False, index=True)
     title = db.Column(db.String(100), nullable=False)
     description = db.Column(db.Text, nullable=True)
+    
+    # TƯ DUY MA TRẬN EISENHOWER (Trục Khẩn cấp): 
+    # Trường deadline kết hợp với ngày hiện tại sẽ được dùng để tính toán xem công việc có khẩn cấp hay không (VD: <= 3 ngày).
     deadline = db.Column(db.DateTime, nullable=False, index=True)
+    
     status = db.Column(db.String(20), default='pending', nullable=False, index=True)
     progress = db.Column(db.Integer, default=0, nullable=False)
+    
+    # TƯ DUY MA TRẬN EISENHOWER (Trục Quan trọng): 
+    # Trường milestone (Cột mốc) đại diện cho trục "Quan trọng" trong Ma trận. 
+    # milestone = True -> Quan trọng (Đóng góp vào mục tiêu lớn).
+    # milestone = False -> Không quan trọng.
     milestone = db.Column(db.Boolean, default=False, nullable=False)
+    
     created_at = db.Column(db.DateTime, default=utc_now, nullable=False)
 
     __table_args__ = (

@@ -3,16 +3,31 @@ from flask_login import login_required, current_user
 from app import db
 from app.forms import TaskForm
 from app.models import Task
-from datetime import datetime
+from datetime import datetime, date
 
 bp = Blueprint('tasks', __name__)
+
+def parse_boolean(val):
+    """
+    Hàm hỗ trợ chuyển đổi giá trị từ form sang Boolean an toàn.
+    Tránh lỗi bool('0') == True trong Python.
+    """
+    if isinstance(val, bool): return val
+    if isinstance(val, str): return val.lower() in ['1', 'true', 'yes', 'có']
+    return bool(val)
 
 @bp.route('/tasks')
 @login_required
 def list_tasks():
-    """Lấy danh sách công việc, sắp xếp theo hạn chót tăng dần (càng gần hạn càng lên đầu)."""
-    tasks = Task.query.filter_by(user_id=current_user.id).order_by(Task.deadline).all()
-    return render_template('tasks/list.html', tasks=tasks)
+    """
+    Tư duy giải thuật (Ma trận Eisenhower):
+    - Sắp xếp theo 2 tiêu chí:
+      1. Task.milestone.desc(): Ưu tiên các task "Quan trọng" (milestone=True) lên đầu (Trục Quan trọng).
+      2. Task.deadline.asc(): Trong cùng nhóm, ưu tiên task có hạn chót gần nhất (Trục Khẩn cấp).
+    - Truyền biến `today` ra template để Jinja2 tính toán số ngày còn lại.
+    """
+    tasks = Task.query.filter_by(user_id=current_user.id).order_by(Task.milestone.desc(), Task.deadline.asc()).all()
+    return render_template('tasks/list.html', tasks=tasks, today=date.today())
 
 @bp.route('/tasks/add', methods=['GET', 'POST'])
 @login_required
@@ -29,7 +44,8 @@ def add_task():
                 deadline=datetime.combine(form.deadline.data, datetime.min.time()),
                 status=form.status.data,
                 progress=form.progress.data,
-                milestone=bool(form.milestone.data)
+                # Sử dụng hàm parse_boolean để tránh lỗi bool('0')
+                milestone=parse_boolean(form.milestone.data)
             )
             db.session.add(task)
             db.session.commit()
@@ -62,7 +78,8 @@ def edit_task(id):
             form.populate_obj(task)
             # Form DateField trả về kiểu date, cần combine lại thành datetime cho DB
             task.deadline = datetime.combine(form.deadline.data, datetime.min.time())
-            task.milestone = bool(form.milestone.data)
+            # Sử dụng hàm parse_boolean
+            task.milestone = parse_boolean(form.milestone.data)
             db.session.commit()
             flash('Đã cập nhật công việc.', 'success')
             return redirect(url_for('tasks.list_tasks'))

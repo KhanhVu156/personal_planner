@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 
-<!-- ✅ TƯ DUY FIX UI: Thêm CSS để ẩn các nút mũi tên mặc định của input type="number" -->
+<!-- TƯ DUY FIX UI: Thêm CSS để ẩn các nút mũi tên mặc định của input type="number" -->
 <style>
     /* Ẩn spinners trên Chrome, Safari, Edge, Opera */
     input[type="number"]::-webkit-outer-spin-button,
@@ -14,7 +14,7 @@
         -moz-appearance: textfield;
     }
 
-    /* ✅ TƯ DUY FIX UX: Animation hiện ra mượt mà cho khối kết quả */
+    /* TƯ DUY FIX UX: Animation hiện ra mượt mà cho khối kết quả */
     @keyframes slideUpFade {
         from { opacity: 0; transform: translateY(20px); }
         to { opacity: 1; transform: translateY(0); }
@@ -23,7 +23,7 @@
         animation: slideUpFade 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
 
-    /* ✅ TƯ DUY FIX UI: Hiệu ứng Fade In mượt mà khi chuyển đổi trạng thái (Loading -> Data) */
+    /* TƯ DUY FIX UI: Hiệu ứng Fade In mượt mà khi chuyển đổi trạng thái (Loading -> Data) */
     @keyframes fadeIn {
         from { opacity: 0; }
         to { opacity: 1; }
@@ -34,8 +34,8 @@
 
     /* Custom spinner cho đẹp và rõ nét hơn */
     .custom-spinner {
-        border: 4px solid rgba(59, 130, 246, 0.2); /* Blue-500 với opacity */
-        border-top-color: #2563eb; /* Blue-600 */
+        border: 4px solid rgba(59, 130, 246, 0.2);
+        border-top-color: #2563eb;
         border-radius: 50%;
         width: 3rem;
         height: 3rem;
@@ -47,49 +47,33 @@
 </style>
 
 <!-- PHẦN 1: HEADER & BỘ LỌC THÁNG/NĂM -->
-<!-- ✅ TƯ DUY FIX UI: Thêm relative z-50 để tạo Stacking Context, đảm bảo dropdown luôn nổi lên trên -->
-<div class="relative z-50 flex flex-col md:flex-row justify-between items-start md:items-center mb-6 bg-white dark:bg-slate-800 p-4 rounded-lg shadow transition-colors duration-300 gap-4">
+<div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 bg-white dark:bg-slate-800 p-4 rounded-lg shadow transition-colors duration-300 gap-4">
     <h2 id="page-title" class="text-xl font-bold text-gray-800 dark:text-slate-100">Tổng quan tháng {{ display_month }}/{{ display_year }}</h2>
     
-    <!-- ✅ FIX CACHE: Thêm input _t để chống cache trình duyệt khi submit form -->
+    <!-- FIX CACHE: Thêm input _t để chống cache trình duyệt khi submit form -->
     <form method="GET" action="{{ url_for('dashboard.index') }}" class="flex items-center w-full md:w-auto" id="filter-form">
         <input type="hidden" name="_t" id="form-cache-buster" value="">
-        <div class="flex items-center bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl shadow-sm overflow-visible h-12 w-full md:w-auto">
+        <div class="flex items-center bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl shadow-sm overflow-hidden h-12 w-full md:w-auto">
             
-            <!-- Custom Dropdown Tháng -->
-            <div class="relative flex items-center h-full flex-1 md:flex-none" id="month-selector-wrapper">
-                <input type="hidden" name="month" id="month-input" value="{{ display_month }}">
-                
-                <button type="button" id="month-btn" class="appearance-none bg-transparent pl-5 pr-10 h-full text-sm md:text-base font-semibold text-gray-700 dark:text-slate-200 focus:outline-none cursor-pointer flex items-center w-full text-left rounded-l-xl">
-                    <span id="month-label">Tháng {{ display_month }}</span>
-                </button>
-                
-                <div class="pointer-events-none absolute right-3 text-gray-400 dark:text-slate-500">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                </div>
-
-                <!-- ✅ TƯ DUY FIX LỖI: Đổi từ 'fixed' sang 'absolute top-full left-0 mt-2'.
-                     Giúp menu tự động bám dính ngay dưới nút bấm, không cần JS tính tọa độ, không bao giờ bị che khuất. -->
-                <div id="month-menu" class="absolute top-full left-0 mt-2 z-[100] w-40 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl shadow-2xl hidden opacity-0 transform -translate-y-2 transition-all duration-200 overflow-hidden">
-                    <ul class="max-h-60 overflow-y-auto py-1" id="month-list">
-                        {% for m in range(1, 13) %}
-                            <li>
-                                <button type="button" class="month-item w-full text-left px-4 py-2.5 text-sm transition-colors duration-150
-                                               {% if m == display_month %} bg-blue-600 text-white font-medium {% else %} text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 {% endif %}" 
-                                        data-value="{{ m }}">Tháng {{ m }}</button>
-                            </li>
-                        {% endfor %}
-                    </ul>
-                </div>
+            <div class="relative flex items-center h-full flex-1 md:flex-none pl-5 pr-4 gap-2">
+                <span class="text-sm md:text-base font-semibold text-gray-700 dark:text-slate-200 pointer-events-none select-none whitespace-nowrap">Tháng</span>
+                <input type="number" name="month" id="month-input" value="{{ display_month }}" min="1" max="12" required 
+                       class="appearance-none bg-transparent h-full text-sm md:text-base font-bold text-blue-600 dark:text-blue-400 focus:outline-none w-[35px] text-center" 
+                       aria-label="Nhập tháng">
             </div>
             
             <div class="w-px h-6 bg-gray-300 dark:bg-slate-700"></div>
             
-            <input type="number" name="year" id="year-input" aria-label="Nhập năm" value="{{ display_year }}" min="2000" max="2100" required class="bg-transparent w-28 px-3 h-full text-sm md:text-base font-semibold text-center text-gray-700 dark:text-slate-200 focus:outline-none" placeholder="Năm">
+            <div class="relative flex items-center h-full flex-1 md:flex-none px-4 gap-2">
+                <span class="text-sm md:text-base font-semibold text-gray-700 dark:text-slate-200 pointer-events-none select-none whitespace-nowrap">Năm</span>
+                <input type="number" name="year" id="year-input" aria-label="Nhập năm" value="{{ display_year }}" min="2000" max="2100" required 
+                       class="appearance-none bg-transparent h-full text-sm md:text-base font-bold text-blue-600 dark:text-blue-400 focus:outline-none w-[55px] text-center" 
+                       placeholder="Năm">
+            </div>
             
             <div class="w-px h-6 bg-gray-300 dark:bg-slate-700"></div>
             
-            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-6 md:px-8 h-full text-sm md:text-base font-bold transition-all duration-200 whitespace-nowrap rounded-r-xl">
+            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-6 md:px-8 h-full text-sm md:text-base font-bold transition-all duration-200 whitespace-nowrap">
                 Xem
             </button>
         </div>
@@ -98,7 +82,6 @@
 
 <!-- ========================================== -->
 <!-- TRẠNG THÁI 1: LOADING (HIỂN THỊ KHI ĐANG CHỜ API) -->
-<!-- ✅ TƯ DUY FIX UI: Chiều cao cố định, flex hoàn hảo, không có khoảng trắng thừa -->
 <!-- ========================================== -->
 <div id="dashboard-loading-state" class="hidden flex-col items-center justify-center h-[400px] w-full bg-white dark:bg-slate-800 rounded-xl shadow mb-8 transition-colors duration-300">
     <div class="custom-spinner mb-5"></div>
@@ -228,11 +211,34 @@
     </div>
 </div>
 
-<!-- KHU VỰC: CÔNG VIỆC (Luôn hiển thị độc lập) -->
-<div id="tasks-section" class="bg-white dark:bg-slate-800 p-6 rounded shadow transition-colors duration-300 mb-8">
-    <h3 class="text-xl font-semibold mb-4 text-gray-800 dark:text-slate-100">Công việc sắp tới</h3>
-    <ul id="task-list" class="space-y-3"></ul>
-    <a href="{{ url_for('tasks.list_tasks') }}" class="text-blue-600 dark:text-blue-400 font-semibold mt-4 inline-block hover:underline">Xem tất cả &rarr;</a>
+<!-- ========================================== -->
+<!-- KHU VỰC: CÔNG VIỆC (ÁP DỤNG TƯ DUY MA TRẬN EISENHOWER) -->
+<!-- ========================================== -->
+<div id="tasks-section" class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 p-6 md:p-8 transition-colors duration-300 mb-8">
+    <div class="flex items-center justify-between mb-6">
+        <h3 class="text-xl font-bold text-gray-800 dark:text-slate-100 flex items-center gap-2">
+            <svg class="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
+            Công việc sắp tới
+        </h3>
+        <a href="{{ url_for('tasks.list_tasks') }}" class="text-sm font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 flex items-center gap-1 transition-colors">
+            Xem tất cả
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+        </a>
+    </div>
+    
+    <!-- TƯ DUY FIX UI: Xóa bỏ viền (border) của thẻ cha bọc ngoài danh sách để tránh bị "hộp viền trắng" -->
+    <div class="bg-gray-50 dark:bg-slate-900/50 rounded-xl p-4 md:p-6">
+        <ul id="task-list" class="space-y-4">
+            <!-- JS sẽ render danh sách task với UI mới tại đây -->
+            <li class="animate-pulse flex items-center justify-between p-4 bg-white dark:bg-slate-800 rounded-lg">
+                <div class="flex-1 space-y-2">
+                    <div class="h-4 bg-gray-200 dark:bg-slate-700 rounded w-1/3"></div>
+                    <div class="h-3 bg-gray-200 dark:bg-slate-700 rounded w-1/4"></div>
+                </div>
+                <div class="w-1/3 h-2 bg-gray-200 dark:bg-slate-700 rounded"></div>
+            </li>
+        </ul>
+    </div>
 </div>
 
 <!-- PHẦN 6: FORM LẬP KẾ HOẠCH TÀI CHÍNH -->
@@ -270,7 +276,7 @@
             <input type="hidden" id="region" value="vn">
         </div>
 
-        <!-- ✅ TÍNH NĂNG: TỶ LỆ TIẾT KIỆM CHO TỪNG DANH MỤC -->
+        <!-- TÍNH NĂNG: TỶ LỆ TIẾT KIỆM CHO TỪNG DANH MỤC -->
         <div class="md:col-span-2 mt-4 border-t border-gray-200 dark:border-slate-700 pt-4">
             <label class="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-3 flex items-center gap-2">
                 <svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
@@ -351,7 +357,7 @@
         </div>
     </form>
     
-    <!-- ✅ TƯ DUY FIX UI: Sử dụng hidden (display:none) để triệt tiêu khoảng trắng, dùng animation CSS để hiện ra mượt mà -->
+    <!-- TƯ DUY FIX UI: Sử dụng hidden (display:none) để triệt tiêu khoảng trắng, dùng animation CSS để hiện ra mượt mà -->
     <div id="plan-result" class="hidden mt-6 p-6 bg-gray-50 dark:bg-slate-800/50 rounded-xl border border-gray-200 dark:border-slate-700">
         <div class="flex flex-col mb-6">
             <div class="flex flex-col sm:flex-row sm:items-center gap-4">
@@ -387,7 +393,7 @@
 {% block scripts %}
 <script>
     // =========================================================
-    // ✅ TƯ DUY FIX LỖI CỐT LÕI (HTMX & Biến toàn cục):
+    // TƯ DUY FIX LỖI CỐT LÕI (HTMX & Biến toàn cục):
     // - Bọc TOÀN BỘ script trong IIFE (Hàm tự thực thi) để cô lập biến.
     // - Khi HTMX swap DOM (chuyển trang không load lại), trình duyệt sẽ cố chạy lại script này.
     // - Nếu không có IIFE, các biến `const formatMoney` sẽ bị khai báo trùng, gây SyntaxError 
@@ -431,13 +437,12 @@
             return normalized;
         }
 
-        // ✅ HÀM HIỂN THỊ MƯỢT MÀ: Thay vì chỉ remove 'hidden', ta thêm 'flex' và hiệu ứng fade-in
+        // HÀM HIỂN THỊ MƯỢT MÀ: Thay vì chỉ remove 'hidden', ta thêm 'flex' và hiệu ứng fade-in
         function showElement(el, displayType = 'block') {
             if (!el) return;
             el.classList.remove('hidden');
-            // Xóa animation cũ (nếu có) để nó có thể chạy lại
             el.classList.remove('animate-fade-in');
-            void el.offsetWidth; // Trigger reflow
+            void el.offsetWidth; 
             el.classList.add('animate-fade-in');
             if (displayType === 'flex') el.classList.add('flex');
         }
@@ -448,76 +453,33 @@
             el.classList.remove('flex', 'animate-fade-in');
         }
 
+        // Định nghĩa Map danh mục dùng chung để tránh khai báo lặp lại (Clean Code)
+        const categoryMap = { 'food': 'Ăn uống', 'transport': 'Di chuyển', 'education': 'Học tập', 'entertainment': 'Giải trí', 'shopping': 'Mua sắm', 'bills': 'Hóa đơn', 'other': 'Khác', 'salary': 'Lương' };
+
         // ---------------------------------------------------------
-        // 2. KHỞI TẠO DROPDOWN & SỰ KIỆN
+        // 2. KHỞI TẠO SỰ KIỆN
         // ---------------------------------------------------------
         function initDropdowns() {
-            const monthBtn = document.getElementById('month-btn');
-            const monthMenu = document.getElementById('month-menu');
-            const monthLabel = document.getElementById('month-label');
             const monthInput = document.getElementById('month-input');
             const yearInput = document.getElementById('year-input');
             const pageTitle = document.getElementById('page-title');
 
-            if (!monthBtn || !monthMenu || !monthLabel || !monthInput) return;
+            if (!monthInput || !yearInput || !pageTitle) return;
 
+            // Cập nhật tiêu đề trang khi người dùng nhập tháng/năm trực tiếp
             const updatePageTitle = () => {
-                if (pageTitle && monthInput && yearInput) {
-                    pageTitle.innerText = `Tổng quan tháng ${monthInput.value}/${yearInput.value}`;
-                }
+                pageTitle.innerText = `Tổng quan tháng ${monthInput.value}/${yearInput.value}`;
             };
 
-            const closeMonthMenu = () => {
-                monthMenu.classList.remove('opacity-100', 'translate-y-0');
-                monthMenu.classList.add('opacity-0', '-translate-y-2');
-                setTimeout(() => monthMenu.classList.add('hidden'), 200);
-            };
+            // Gắn sự kiện cho tháng
+            monthInput.oninput = updatePageTitle;
+            monthInput.onchange = updatePageTitle;
+            
+            // Gắn sự kiện cho năm
+            yearInput.oninput = updatePageTitle;
+            yearInput.onchange = updatePageTitle;
 
-            // ✅ TƯ DUY FIX: Dùng .onclick thay vì .addEventListener
-            // Để tránh việc sự kiện bị cộng dồn (multiple binding) khi HTMX render lại HTML.
-            // ✅ TƯ DUY FIX MENU BỊ CHE: Không cần tính toán top/left bằng JS nữa vì đã dùng absolute.
-            monthBtn.onclick = (e) => {
-                e.stopPropagation();
-                const isOpen = monthMenu.classList.contains('opacity-100');
-                if (isOpen) {
-                    closeMonthMenu();
-                } else {
-                    monthMenu.classList.remove('hidden');
-                    void monthMenu.offsetWidth; 
-                    monthMenu.classList.remove('opacity-0', '-translate-y-2');
-                    monthMenu.classList.add('opacity-100', 'translate-y-0');
-                }
-            };
-
-            monthMenu.onclick = (e) => {
-                const item = e.target.closest('.month-item');
-                if (!item) return;
-                e.stopPropagation();
-                const val = item.getAttribute('data-value');
-                if (monthInput.value === val) {
-                    closeMonthMenu();
-                    return;
-                }
-                monthInput.value = val;
-                monthLabel.innerText = item.innerText;
-                updatePageTitle();
-
-                const items = monthMenu.querySelectorAll('.month-item');
-                items.forEach(i => {
-                    i.classList.remove('bg-blue-600', 'text-white', 'font-medium');
-                    i.classList.add('text-gray-700', 'dark:text-slate-300', 'hover:bg-gray-100', 'dark:hover:bg-slate-700');
-                });
-                item.classList.remove('text-gray-700', 'dark:text-slate-300', 'hover:bg-gray-100', 'dark:hover:bg-slate-700');
-                item.classList.add('bg-blue-600', 'text-white', 'font-medium');
-                closeMonthMenu();
-            };
-
-            if (yearInput) {
-                yearInput.oninput = updatePageTitle;
-                yearInput.onchange = updatePageTitle;
-            }
-
-            // Region Dropdown (Dành cho form Lập kế hoạch)
+            // Region Dropdown (Vẫn giữ nguyên cho form Lập kế hoạch)
             const regionWrapper = document.getElementById('custom-region-dropdown');
             const regionTrigger = document.getElementById('dropdown-trigger');
             const regionMenu = document.getElementById('dropdown-menu');
@@ -563,17 +525,9 @@
             }
         }
 
-        // Sự kiện click ra ngoài để đóng menu (Gắn 1 lần duy nhất)
+        // Sự kiện click ra ngoài để đóng menu Region (Gắn 1 lần duy nhất)
         if (!window.dashboardDocEventsAttached) {
             document.addEventListener('click', (e) => {
-                const monthMenu = document.getElementById('month-menu');
-                const monthBtn = document.getElementById('month-btn');
-                if (monthMenu && monthBtn && !monthBtn.contains(e.target) && !monthMenu.contains(e.target)) {
-                    monthMenu.classList.remove('opacity-100', 'translate-y-0');
-                    monthMenu.classList.add('opacity-0', '-translate-y-2');
-                    setTimeout(() => monthMenu.classList.add('hidden'), 200);
-                }
-
                 const regionWrapper = document.getElementById('custom-region-dropdown');
                 const regionMenu = document.getElementById('dropdown-menu');
                 const regionChevron = document.getElementById('dropdown-chevron');
@@ -607,12 +561,10 @@
         let isInitRunning = false;
         let currentAbortController = null;
 
-        const categoryMap = { 'food': 'Ăn uống', 'transport': 'Di chuyển', 'education': 'Học tập', 'entertainment': 'Giải trí', 'shopping': 'Mua sắm', 'bills': 'Hóa đơn', 'other': 'Khác', 'salary': 'Lương' };
-
         let budgetChartObserver = null;
         let forecastChartObserver = null;
 
-        // ✅ TƯ DUY FIX LỖI "KẸT" THÁNG: 
+        // TƯ DUY FIX LỖI "KẸT" THÁNG: 
         // Khi HTMX swap DOM, URL thay đổi nhưng biến JS có thể không cập nhật kịp.
         // Hàm này sẽ đọc lại giá trị thực tế đang hiển thị trên thẻ input để gọi API.
         function syncFiltersFromDOM() {
@@ -652,7 +604,7 @@
             isInitRunning = true;
             
             TODAY = new Date();
-            const filters = syncFiltersFromDOM(); // ✅ Lấy tháng/năm mới nhất từ DOM
+            const filters = syncFiltersFromDOM(); 
 
             if (currentAbortController) currentAbortController.abort();
             currentAbortController = new AbortController();
@@ -664,7 +616,6 @@
             const financialSections = document.getElementById('financial-sections');
             const financialEmptyState = document.getElementById('financial-empty-state');
 
-            // ✅ KÍCH HOẠT HIỆU ỨNG MƯỢT MÀ
             if (loadingState) { showElement(loadingState, 'flex'); }
             hideElement(financialSections);
             hideElement(financialEmptyState);
@@ -687,7 +638,6 @@
                 data.budgets = normBudgets;
                 data.cat_expenses = normCatExpenses;
 
-                // Kiểm tra dữ liệu an toàn
                 const incomeVal = safeParseNumber(data.income);
                 const expensesVal = safeParseNumber(data.expenses);
                 const totalAssetsVal = safeParseNumber(data.total_assets);
@@ -696,7 +646,6 @@
                 const hasValidExpenses = Object.values(normCatExpenses).some(val => val > 0);
                 const hasFinancialData = incomeVal > 0 || expensesVal > 0 || totalAssetsVal > 0 || hasValidBudgets || hasValidExpenses || (data.wallets && data.wallets.length > 0);
                 
-                // Ẩn loading
                 if (loadingState) hideElement(loadingState);
                 
                 if (!hasFinancialData) {
@@ -872,39 +821,157 @@
             `).join('');
         }
 
+        // ---------------------------------------------------------
+        // RENDER TASKS VỚI TƯ DUY MA TRẬN EISENHOWER
+        // ---------------------------------------------------------
         function renderTasks(tasks) {
             const el = document.getElementById('task-list');
             if (!tasks || tasks.length === 0) {
-                el.innerHTML = '<li class="text-gray-500 dark:text-slate-400 italic text-center py-4">Chưa có deadline nào sắp tới...</li>';
+                el.innerHTML = `
+                    <li class="flex flex-col items-center justify-center py-8 text-gray-500 dark:text-slate-400">
+                        <svg class="w-12 h-12 mb-3 text-gray-300 dark:text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
+                        <p class="italic">Tuyệt vời! Không có công việc nào sắp tới hạn.</p>
+                    </li>
+                `;
                 return;
             }
+
+            // Lấy thời gian hiện tại của máy khách
+            const now = new Date();
+            // Reset giờ phút giây để tính toán khoảng cách ngày chính xác
+            now.setHours(0, 0, 0, 0);
+
             el.innerHTML = tasks.map(task => {
                 const safeProgress = Math.max(0, Math.min(100, task.progress || 0));
+                
+                // FIX LỖI ĐỒNG HỒ: Parse chuỗi ngày tháng định dạng DD/MM/YYYY một cách an toàn
+                // Tránh lỗi new Date("31/10/2026") trả về Invalid Date hoặc parse sai định dạng
+                const parts = task.deadline.split('/');
+                let deadlineDate = new Date(parts[2], parts[1] - 1, parts[0]);
+                deadlineDate.setHours(0, 0, 0, 0); // Reset giờ của deadline để so sánh chính xác
+
+                const diffTime = deadlineDate.getTime() - now.getTime();
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                // TƯ DUY MA TRẬN EISENHOWER:
+                // Xác định 2 trục: Quan trọng (milestone) và Khẩn cấp (deadline <= 3 ngày)
+                const isImportant = !!task.milestone;
+                const isUrgent = (diffDays <= 3 && diffDays >= 0); // Chỉ coi là khẩn cấp nếu chưa quá hạn
+                const isOverdue = (diffDays < 0);
+
+                let priorityBadge = '';
+                
+                // TƯ DUY UI PREMIUM & ĐỒNG BỘ:
+                // - Base class: Cố định padding (px-2.5 py-1), font nhỏ, thêm justify-center để căn giữa.
+                // - Loại bỏ gap-1.5 và tracking-wide ở base class vì nó gây lệch chữ.
+                // - Text span bên trong sẽ tự quản lý margin và tracking.
+                const baseBadgeClass = "inline-flex items-center justify-center px-2.5 py-1 rounded-md text-[10px] font-bold uppercase border shadow-sm transition-colors";
+                const dotBaseClass = "w-1.5 h-1.5 rounded-full flex-shrink-0";
+                const textBaseClass = "ml-1.5 tracking-wider leading-none";
+
+                let bgClass = 'bg-white dark:bg-slate-800 border-l-4 border-transparent';
+                let deadlineColorClass = 'text-slate-500 dark:text-slate-400';
+                let deadlineIcon = '<svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>';
+
+                if (isOverdue) {
+                    // Trạng thái Quá hạn (Xám)
+                    bgClass = 'bg-white dark:bg-slate-800 border-l-4 border-slate-400 dark:border-slate-600';
+                    deadlineColorClass = 'text-slate-500 dark:text-slate-400 line-through';
+                    priorityBadge = `
+                        <span class="${baseBadgeClass} bg-slate-100 text-slate-600 border-slate-300 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700">
+                            <span class="${dotBaseClass} bg-slate-400"></span>
+                            <span class="${textBaseClass}">Quá hạn</span>
+                        </span>`;
+                } else if (isImportant && isUrgent) {
+                    // Làm ngay (Đỏ)
+                    bgClass = 'bg-white dark:bg-slate-800 border-l-4 border-red-500';
+                    deadlineColorClass = 'text-red-600 dark:text-red-400 font-bold';
+                    priorityBadge = `
+                        <span class="${baseBadgeClass} bg-red-50 text-red-600 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-900/50">
+                            <span class="${dotBaseClass} bg-red-500 animate-pulse"></span>
+                            <span class="${textBaseClass}">Làm ngay</span>
+                        </span>`;
+                    deadlineIcon = '<svg class="w-3.5 h-3.5 mr-1 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
+                } else if (isImportant && !isUrgent) {
+                    // Lên lịch (Xanh dương)
+                    bgClass = 'bg-white dark:bg-slate-800 border-l-4 border-blue-500';
+                    deadlineColorClass = 'text-blue-600 dark:text-blue-400 font-semibold';
+                    priorityBadge = `
+                        <span class="${baseBadgeClass} bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-900/50">
+                            <span class="${dotBaseClass} bg-blue-500"></span>
+                            <span class="${textBaseClass}">Lên lịch</span>
+                        </span>`;
+                } else if (!isImportant && isUrgent) {
+                    // Nhanh gọn (Cam)
+                    bgClass = 'bg-white dark:bg-slate-800 border-l-4 border-orange-500';
+                    deadlineColorClass = 'text-orange-600 dark:text-orange-400 font-semibold';
+                    priorityBadge = `
+                        <span class="${baseBadgeClass} bg-orange-50 text-orange-600 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-900/50">
+                            <span class="${dotBaseClass} bg-orange-500"></span>
+                            <span class="${textBaseClass}">Nhanh gọn</span>
+                        </span>`;
+                } else {
+                    // Bình thường (Xám nhạt / Slate)
+                    priorityBadge = `
+                        <span class="${baseBadgeClass} bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600">
+                            <span class="${dotBaseClass} bg-slate-400"></span>
+                            <span class="${textBaseClass}">Bình thường</span>
+                        </span>`;
+                }
+
+                // Tư duy tái cấu trúc giao diện Công việc:
+                // - Loại bỏ class 'border' để không có hộp viền trắng xung quanh thẻ.
+                // - Thanh tiến độ đổi sang màu xanh nước biển (sử dụng inline style để đảm bảo hiển thị).
+                // - Tăng kích thước chữ Tiến độ (text-sm) và phần trăm (text-base).
+                // - Đảm bảo Badge và Title thẳng hàng tuyệt đối theo chiều dọc (căn lề trái).
                 return `
-                <li class="flex justify-between items-center border-b border-gray-100 dark:border-slate-700 pb-2">
-                    <div class="flex-1 pr-4 truncate">
-                        <strong class="text-gray-800 dark:text-slate-200 block truncate" title="${task.title}">${task.title}</strong>
-                        <small class="text-red-500 font-medium">Hạn: ${task.deadline}</small>
-                    </div>
-                    <div class="w-1/3 flex-shrink-0">
-                        <div class="flex justify-between text-xs mb-1 dark:text-slate-400">
-                            <span>Tiến độ</span>
-                            <span class="font-bold">${safeProgress}%</span>
+                <li class="${bgClass} rounded-xl p-4 sm:p-5 shadow-sm hover:shadow-md transition-all duration-200">
+                    <!-- Phần Header: Badge, Tiêu đề, Hạn chót -->
+                    <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-4">
+                        <div class="flex-1 min-w-0 flex flex-col items-start">
+                            <!-- Badge được đặt trong 1 div riêng để tách biệt khỏi flex container phía trên -->
+                            <div class="mb-2">
+                                ${priorityBadge}
+                            </div>
+                            <h4 class="text-base sm:text-lg font-bold text-gray-800 dark:text-slate-100 truncate w-full" title="${task.title}">
+                                ${task.title}
+                            </h4>
                         </div>
-                        <div class="w-full bg-gray-200 dark:bg-slate-600 rounded-full h-2">
-                            <div class="bg-blue-600 h-2 rounded-full transition-all duration-500" style="width: ${safeProgress}%"></div>
+                        
+                        <div class="flex items-center text-sm ${deadlineColorClass} shrink-0">
+                            ${deadlineIcon}
+                            <span>Hạn chót: ${task.deadline}</span>
+                            ${diffDays >= 0 ? `<span class="ml-2 text-xs px-2 py-0.5 rounded-full bg-black/5 dark:bg-white/10 font-medium">${diffDays === 0 ? 'Hôm nay' : `Còn ${diffDays} ngày`}</span>` : ''}
+                        </div>
+                    </div>
+
+                    <!-- Phần Tiến độ -->
+                    <div class="w-full">
+                        <!-- Tăng kích thước chữ từ text-xs lên text-sm -->
+                        <div class="flex justify-between items-center text-sm mb-2">
+                            <span class="font-medium text-gray-500 dark:text-slate-400">Tiến độ</span>
+                            <span class="font-bold text-blue-600 dark:text-blue-400 text-base">${safeProgress}%</span>
+                        </div>
+                        <!-- Tăng chiều cao thanh tiến độ lên h-2.5 -->
+                        <div class="w-full bg-gray-200 dark:bg-slate-700/50 rounded-full h-2.5 overflow-hidden">
+                            <!-- Sử dụng inline style cho background-color để đảm bảo thanh luôn màu xanh nước biển -->
+                            <div class="h-full rounded-full transition-all duration-500" style="width: ${safeProgress}%; background-color: #3b82f6;"></div>
                         </div>
                     </div>
                 </li>
             `}).join('');
         }
 
+        // TƯ DUY FIX UI: Cập nhật theme cho biểu đồ để lưới dễ nhìn hơn ở cả 2 chế độ
         function getChartTheme() {
             const isDark = document.documentElement.classList.contains('dark');
             return {
                 isDark: isDark,
                 textColor: isDark ? '#94a3b8' : '#64748b',
-                gridColor: isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)',
+                // Tăng độ đậm của lưới để dễ nhìn, không bị chìm vào nền
+                gridColor: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.1)',
+                // Thêm màu cho đường viền trục tọa độ
+                borderColor: isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.2)',
                 font: { family: "'Inter', system-ui, sans-serif", size: 12, weight: '500' }
             };
         }
@@ -985,12 +1052,12 @@
                                 grace: '10%',
                                 ticks: { color: theme.textColor, font: theme.font, callback: (val) => formatMoney(val), precision: 0 },
                                 grid: { color: theme.gridColor, drawTicks: false },
-                                border: { display: false }
+                                border: { display: true, color: theme.borderColor }
                             },
                             x: { 
                                 ticks: { color: theme.textColor, font: theme.font }, 
                                 grid: { display: false },
-                                border: { display: false }
+                                border: { display: true, color: theme.borderColor }
                             }
                         }
                     }
@@ -1129,7 +1196,7 @@
                                 x: { 
                                     ticks: { color: theme.textColor, font: theme.font, maxRotation: 45 }, 
                                     grid: { display: false },
-                                    border: { display: false }
+                                    border: { display: true, color: theme.borderColor }
                                 },
                                 y: { 
                                     beginAtZero: true, 
@@ -1146,7 +1213,7 @@
                                         drawTicks: false, 
                                         lineWidth: 1
                                     },
-                                    border: { display: false }
+                                    border: { display: true, color: theme.borderColor }
                                 }
                             }
                         }
@@ -1175,7 +1242,10 @@
 
             document.getElementById('insights-list').innerHTML = `<li>${retryBtnHtml}</li>`;
             document.getElementById('burn-rate-content').innerHTML = '<p class="text-gray-500 italic text-center py-4">Không có dữ liệu</p>';
-            document.getElementById('task-list').innerHTML = '<li class="text-gray-500 text-center py-4">Lỗi tải dữ liệu</li>';
+            
+            // Xử lý lỗi cho phần Tasks
+            const taskList = document.getElementById('task-list');
+            if (taskList) taskList.innerHTML = '<li class="text-gray-500 text-center py-4">Lỗi tải dữ liệu</li>';
             
             ['val-income', 'val-expense', 'val-total-assets'].forEach(id => { 
                 const el = document.getElementById(id); 
@@ -1204,7 +1274,21 @@
 
             document.getElementById('insights-list').innerHTML = '<li class="animate-pulse h-4 bg-gray-200 dark:bg-slate-700 rounded w-full"></li>';
             document.getElementById('burn-rate-content').innerHTML = '<div class="h-4 bg-gray-200 dark:bg-slate-700 rounded w-3/4 animate-pulse"></div>';
-            document.getElementById('task-list').innerHTML = '';
+            
+            // Reset Task list về trạng thái loading
+            const taskList = document.getElementById('task-list');
+            if (taskList) {
+                taskList.innerHTML = `
+                    <li class="animate-pulse flex items-center justify-between p-4 bg-white dark:bg-slate-800 rounded-lg">
+                        <div class="flex-1 space-y-2">
+                            <div class="h-4 bg-gray-200 dark:bg-slate-700 rounded w-1/3"></div>
+                            <div class="h-3 bg-gray-200 dark:bg-slate-700 rounded w-1/4"></div>
+                        </div>
+                        <div class="w-1/3 h-2 bg-gray-200 dark:bg-slate-700 rounded"></div>
+                    </li>
+                `;
+            }
+
             ['val-income', 'val-expense', 'val-total-assets'].forEach(id => { 
                 const el = document.getElementById(id); 
                 if (el) el.innerHTML = '<span class="inline-block animate-pulse bg-gray-300 dark:bg-slate-600 rounded h-8 w-32"></span>'; 
@@ -1277,11 +1361,12 @@
 
                 document.getElementById('inflation_rate').innerText = data.inflation_rate || 0;
                 
-                const catMap = { 'food': 'Ăn uống', 'transport': 'Di chuyển', 'education': 'Học tập', 'entertainment': 'Giải trí', 'shopping': 'Mua sắm', 'bills': 'Hóa đơn', 'other': 'Khác', 'salary': 'Lương' };
-                
-                const budgetsHtml = Object.entries(data.budgets)
+                // Sử dụng biến categoryMap toàn cục thay vì khai báo lại (Clean Code)
+                const sortedBudgets = Object.entries(data.budgets).sort((a, b) => b[1] - a[1]);
+
+                const budgetsHtml = sortedBudgets
                     .map(([cat, amount]) => {
-                        const catName = catMap[cat] || cat;
+                        const catName = categoryMap[cat] || cat;
                         const numAmount = Number(amount) || 0;
                         const formattedAmount = new Intl.NumberFormat('vi-VN').format(numAmount);
                         const textColor = numAmount > 0 ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-slate-500';
