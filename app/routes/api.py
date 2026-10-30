@@ -36,12 +36,13 @@ def get_dashboard_stats():
         balance = total_income - total_expense
 
         # 2. Tính thu/chi theo tháng được chọn
+        # ✅ FIX TURSO: Dùng func.date() để ép kiểu cột date trong DB về kiểu Date trước khi so sánh
         month_totals = db.session.query(
             Transaction.type, func.coalesce(func.sum(Transaction.amount), 0)
         ).filter(
             Transaction.user_id == user_id,
-            Transaction.date >= start_date,
-            Transaction.date <= end_date,
+            func.date(Transaction.date) >= start_date,
+            func.date(Transaction.date) <= end_date,
         ).group_by(Transaction.type).all()
 
         income_month = next((float(t[1]) for t in month_totals if t[0] == 'income'), 0.0)
@@ -53,8 +54,8 @@ def get_dashboard_stats():
         ).filter(
             Transaction.user_id == user_id,
             Transaction.type == 'expense',
-            Transaction.date >= start_date,
-            Transaction.date <= end_date,
+            func.date(Transaction.date) >= start_date,
+            func.date(Transaction.date) <= end_date,
         ).group_by(Transaction.category).all()
         
         cat_exp_dict = {str(cat).strip().lower(): float(total) for cat, total in cat_exp}
@@ -68,9 +69,22 @@ def get_dashboard_stats():
             .filter(Task.status.in_(['pending', 'in_progress'])) \
             .order_by(Task.deadline.asc()).limit(5).all()
         
-        tasks_data = [{
-            'id': t.id, 'title': t.title, 'deadline': t.deadline.strftime('%d/%m/%Y'), 'progress': t.progress
-        } for t in upcoming_tasks]
+        tasks_data = []
+        for t in upcoming_tasks:
+            # ✅ FIX TURSO: Xử lý an toàn nếu deadline trả về dạng string
+            if isinstance(t.deadline, str):
+                try:
+                    date_str = t.deadline.split(' ')[0].split('T')[0]
+                    deadline_obj = datetime.strptime(date_str, '%Y-%m-%d')
+                    formatted_deadline = deadline_obj.strftime('%d/%m/%Y')
+                except ValueError:
+                    formatted_deadline = t.deadline
+            else:
+                formatted_deadline = t.deadline.strftime('%d/%m/%Y')
+
+            tasks_data.append({
+                'id': t.id, 'title': t.title, 'deadline': formatted_deadline, 'progress': t.progress
+            })
 
         # 6. Phân tích (Insights)
         insights = []
@@ -94,8 +108,8 @@ def get_dashboard_stats():
         prev_expense_raw = db.session.query(func.coalesce(func.sum(Transaction.amount), 0)).filter(
             Transaction.user_id == user_id,
             Transaction.type == 'expense',
-            Transaction.date >= prev_start_date,
-            Transaction.date <= prev_end_date,
+            func.date(Transaction.date) >= prev_start_date,
+            func.date(Transaction.date) <= prev_end_date,
         ).scalar()
         
         prev_expense = float(prev_expense_raw or 0.0)
@@ -126,23 +140,19 @@ def get_dashboard_stats():
 
         # =====================================================================
         # ✅ FIX CRITICAL: DỰ BÁO CHI TIÊU (FORECAST)
-        # TƯ DUY: Phải tính toán dựa trên tháng đang xem, không phải ngày hôm nay.
         # =====================================================================
-        
-        # 1. Xác định ngày cơ sở (Base Date) để tính 30 ngày trước đó
         if today_vn.month == month and today_vn.year == year:
             forecast_base_date = today_vn.date()
         else:
-            forecast_base_date = end_date  # Nếu xem tháng khác, lấy ngày cuối tháng đó
+            forecast_base_date = end_date
 
         start_30 = forecast_base_date - timedelta(days=30)
         
-        # 2. Lấy dữ liệu 30 ngày gần nhất (Tính từ Base Date)
         trans_30d = db.session.query(Transaction.date, Transaction.amount).filter(
             Transaction.user_id == user_id,
             Transaction.type == 'expense',
-            Transaction.date >= start_30,
-            Transaction.date <= forecast_base_date # Chỉ lấy lùi về quá khứ so với mốc
+            func.date(Transaction.date) >= start_30,
+            func.date(Transaction.date) <= forecast_base_date
         ).all()
 
         weekday_sums = {i: 0.0 for i in range(7)}
@@ -150,14 +160,23 @@ def get_dashboard_stats():
         total_30d = 0.0
 
         for t_date, t_amount in trans_30d:
-            wd = t_date.weekday()
+            # ✅ FIX TURSO: Turso trả về String, SQLite trả về Date. Xử lý cả 2.
+            if isinstance(t_date, str):
+                try:
+                    date_str = t_date.split(' ')[0].split('T')[0]
+                    t_date_obj = datetime.strptime(date_str, '%Y-%m-%d').date()
+                except ValueError:
+                    continue 
+            else:
+                t_date_obj = t_date
+                
+            wd = t_date_obj.weekday()
             weekday_sums[wd] += float(t_amount)
             weekday_counts[wd] += 1
             total_30d += float(t_amount)
 
         avg_daily_30d = total_30d / 30.0 if total_30d > 0 else 0.0
         
-        # 3. Dự báo 7 ngày tiếp theo (Tính từ Base Date + 1)
         forecast_data = []
         for i in range(1, 8):
             future_date = forecast_base_date + timedelta(days=i)
@@ -210,7 +229,6 @@ def get_dashboard_stats():
             'insights': insights,
             'burn_rate': burn_rate,
             'forecast': forecast_data,
-            # ✅ Trả về ngày cơ sở để Frontend tính nhãn trục X
             'forecast_base_date': forecast_base_date.isoformat()
         }
         
@@ -220,6 +238,8 @@ def get_dashboard_stats():
 
     except Exception as e:
         current_app.logger.error(f"Lỗi API Dashboard: {str(e)}")
+        # ✅ Đảm bảo đóng session nếu có lỗi để tránh treo DB
+        db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
 
@@ -250,4 +270,5 @@ def financial_plan():
         
     except Exception as e:
         current_app.logger.error(f"Lỗi API Financial Plan: {str(e)}")
+        db.session.rollback()
         return jsonify({'error': f"Lỗi máy chủ: {str(e)}"}), 500
