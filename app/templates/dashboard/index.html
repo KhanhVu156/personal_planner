@@ -22,11 +22,32 @@
     .animate-slide-up {
         animation: slideUpFade 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
+
+    /* ✅ TƯ DUY FIX UI: Hiệu ứng Fade In mượt mà khi chuyển đổi trạng thái (Loading -> Data) */
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+    .animate-fade-in {
+        animation: fadeIn 0.3s ease-in-out forwards;
+    }
+
+    /* Custom spinner cho đẹp và rõ nét hơn */
+    .custom-spinner {
+        border: 4px solid rgba(59, 130, 246, 0.2); /* Blue-500 với opacity */
+        border-top-color: #2563eb; /* Blue-600 */
+        border-radius: 50%;
+        width: 3rem;
+        height: 3rem;
+        animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
 </style>
 
 <!-- PHẦN 1: HEADER & BỘ LỌC THÁNG/NĂM -->
 <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 bg-white dark:bg-slate-800 p-4 rounded-lg shadow transition-colors duration-300 gap-4">
-    <!-- ✅ ID để JS cập nhật tiêu đề ngay lập tức -->
     <h2 id="page-title" class="text-xl font-bold text-gray-800 dark:text-slate-100">Tổng quan tháng {{ display_month }}/{{ display_year }}</h2>
     
     <!-- ✅ FIX CACHE: Thêm input _t để chống cache trình duyệt khi submit form -->
@@ -74,17 +95,17 @@
 
 <!-- ========================================== -->
 <!-- TRẠNG THÁI 1: LOADING (HIỂN THỊ KHI ĐANG CHỜ API) -->
-<!-- ✅ TƯ DUY FIX UI: Loại bỏ py-24 dư thừa, dùng flex thuần túy để căn giữa hoàn hảo -->
+<!-- ✅ TƯ DUY FIX UI: Chiều cao cố định, flex hoàn hảo, không có khoảng trắng thừa -->
 <!-- ========================================== -->
-<div id="dashboard-loading-state" class="hidden flex-col items-center justify-center bg-white dark:bg-slate-800 rounded-xl shadow mb-8 transition-colors duration-300 w-full min-h-[400px]">
-    <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-    <p class="text-gray-500 dark:text-slate-400 font-medium text-center">Đang tải dữ liệu tổng quan...</p>
+<div id="dashboard-loading-state" class="hidden flex-col items-center justify-center h-[400px] w-full bg-white dark:bg-slate-800 rounded-xl shadow mb-8 transition-colors duration-300">
+    <div class="custom-spinner mb-5"></div>
+    <p class="text-gray-500 dark:text-slate-400 font-medium">Đang tải dữ liệu tổng quan...</p>
 </div>
 
 <!-- ========================================== -->
 <!-- TRẠNG THÁI 2: EMPTY STATE (HIỂN THỊ KHI KHÔNG CÓ DATA) -->
 <!-- ========================================== -->
-<div id="financial-empty-state" class="hidden flex-col items-center justify-center py-24 px-4 bg-white dark:bg-slate-800 rounded-xl shadow mb-8 transition-colors duration-300 w-full min-h-[400px]">
+<div id="financial-empty-state" class="hidden flex-col items-center justify-center h-[400px] w-full bg-white dark:bg-slate-800 rounded-xl shadow mb-8 transition-colors duration-300">
     <h3 class="text-2xl font-bold text-gray-800 dark:text-slate-100 mb-4 text-center">Chưa có dữ liệu tài chính</h3>
     <p class="text-gray-500 dark:text-slate-400 mb-8 text-center max-w-lg mx-auto leading-relaxed">
         Không có giao dịch hay ngân sách nào được ghi nhận trong tháng {{ display_month }}/{{ display_year }}. 
@@ -407,6 +428,23 @@
             return normalized;
         }
 
+        // ✅ HÀM HIỂN THỊ MƯỢT MÀ: Thay vì chỉ remove 'hidden', ta thêm 'flex' và hiệu ứng fade-in
+        function showElement(el, displayType = 'block') {
+            if (!el) return;
+            el.classList.remove('hidden');
+            // Xóa animation cũ (nếu có) để nó có thể chạy lại
+            el.classList.remove('animate-fade-in');
+            void el.offsetWidth; // Trigger reflow
+            el.classList.add('animate-fade-in');
+            if (displayType === 'flex') el.classList.add('flex');
+        }
+
+        function hideElement(el) {
+            if (!el) return;
+            el.classList.add('hidden');
+            el.classList.remove('flex', 'animate-fade-in');
+        }
+
         // ---------------------------------------------------------
         // 2. KHỞI TẠO DROPDOWN & SỰ KIỆN
         // ---------------------------------------------------------
@@ -625,9 +663,10 @@
             const financialSections = document.getElementById('financial-sections');
             const financialEmptyState = document.getElementById('financial-empty-state');
 
-            if (loadingState) { loadingState.classList.remove('hidden'); loadingState.classList.add('flex'); }
-            if (financialSections) financialSections.classList.add('hidden');
-            if (financialEmptyState) { financialEmptyState.classList.add('hidden'); financialEmptyState.classList.remove('flex'); }
+            // ✅ KÍCH HOẠT HIỆU ỨNG MƯỢT MÀ
+            if (loadingState) { showElement(loadingState, 'flex'); }
+            hideElement(financialSections);
+            hideElement(financialEmptyState);
 
             try {
                 const res = await fetch(`/api/dashboard-stats?month=${filters.month}&year=${filters.year}&t=${Date.now()}`, {
@@ -656,23 +695,19 @@
                 const hasValidExpenses = Object.values(normCatExpenses).some(val => val > 0);
                 const hasFinancialData = incomeVal > 0 || expensesVal > 0 || totalAssetsVal > 0 || hasValidBudgets || hasValidExpenses || (data.wallets && data.wallets.length > 0);
                 
-                if (loadingState) { loadingState.classList.add('hidden'); loadingState.classList.remove('flex'); }
+                // Ẩn loading
+                if (loadingState) hideElement(loadingState);
                 
                 if (!hasFinancialData) {
-                    if (financialSections) financialSections.classList.add('hidden');
+                    hideElement(financialSections);
                     if (financialEmptyState) {
-                        financialEmptyState.classList.remove('hidden');
-                        financialEmptyState.classList.add('flex');
+                        showElement(financialEmptyState, 'flex');
                     }
                 } else {
                     if (financialSections) {
-                        financialSections.classList.remove('hidden');
-                        void financialSections.offsetWidth; 
+                        showElement(financialSections, 'block');
                     }
-                    if (financialEmptyState) {
-                        financialEmptyState.classList.add('hidden');
-                        financialEmptyState.classList.remove('flex');
-                    }
+                    hideElement(financialEmptyState);
                 }
 
                 safeRun(renderSummary, data, filters);
@@ -712,7 +747,7 @@
 
                 console.error('[Dashboard] Fetch error:', err);
                 
-                if (loadingState) { loadingState.classList.add('hidden'); loadingState.classList.remove('flex'); }
+                if (loadingState) hideElement(loadingState);
 
                 if (err.name === 'AbortError') {
                     renderErrorState('Yêu cầu quá thời gian. Vui lòng kiểm tra mạng và thử lại.');
@@ -720,7 +755,7 @@
                     renderErrorState();
                 }
             } finally {
-                if (loadingState) { loadingState.classList.add('hidden'); loadingState.classList.remove('flex'); }
+                if (loadingState) hideElement(loadingState);
                 isInitRunning = false;
             }
         }
@@ -1151,7 +1186,7 @@
             if (grid) grid.innerHTML = `<div class="col-span-full text-center text-red-500 p-4">Không thể tải dữ liệu ví</div>`;
             
             const financialSections = document.getElementById('financial-sections');
-            if (financialSections) financialSections.classList.remove('hidden');
+            if (financialSections) showElement(financialSections);
         }
 
         // ---------------------------------------------------------
@@ -1162,9 +1197,9 @@
             const financialSections = document.getElementById('financial-sections');
             const financialEmptyState = document.getElementById('financial-empty-state');
             
-            if (loadingState) { loadingState.classList.remove('hidden'); loadingState.classList.add('flex'); }
-            if (financialSections) financialSections.classList.add('hidden');
-            if (financialEmptyState) { financialEmptyState.classList.add('hidden'); financialEmptyState.classList.remove('flex'); }
+            if (loadingState) { showElement(loadingState, 'flex'); }
+            hideElement(financialSections);
+            hideElement(financialEmptyState);
 
             document.getElementById('insights-list').innerHTML = '<li class="animate-pulse h-4 bg-gray-200 dark:bg-slate-700 rounded w-full"></li>';
             document.getElementById('burn-rate-content').innerHTML = '<div class="h-4 bg-gray-200 dark:bg-slate-700 rounded w-3/4 animate-pulse"></div>';
@@ -1205,7 +1240,7 @@
             };
 
             const resultBox = document.getElementById('plan-result');
-            resultBox.classList.add('hidden');
+            hideElement(resultBox);
             resultBox.classList.remove('animate-slide-up');
 
             btn.disabled = true;
@@ -1269,8 +1304,7 @@
                         <span class="text-lg font-black text-green-700 dark:text-green-400 whitespace-nowrap shrink-0">${formattedSavings} VND</span>
                     </div>`;
 
-                resultBox.classList.remove('hidden');
-                void resultBox.offsetWidth; 
+                showElement(resultBox, 'block');
                 resultBox.classList.add('animate-slide-up');
 
             } catch (err) {
