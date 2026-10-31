@@ -40,11 +40,12 @@
 
 - **Input (Giao dịch):** Số tiền (VND), Ngày, Danh mục (7 loại), Ví (tùy chọn). Hệ thống tự động parse tiền tệ (VD: `10.000.000` -> `10000000`).
 - **Input (Ngân sách):** Tháng, Năm, Danh mục, Số tiền. Hỗ trợ Upsert (Thêm mới hoặc Cập nhật).
+- **Input (Công việc):** Tên, Mô tả, Hạn chót, Trạng thái, Tiến độ, **Mức độ Quan trọng (Ma trận)**.
 - **Xử lý lỗi:** Validator của WTForms kiểm tra chặt chẽ, hiển thị thông báo lỗi màu đỏ nếu số tiền âm, sai định dạng ngày, hoặc vượt quá giới hạn.
 
 ### 5. Minh chứng
 
-- **Giao diện:** Hỗ trợ Dark/Light mode, Skeleton Loading, biểu đồ Chart.js.
+- **Giao diện:** Hỗ trợ Dark/Light mode, Skeleton Loading, biểu đồ Chart.js, phân loại công việc trực quan bằng Ma trận Eisenhower.
 - **Hiệu năng:** Tốc độ phản hồi API Dashboard `< 200ms` nhờ Redis Cache.
 - **Mã nguồn:** Được tổ chức theo mô hình App Factory, Blueprints rõ ràng.
 
@@ -54,7 +55,7 @@
 
 **Personal Planner** là một hệ sinh thái Full-stack được thiết kế để chạy cực nhẹ trên môi trường Cloud giới hạn (Render Free Tier - 512MB RAM). Điểm nhấn của dự án là việc ứng dụng **Thuật toán Thống kê (Statistical Forecasting)** và **Tối ưu hóa SQL (SQL Aggregation)** để thay thế cho các mô hình AI cồng kềnh.
 
-Ứng dụng không chỉ dừng lại ở mức CRUD cơ bản mà giải quyết triệt để các bài toán về dự báo chi tiêu, phân bổ ngân sách thông minh, và quản lý công việc, mang lại trải nghiệm mượt mà như ứng dụng Single Page Application (SPA).
+Ứng dụng không chỉ dừng lại ở mức CRUD cơ bản mà giải quyết triệt để các bài toán về dự báo chi tiêu, phân bổ ngân sách thông minh, và quản lý công việc (tích hợp Ma trận Eisenhower), mang lại trải nghiệm mượt mà như ứng dụng Single Page Application (SPA).
 
 ---
 
@@ -72,6 +73,7 @@
 - **Weekday Moving Average:** Dự báo chi tiêu 7 ngày tới dựa trên thói quen chi tiêu theo từng thứ trong tuần.
 - **Dynamic Budget Allocation:** Phân bổ ngân sách dựa trên Lịch sử chi tiêu + Trọng số ưu tiên.
 - **Làm tròn 10k VNĐ:** Tự động làm tròn số tiền phân bổ và bù trừ sai số vào danh mục "Khác".
+- **Ma trận Eisenhower (Eisenhower Matrix):** Tự động phân loại và sắp xếp công việc dựa trên 2 trục: **Quan trọng** (Cột mốc/Milestone) và **Khẩn cấp** (Hạn chót <= 3 ngày). Giao diện tự động gắn nhãn (Làm ngay, Lên lịch, Nhanh gọn, Bình thường) giúp người dùng tối ưu hóa thời gian.
 
 ### 3. Trực quan hóa & Trải nghiệm UI/UX
 
@@ -183,6 +185,7 @@ Truy cập giao diện tại: **<http://127.0.0.1:5000>**
 `GET /api/dashboard-stats?month=1&year=2024`
 
 - Trả về thông tin Thu/Chi, Tài sản, Ngân sách, Dự báo chi tiêu 7 ngày tới, Insight.
+- **Cập nhật:** Trả về danh sách Công việc sắp tới kèm theo trường `milestone` (Boolean) để Frontend render Ma trận Eisenhower.
 
 ### 2. Lập kế hoạch tài chính (Phân bổ ngân sách)
 
@@ -210,6 +213,7 @@ Truy cập giao diện tại: **<http://127.0.0.1:5000>**
 - **Render Free Tier (512MB RAM):** Render sẽ tự động "ngủ đông" (Spin down) nếu không có truy cập trong 15 phút. Sử dụng **UptimeRobot** để ping giữ web luôn "thức".
 - **Lỗi build `libsql` trên Windows:** Gói `sqlalchemy-libsql` không hỗ trợ compile trên Windows. File `requirements.txt` đã cấu hình tự động bỏ qua gói này trên Windows.
 - **Xử lý Timezone:** Lưu trữ UTC dưới DB, nhưng mọi tính toán trong Scheduler ép sang giờ Việt Nam (`Asia/Ho_Chi_Minh`) để tránh lệch 7 giờ.
+- **Xử lý ngày tháng (Frontend):** Hàm parse ngày tháng trong JS đã được custom để đọc đúng định dạng `DD/MM/YYYY` (tránh lỗi `Invalid Date` của trình duyệt) khi tính toán Ma trận Eisenhower.
 
 ---
 
