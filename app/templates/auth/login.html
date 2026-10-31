@@ -4,14 +4,18 @@
     <div class="bg-white dark:bg-slate-800 p-8 rounded shadow-md w-full max-w-md transition-colors duration-300 border border-gray-100 dark:border-slate-700">
         <h2 class="text-2xl font-bold mb-6 text-center text-gray-800 dark:text-slate-100">Đăng nhập</h2>
         
-        <!-- ✅ FIX (3.4): Đã xóa hx-boost="false" dư thừa -->
+        <!-- Đã xóa hx-boost="false" dư thừa -->
         <form method="POST" action="" 
               onsubmit="const b=this.querySelector('[type=submit]');if(b){b.disabled=true;b.value='Đang đăng nhập...';}">
             {{ form.hidden_tag() }}
 
             <div class="mb-4">
                 {{ form.email.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
-                {{ form.email(class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white",
+                <!-- 
+                    Tư duy sửa đổi: Bổ sung class placeholder:text-gray-500 để tăng độ tương phản cho chữ gợi ý ở Light Mode.
+                    Thêm dark:placeholder:text-slate-400 để đảm bảo hiển thị rõ ở Dark Mode.
+                -->
+                {{ form.email(class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white placeholder:text-gray-500 dark:placeholder:text-slate-400",
                               placeholder="you@example.com",
                               autocomplete="email",
                               inputmode="email",
@@ -25,10 +29,12 @@
             <div class="mb-4">
                 {{ form.password.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
                 
-                <!-- TƯ DUY ĐỒNG BỘ UI: Dùng Flexbox thay vì absolute. 
-                     Giúp input và button nằm cạnh nhau, tự động co giãn theo màn hình, không bao giờ đè chữ. -->
+                <!-- Tư duy đồng bộ UI: Dùng Flexbox thay vì absolute. Giúp input và button nằm cạnh nhau, tự động co giãn theo màn hình, không bao giờ đè chữ. -->
                 <div class="flex items-center w-full border border-gray-300 rounded focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500 transition-all dark:bg-slate-700 dark:border-slate-600">
-                    {{ form.password(class="flex-1 px-3 py-2 bg-transparent text-gray-800 dark:text-white focus:outline-none border-none", 
+                    <!-- 
+                        Tư duy sửa đổi: Tương tự ô email, bổ sung class placeholder để chữ "Nhập mật khẩu" rõ nét hơn.
+                    -->
+                    {{ form.password(class="flex-1 px-3 py-2 bg-transparent text-gray-800 dark:text-white focus:outline-none border-none placeholder:text-gray-500 dark:placeholder:text-slate-400", 
                                      placeholder="Nhập mật khẩu",
                                      autocomplete="current-password") }}
                     
@@ -63,7 +69,7 @@
 
 <script>
     /** 
-     * TƯ DUY TỐI ƯU: Hàm dùng chung để ẩn/hiện mật khẩu.
+     * Tư duy tối ưu: Hàm dùng chung để ẩn/hiện mật khẩu.
      * Thay vì viết inline onclick dài dòng, ta gọi hàm này ở tất cả các form.
      */
     function togglePassword(btn) {
