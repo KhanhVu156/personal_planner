@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="vi" class="scroll-smooth no-transition">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personal Planner</title>
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    
+    <!-- Tư duy tối ưu FOUC -->
+    <script>
+        if (localStorage.getItem('darkMode') === 'enabled' || (!('darkMode' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+    </script>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    
+    <!-- TƯ DUY TỐI ƯU: Tích hợp thư viện Flatpickr cho Custom Date Picker -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+
+    <link rel="prefetch" href="{{ url_for('dashboard.index') }}">
+    <link rel="prefetch" href="{{ url_for('transactions.list_transactions') }}">
+    <link rel="prefetch" href="{{ url_for('budgets.list_budgets') }}">
+    <link rel="prefetch" href="{{ url_for('wallets.list_wallets') }}">
+    <link rel="prefetch" href="{{ url_for('tasks.list_tasks') }}">
+
+    <style>
+        /* Tư duy tối ưu: Giữ cho thanh cuộn luôn có không gian cố định để tránh layout shift 
+           khiến View Transition của HTMX bị hủy ngang (gây ra InvalidStateError). */
+        html {
+            scrollbar-gutter: stable;
+        }
+        .no-transition *, .no-transition *::before, .no-transition *::after {
+            transition: none !important;
+            animation: none !important;
+        }
+        @keyframes fade-slide-out { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-10px); } }
+        @keyframes fade-slide-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        ::view-transition-old(root) { animation: 250ms cubic-bezier(0.4, 0, 0.2, 1) both fade-slide-out; }
+        ::view-transition-new(root) { animation: 250ms cubic-bezier(0.4, 0, 0.2, 1) both fade-slide-in; }
+
+        /* TƯ DUY FIX UI: Tùy chỉnh CSS cho Flatpickr để đồng bộ với Dark Mode của Tailwind */
+        .flatpickr-calendar {
+            background-color: #fff;
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            font-family: inherit;
+        }
+        .dark .flatpickr-calendar {
+            background-color: #1e293b; /* slate-800 */
+            border-color: #334155;     /* slate-700 */
+            color: #e2e8f0;            /* slate-200 */
+        }
+        .dark .flatpickr-day {
+            color: #e2e8f0;
+        }
+        .dark .flatpickr-day.selected {
+            background-color: #2563eb; /* blue-600 */
+            border-color: #2563eb;
+            color: #fff;
+        }
+        .dark .flatpickr-day:hover {
+            background-color: #334155; /* slate-700 */
+        }
+        .dark .flatpickr-months .flatpickr-month {
+            color: #e2e8f0;
+        }
+        .dark .flatpickr-current-month .flatpickr-monthDropdown-months {
+            background-color: #1e293b;
+            color: #e2e8f0;
+        }
+        .dark .flatpickr-weekdays {
+            background-color: #1e293b;
+        }
+        .dark .flatpickr-weekday {
+            color: #94a3b8; /* slate-400 */
+        }
+        .dark .flatpickr-months .flatpickr-prev-month, 
+        .dark .flatpickr-months .flatpickr-next-month {
+            color: #e2e8f0;
+            fill: #e2e8f0;
+        }
+    </style>
+</head>
+<body hx-boost="true" hx-swap="innerHTML transition:true" hx-history="false" hx-headers='{"X-CSRFToken": "{{ csrf_token() }}"}' class="bg-gray-50 text-gray-800 flex flex-col min-h-screen transition-colors duration-300 dark:bg-slate-900 dark:text-slate-200">
+
+    <!-- NAVBAR -->
+    <nav class="bg-white shadow-md sticky top-0 z-50 transition-colors duration-300 dark:bg-slate-800 dark:border-b dark:border-slate-700">
+        <div class="max-w-7xl mx-auto px-3 sm:px-4 py-3">
+            <div class="flex justify-between items-center gap-2">
+                
+                <!-- TƯ DUY FIX UI: Thêm icon Trở về trang chủ bên trái Logo (chỉ hiện khi đã đăng nhập) -->
+                <div class="flex items-center gap-2 sm:gap-3 shrink-0">
+                    {% if current_user.is_authenticated %}
+                        <a href="{{ url_for('main.index') }}" class="text-gray-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400 transition-colors" title="Trở về trang chủ">
+                            <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+                            </svg>
+                        </a>
+                        <div class="h-5 w-px bg-gray-300 dark:bg-slate-600"></div>
+                    {% endif %}
+
+                    <a href="{{ url_for('main.index') if not current_user.is_authenticated else url_for('dashboard.index') }}" 
+                       class="text-lg sm:text-xl font-bold text-blue-600 dark:text-blue-400 flex items-center">
+                        <svg class="w-5 h-5 sm:w-6 sm:h-6 mr-1.5 sm:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+                        <span>Planner</span>
+                    </a>
+
+                    {% if not current_user.is_authenticated and request.endpoint != 'main.index' %}
+                        <div class="hidden sm:block h-5 w-px bg-gray-300 dark:bg-slate-600"></div>
+                        <a href="{{ url_for('main.index') }}" class="hidden sm:inline-block text-sm font-medium text-gray-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors whitespace-nowrap">
+                            Trở về trang chủ
+                        </a>
+                    {% endif %}
+                </div>
+                
+                <div class="hidden md:flex items-center space-x-6 font-medium dark:text-slate-300">
+                    {% if current_user.is_authenticated %}
+                        <!-- TƯ DUY FIX UI: Loại bỏ hx-boost="false" để kích hoạt lại hiệu ứng chuyển cảnh mượt mà của HTMX View Transitions -->
+                        <a href="{{ url_for('dashboard.index') }}" class="nav-link hover:text-blue-600 dark:hover:text-blue-400 transition">Tổng quan</a>
+                        <a href="{{ url_for('transactions.list_transactions') }}" class="nav-link hover:text-blue-600 dark:hover:text-blue-400 transition">Giao dịch</a>
+                        <a href="{{ url_for('wallets.list_wallets') }}" class="nav-link hover:text-blue-600 dark:hover:text-blue-400 transition">Ví tiền</a>
+                        <a href="{{ url_for('budgets.list_budgets') }}" class="nav-link hover:text-blue-600 dark:hover:text-blue-400 transition">Ngân sách</a>
+                        <a href="{{ url_for('tasks.list_tasks') }}" class="nav-link hover:text-blue-600 dark:hover:text-blue-400 transition">Công việc</a>
+                        <a href="{{ url_for('auth.profile') }}" class="nav-link hover:text-blue-600 dark:hover:text-blue-400 transition">Cá nhân</a>
+                        
+                        {% if current_user.email == 'demo@personalplanner.com' %}
+                            <a href="{{ url_for('auth.upgrade') }}" hx-boost="false" class="text-green-600 hover:text-green-700 font-semibold transition ml-4">Đăng ký ngay</a>
+                        {% endif %}
+                        
+                        <a href="{{ url_for('auth.logout') }}" hx-boost="false" class="text-red-500 hover:text-red-700 font-semibold transition ml-4">Đăng xuất</a>
+                    {% else %}
+                        <div class="flex items-center gap-2">
+                            <a href="{{ url_for('auth.login') }}" class="px-4 py-1.5 rounded-md transition-all duration-300 {% if request.endpoint == 'auth.login' %} bg-blue-600 text-white shadow-sm {% else %} text-gray-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-slate-700 {% endif %}">Đăng nhập</a>
+                            <a href="{{ url_for('auth.register') }}" class="px-4 py-1.5 rounded-md transition-all duration-300 {% if request.endpoint == 'auth.register' %} bg-blue-600 text-white shadow-sm {% else %} text-gray-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-slate-700 {% endif %}">Đăng ký</a>
+                        </div>
+                    {% endif %}
+                </div>
+
+                <div class="flex items-center gap-3 sm:gap-4 shrink-0">
+                    <div class="flex items-center gap-1.5 sm:gap-2">
+                        <span class="text-sm sm:text-base select-none">☀️</span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="darkModeToggle" class="sr-only peer" aria-label="Chuyển đổi giao diện Sáng/Tối">
+                            <div class="w-11 h-6 bg-gray-300 dark:bg-slate-600 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                        </label>
+                        <span class="text-sm sm:text-base select-none">🌙</span>
+                    </div>
+                    
+                    {% if not current_user.is_authenticated %}
+                        <div class="flex md:hidden items-center gap-2">
+                            <a href="{{ url_for('auth.login') }}" class="whitespace-nowrap px-2 py-1 rounded text-sm font-medium {% if request.endpoint == 'auth.login' %} text-blue-600 dark:text-blue-400 {% else %} text-gray-600 dark:text-slate-300 {% endif %} transition">Đăng nhập</a>
+                            <a href="{{ url_for('auth.register') }}" class="whitespace-nowrap px-2 py-1 rounded text-sm font-medium {% if request.endpoint == 'auth.register' %} text-blue-600 dark:text-blue-400 {% else %} text-gray-600 dark:text-slate-300 {% endif %} transition">Đăng ký</a>
+                        </div>
+                    {% else %}
+                        <div class="md:hidden flex items-center">
+                            <button type="button" id="mobileMenuBtn" hx-boost="false" aria-controls="mobileMenu" aria-expanded="false" class="p-1.5 rounded-md hover:bg-gray-100 focus:outline-none dark:hover:bg-slate-700">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                            </button>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        {% if current_user.is_authenticated %}
+        <div id="mobileMenu" class="hidden md:hidden bg-white shadow-lg dark:bg-slate-800 border-t border-gray-100 dark:border-slate-700">
+            <div class="flex flex-col px-4 pt-2 pb-4 space-y-2 dark:text-slate-300">
+                <!-- TƯ DUY FIX UI: Loại bỏ hx-boost="false" cho các link điều hướng trên mobile -->
+                <a href="{{ url_for('dashboard.index') }}" class="nav-link block py-2 hover:text-blue-600 transition">Tổng quan</a>
+                <a href="{{ url_for('transactions.list_transactions') }}" class="nav-link block py-2 hover:text-blue-600 transition">Giao dịch</a>
+                <a href="{{ url_for('wallets.list_wallets') }}" class="nav-link block py-2 hover:text-blue-600 transition">Ví tiền</a>
+                <a href="{{ url_for('budgets.list_budgets') }}" class="nav-link block py-2 hover:text-blue-600 transition">Ngân sách</a>
+                <a href="{{ url_for('tasks.list_tasks') }}" class="nav-link block py-2 hover:text-blue-600 transition">Công việc</a>
+                <a href="{{ url_for('auth.profile') }}" class="nav-link block py-2 hover:text-blue-600 transition">Cá nhân</a>
+                
+                {% if current_user.email == 'demo@personalplanner.com' %}
+                    <a href="{{ url_for('auth.upgrade') }}" hx-boost="false" class="block py-2 text-green-600 font-semibold">Đăng ký ngay</a>
+                {% endif %}
+                
+                <a href="{{ url_for('auth.logout') }}" hx-boost="false" class="block py-2 text-red-500 font-semibold">Đăng xuất</a>
+            </div>
+        </div>
+        {% endif %}
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 py-8 flex-grow w-full">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    {% if category == 'success' %}{% set flash_class = 'bg-green-100 text-green-800 border-l-4 border-green-500 flash-success' %}
+                    {% elif category in ['info', 'message'] %}{% set flash_class = 'bg-blue-100 text-blue-800 border-l-4 border-blue-500 flash-info' %}
+                    {% else %}{% set flash_class = 'bg-red-100 text-red-800 border-l-4 border-red-500 flash-danger' %}{% endif %}
+                    <div class="mb-4 p-4 rounded-md flex justify-between items-center shadow-sm flash-message {{ flash_class }}">
+                        <span class="font-medium">{{ message }}</span>
+                        <button onclick="this.parentElement.remove()" class="text-gray-500 hover:text-gray-700 focus:outline-none">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        </button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="bg-white border-t border-gray-200 py-4 mt-auto transition-colors duration-300 dark:bg-slate-800 dark:border-slate-700">
+        <div class="max-w-7xl mx-auto px-4 text-center text-sm text-gray-500 dark:text-slate-400">
+            Personal Planner - Hệ thống quản lý tài chính & công việc cá nhân.
+            <div class="mt-2 space-x-4">
+                <a href="{{ url_for('main.guide') }}" class="hover:text-blue-600 dark:hover:text-blue-400 transition">Hướng dẫn sử dụng</a>
+                <a href="{{ url_for('main.privacy') }}" class="hover:text-blue-600 dark:hover:text-blue-400 transition">Chính sách dữ liệu</a>
+                <a href="{{ url_for('main.contact') }}" class="hover:text-blue-600 dark:hover:text-blue-400 transition">Liên hệ hỗ trợ</a>
+            </div>
+        </div>
+    </footer>
+
+    <!-- CUSTOM MODAL XÓA (Global) -->
+    <div id="custom-delete-modal" class="fixed inset-0 z-[100] hidden bg-black/50 flex items-center justify-center transition-opacity duration-300">
+        <div class="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-96 p-6 transform scale-95 transition-transform duration-300">
+            <h3 class="text-lg font-bold text-gray-800 dark:text-slate-100 mb-2">Xác nhận xóa</h3>
+            <p class="text-gray-600 dark:text-slate-300 mb-6">Bạn có chắc chắn muốn xóa mục này không? Hành động này không thể hoàn tác.</p>
+            <div class="flex justify-end space-x-3">
+                <button id="modal-cancel-btn" class="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 dark:bg-slate-600 dark:text-white dark:hover:bg-slate-500 transition">Hủy</button>
+                <button id="modal-confirm-btn" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition">Xóa ngay</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>
+    
+    <!-- TƯ DUY TỐI ƯU: Load thư viện Flatpickr và ngôn ngữ Tiếng Việt -->
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/vn.js"></script>
+
+    {% block scripts %}{% endblock %}
+
+    <script>
+        // TƯ DUY FIX LỖI (HTMX DOM SWAP):
+        if (!window.appJSInitialized) {
+            window.appJSInitialized = true;
+
+            (function() {
+                // ==========================================
+                // 1. XỬ LÝ MOBILE MENU (EVENT DELEGATION)
+                // ==========================================
+                document.addEventListener('click', function(e) {
+                    const btn = e.target.closest('#mobileMenuBtn');
+                    if (btn) {
+                        e.preventDefault();
+                        e.stopPropagation(); 
+                        
+                        const mobileMenu = document.getElementById('mobileMenu');
+                        if (mobileMenu) {
+                            const isHidden = mobileMenu.classList.contains('hidden');
+                            if (isHidden) {
+                                mobileMenu.classList.remove('hidden');
+                                btn.setAttribute('aria-expanded', 'true');
+                            } else {
+                                mobileMenu.classList.add('hidden');
+                                btn.setAttribute('aria-expanded', 'false');
+                            }
+                        }
+                        return;
+                    }
+
+                    const mobileLink = e.target.closest('#mobileMenu a');
+                    if (mobileLink) {
+                        const mobileMenu = document.getElementById('mobileMenu');
+                        if (mobileMenu) {
+                            mobileMenu.classList.add('hidden');
+                            const btn = document.getElementById('mobileMenuBtn');
+                            if (btn) btn.setAttribute('aria-expanded', 'false');
+                        }
+                    }
+                }, true); 
+
+                // ==========================================
+                // 2. LOGIC DARK MODE
+                // ==========================================
+                function applyTheme(isDark) {
+                    const htmlEl = document.documentElement;
+                    if (isDark) { htmlEl.classList.add('dark'); localStorage.setItem('darkMode', 'enabled'); } 
+                    else { htmlEl.classList.remove('dark'); localStorage.setItem('darkMode', 'disabled'); }
+                    if (window.updateChartTheme) window.updateChartTheme(isDark);
+                }
+
+                document.addEventListener('change', function(e) {
+                    if (e.target && e.target.id === 'darkModeToggle') applyTheme(e.target.checked);
+                });
+
+                function syncToggleState() {
+                    const darkModeToggle = document.getElementById('darkModeToggle');
+                    if (darkModeToggle) darkModeToggle.checked = document.documentElement.classList.contains('dark');
+                }
+
+                // ==========================================
+                // 3. HIGHLIGHT NAVBAR
+                // ==========================================
+                function highlightNavbar() {
+                    const currentPath = window.location.pathname;
+                    document.querySelectorAll('.nav-link').forEach(link => {
+                        link.classList.remove('bg-blue-600', 'text-white', 'rounded-md', 'px-3', 'py-1.5', 'shadow-sm', 'font-semibold');
+                        link.classList.add('hover:text-blue-600', 'dark:hover:text-blue-400', 'transition');
+                        const href = link.getAttribute('href');
+                        if (!href || href === '#' || href.startsWith('javascript')) return;
+                        const linkPath = new URL(href, window.location.origin).pathname;
+                        let isMatch = (linkPath === '/' && currentPath === '/') || (linkPath !== '/' && linkPath !== '#' && currentPath.startsWith(linkPath));
+                        if (isMatch) {
+                            link.classList.remove('hover:text-blue-600', 'dark:hover:text-blue-400');
+                            link.classList.add('bg-blue-600', 'text-white', 'rounded-md', 'px-3', 'py-1.5', 'shadow-sm', 'font-semibold');
+                        }
+                    });
+                }
+
+                syncToggleState();
+                highlightNavbar();
+                requestAnimationFrame(() => requestAnimationFrame(() => document.documentElement.classList.remove('no-transition')));
+
+                // ==========================================
+                // 4. HTMX EVENTS (CHUYỂN TRANG)
+                // ==========================================
+                document.addEventListener('htmx:beforeSwap', function() {
+                    document.documentElement.classList.add('no-transition');
+                    // TƯ DUY FIX LỖI: Đánh dấu trang đang chuẩn bị chuyển. 
+                    // Bất kỳ hàm fetch nào đang chạy ngầm nên kiểm tra biến này trước khi cập nhật DOM.
+                    window.isPageUnloading = true; 
+                });
+
+                document.addEventListener('htmx:afterSettle', function() {
+                    syncToggleState();
+                    highlightNavbar();
+                    const metaToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+                    if (metaToken) document.body.setAttribute('hx-headers', JSON.stringify({ 'X-CSRFToken': metaToken }));
+                    requestAnimationFrame(() => requestAnimationFrame(() => document.documentElement.classList.remove('no-transition')));
+                    
+                    // Reset lại biến cờ sau khi trang mới đã ổn định
+                    window.isPageUnloading = false;
+                });
+
+                // ==========================================
+                // 5. XỬ LÝ SỰ KIỆN BFCACHE VÀ POPSTATE
+                // ==========================================
+                window.addEventListener('pageshow', function(event) {
+                    if (event.persisted) { syncToggleState(); window.location.reload(); }
+                });
+                
+                window.addEventListener('popstate', function() { window.location.reload(); });
+            })();
+        }
+    </script>
+</body>
+</html>

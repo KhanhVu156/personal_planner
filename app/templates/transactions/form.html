@@ -1,0 +1,356 @@
+{% extends "base.html" %}
+{% block content %}
+<!-- 
+    TƯ DUY THIẾT KẾ:
+    - Giao diện form giao dịch (Transaction) đồng bộ với form công việc.
+    - Sử dụng Custom Dropdown cho Loại, Danh mục và Ví để tăng tính thẩm mỹ.
+    - Các trường nhập liệu được chia thành các cột hợp lý để tối ưu không gian.
+    - Xóa bỏ hàm .replace() trong hiển thị lỗi vì Backend đã trả về thông báo tiếng Việt chuẩn xác.
+-->
+<div class="max-w-2xl mx-auto bg-white dark:bg-slate-800 p-6 rounded shadow mt-4 transition-colors duration-300">
+    <h2 class="text-2xl font-bold mb-6 text-gray-800 dark:text-slate-100">
+        {% if 'Add' in title %}Thêm Giao dịch{% else %}Sửa Giao dịch{% endif %}
+    </h2>
+
+    <!-- KHUNG HIỂN THỊ LỖI TỔNG QUÁT -->
+    {% if form.errors %}
+    <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded shadow-sm">
+        <p class="font-bold">Vui lòng kiểm tra lại các thông tin sau:</p>
+        <ul class="list-disc pl-5 mt-2">
+            {% for field_name, errors in form.errors.items() %}
+                {% for error in errors %}
+                    <li><b>{{ form[field_name].label.text }}:</b> {{ error }}</li>
+                {% endfor %}
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    <form method="POST" action="" novalidate>
+        {{ form.hidden_tag() }}
+        
+        <!-- Hàng 1: Ngày & Loại -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+                {{ form.date.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
+                <!-- 
+                    TƯ DUY TỐI ƯU: Đổi type="date" thành type="text" và thêm class "datepicker".
+                    Flatpickr sẽ tự động biến input này thành một Date Picker hiện đại, hỗ trợ Dark Mode.
+                -->
+                {{ form.date(class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white transition-colors datepicker", type="text", placeholder="YYYY-MM-DD") }}
+                {% for error in form.date.errors %}
+                    <span class="text-red-500 text-sm mt-1 block">{{ error }}</span>
+                {% endfor %}
+            </div>
+            
+            <!-- CUSTOM DROPDOWN: LOẠI GIAO DỊCH -->
+            <div class="relative" id="type-selector-wrapper">
+                {{ form.type.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
+                
+                <!-- Thẻ select gốc bị ẩn đi để form vẫn submit đúng -->
+                {{ form.type(class="hidden", id="real-type-select") }}
+
+                <button type="button" id="type-btn" class="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded text-left flex justify-between items-center focus:ring-2 focus:ring-blue-500 outline-none transition-colors text-gray-900 dark:text-white font-medium">
+                    <span id="type-label">
+                        {% set selected_type = form.type.data or 'expense' %}
+                        {% for value, label in form.type.choices %}
+                            {% if value == selected_type %}{{ label }}{% endif %}
+                        {% endfor %}
+                    </span>
+                    <svg class="w-4 h-4 text-gray-500 dark:text-slate-400 transition-transform duration-200" id="type-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </button>
+                
+                <div id="type-menu" class="absolute top-full left-0 mt-1 w-full bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg shadow-2xl hidden opacity-0 transform -translate-y-2 transition-all duration-200 overflow-hidden z-50">
+                    <ul class="max-h-60 overflow-y-auto py-1" id="type-list">
+                        {% for value, label in form.type.choices %}
+                            <li>
+                                <button type="button" class="type-item w-full text-left px-4 py-2.5 text-sm transition-colors duration-150
+                                    {% if value == selected_type %} bg-blue-600 text-white font-medium {% else %} text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-600 {% endif %}" 
+                                    data-value="{{ value }}">{{ label }}</button>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% for error in form.type.errors %}
+                    <span class="text-red-500 text-sm mt-1 block">{{ error }}</span>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Hàng 2: Số tiền & Danh mục -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+                {{ form.amount.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
+                <div class="relative">
+                    <!-- Giữ type="number" để HTML5 validation hoạt động tốt, hoặc dùng text với JS format -->
+                    {{ form.amount(class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white transition-colors pr-12", placeholder="Nhập số tiền...") }}
+                    <span class="absolute right-3 top-2 text-gray-500 dark:text-slate-400 font-bold">VND</span>
+                </div>
+                {% for error in form.amount.errors %}
+                    <span class="text-red-500 text-sm mt-1 block">{{ error }}</span>
+                {% endfor %}
+            </div>
+            
+            <!-- CUSTOM DROPDOWN: DANH MỤC -->
+            <div class="relative" id="category-selector-wrapper">
+                {{ form.category.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
+                
+                <!-- Thẻ select gốc bị ẩn đi -->
+                {{ form.category(class="hidden", id="real-category-select") }}
+
+                <button type="button" id="category-btn" class="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded text-left flex justify-between items-center focus:ring-2 focus:ring-blue-500 outline-none transition-colors text-gray-900 dark:text-white font-medium">
+                    <span id="category-label">
+                        {% set selected_category = form.category.data or 'other' %}
+                        {% for value, label in form.category.choices %}
+                            {% if value == selected_category %}{{ label }}{% endif %}
+                        {% endfor %}
+                    </span>
+                    <svg class="w-4 h-4 text-gray-500 dark:text-slate-400 transition-transform duration-200" id="category-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </button>
+                
+                <div id="category-menu" class="absolute top-full left-0 mt-1 w-full bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg shadow-2xl hidden opacity-0 transform -translate-y-2 transition-all duration-200 overflow-hidden z-50">
+                    <ul class="max-h-60 overflow-y-auto py-1" id="category-list">
+                        {% for value, label in form.category.choices %}
+                            <li>
+                                <button type="button" class="category-item w-full text-left px-4 py-2.5 text-sm transition-colors duration-150
+                                    {% if value == selected_category %} bg-blue-600 text-white font-medium {% else %} text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-600 {% endif %}" 
+                                    data-value="{{ value }}">{{ label }}</button>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% for error in form.category.errors %}
+                    <span class="text-red-500 text-sm mt-1 block">{{ error }}</span>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Hàng 3: Mô tả -->
+        <div class="mb-4">
+            {{ form.description.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
+            {{ form.description(class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white placeholder:text-gray-400 dark:placeholder:text-slate-500 transition-colors", rows="2", placeholder="Nhập mô tả...") }}
+            {% for error in form.description.errors %}
+                <span class="text-red-500 text-sm mt-1 block">{{ error }}</span>
+            {% endfor %}
+        </div>
+
+        <!-- Hàng 4: Ví -->
+        <div class="mb-6">
+            <!-- CUSTOM DROPDOWN: VÍ -->
+            <div class="relative" id="wallet-selector-wrapper">
+                {{ form.wallet_id.label(class="block text-gray-700 dark:text-slate-300 font-semibold mb-1") }}
+                
+                <!-- Thẻ select gốc bị ẩn đi -->
+                {{ form.wallet_id(class="hidden", id="real-wallet-select") }}
+
+                <button type="button" id="wallet-btn" class="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded text-left flex justify-between items-center focus:ring-2 focus:ring-blue-500 outline-none transition-colors text-gray-900 dark:text-white font-medium">
+                    <span id="wallet-label">
+                        {% set selected_wallet = form.wallet_id.data if form.wallet_id.data is not none else 0 %}
+                        {% for value, label in form.wallet_id.choices %}
+                            {% if value == selected_wallet %}{{ label }}{% endif %}
+                        {% endfor %}
+                    </span>
+                    <svg class="w-4 h-4 text-gray-500 dark:text-slate-400 transition-transform duration-200" id="wallet-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </button>
+                
+                <div id="wallet-menu" class="absolute top-full left-0 mt-1 w-full bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg shadow-2xl hidden opacity-0 transform -translate-y-2 transition-all duration-200 overflow-hidden z-50">
+                    <ul class="max-h-60 overflow-y-auto py-1" id="wallet-list">
+                        {% for value, label in form.wallet_id.choices %}
+                            <li>
+                                <button type="button" class="wallet-item w-full text-left px-4 py-2.5 text-sm transition-colors duration-150
+                                    {% if value == selected_wallet %} bg-blue-600 text-white font-medium {% else %} text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-600 {% endif %}" 
+                                    data-value="{{ value }}">{{ label }}</button>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% for error in form.wallet_id.errors %}
+                    <span class="text-red-500 text-sm mt-1 block">{{ error }}</span>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Nút bấm -->
+        <div class="flex items-center justify-end space-x-4 border-t border-gray-200 dark:border-slate-700 pt-4">
+            <a href="{{ url_for('transactions.list_transactions') }}" class="bg-gray-200 text-gray-800 dark:bg-slate-600 dark:text-slate-100 py-2 px-6 rounded hover:bg-gray-300 dark:hover:bg-slate-500 transition duration-200 font-semibold">Hủy</a>
+            {{ form.submit(class="bg-blue-600 text-white py-2 px-6 rounded hover:bg-blue-700 transition duration-200 cursor-pointer font-semibold shadow", value="Lưu") }}
+        </div>
+    </form>
+</div>
+
+<script>
+    (function() {
+        'use strict';
+
+        // ==========================================
+        // 1. KHỞI TẠO FLATPICKR CHO CUSTOM DATE PICKER
+        // ==========================================
+        // TƯ DUY TỐI ƯU: Khởi tạo Flatpickr cho các input có class 'datepicker'.
+        // dateFormat: "Y-m-d" để khớp với định dạng backend mong muốn.
+        // altFormat: "d/m/Y" để hiển thị cho người dùng dễ nhìn.
+        if (typeof flatpickr !== 'undefined') {
+            flatpickr(".datepicker", {
+                locale: "vn",
+                dateFormat: "Y-m-d",
+                altInput: true,
+                altFormat: "d/m/Y", 
+                allowInput: false, // Chỉ cho phép chọn từ lịch để tránh nhập sai định dạng
+            });
+        }
+
+        // ==========================================
+        // 2. HÀM DÙNG CHUNG: XỬ LÝ ĐÓNG/MỞ DROPDOWN
+        // ==========================================
+        function setupDropdown(config) {
+            const btn = document.getElementById(config.btnId);
+            const menu = document.getElementById(config.menuId);
+            const label = document.getElementById(config.labelId);
+            const realSelect = document.getElementById(config.selectId);
+            const arrow = document.getElementById(config.arrowId);
+            const items = document.querySelectorAll(`.${config.itemClass}`);
+
+            if (!btn || !menu || !realSelect) return;
+
+            // Sự kiện click vào nút để mở/đóng
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const isOpen = menu.classList.contains('opacity-100');
+
+                // Đóng các menu khác trước khi mở menu hiện tại
+                document.querySelectorAll('.custom-dropdown-menu').forEach(m => {
+                    if (m !== menu) {
+                        m.classList.remove('opacity-100', 'translate-y-0');
+                        m.classList.add('opacity-0', '-translate-y-2');
+                        setTimeout(() => m.classList.add('hidden'), 200);
+                    }
+                });
+                // Reset tất cả các mũi tên khác
+                document.querySelectorAll('.custom-dropdown-arrow').forEach(a => {
+                    if (a !== arrow) a.classList.remove('rotate-180');
+                });
+
+                if (isOpen) {
+                    closeDropdown(menu, arrow);
+                } else {
+                    openDropdown(menu, arrow);
+                }
+            });
+
+            // Sự kiện chọn item
+            items.forEach(item => {
+                item.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const val = item.getAttribute('data-value');
+                    
+                    // Cập nhật giá trị thẻ select gốc
+                    realSelect.value = val;
+                    // Cập nhật text hiển thị
+                    label.innerText = item.innerText;
+
+                    // Reset class active
+                    items.forEach(i => {
+                        i.classList.remove('bg-blue-600', 'text-white', 'font-medium');
+                        i.classList.add('text-gray-700', 'dark:text-slate-300', 'hover:bg-gray-100', 'dark:hover:bg-slate-600');
+                    });
+                    // Set class active cho item vừa chọn
+                    item.classList.remove('text-gray-700', 'dark:text-slate-300', 'hover:bg-gray-100', 'dark:hover:bg-slate-600');
+                    item.classList.add('bg-blue-600', 'text-white', 'font-medium');
+
+                    closeDropdown(menu, arrow);
+                });
+            });
+        }
+
+        function openDropdown(menu, arrow) {
+            menu.classList.remove('hidden');
+            void menu.offsetWidth; // Trigger reflow
+            menu.classList.remove('opacity-0', '-translate-y-2');
+            menu.classList.add('opacity-100', 'translate-y-0');
+            if (arrow) arrow.classList.add('rotate-180');
+        }
+
+        function closeDropdown(menu, arrow) {
+            menu.classList.remove('opacity-100', 'translate-y-0');
+            menu.classList.add('opacity-0', '-translate-y-2');
+            if (arrow) arrow.classList.remove('rotate-180');
+            setTimeout(() => {
+                menu.classList.add('hidden');
+            }, 200);
+        }
+
+        // ==========================================
+        // 3. KHỞI TẠO CÁC DROPDOWN
+        // ==========================================
+        
+        // Loại giao dịch
+        setupDropdown({
+            btnId: 'type-btn',
+            menuId: 'type-menu',
+            labelId: 'type-label',
+            selectId: 'real-type-select',
+            arrowId: 'type-arrow',
+            itemClass: 'type-item'
+        });
+        const typeMenu = document.getElementById('type-menu');
+        const typeArrow = document.getElementById('type-arrow');
+        if (typeMenu) typeMenu.classList.add('custom-dropdown-menu');
+        if (typeArrow) typeArrow.classList.add('custom-dropdown-arrow');
+
+        // Danh mục
+        setupDropdown({
+            btnId: 'category-btn',
+            menuId: 'category-menu',
+            labelId: 'category-label',
+            selectId: 'real-category-select',
+            arrowId: 'category-arrow',
+            itemClass: 'category-item'
+        });
+        const categoryMenu = document.getElementById('category-menu');
+        const categoryArrow = document.getElementById('category-arrow');
+        if (categoryMenu) categoryMenu.classList.add('custom-dropdown-menu');
+        if (categoryArrow) categoryArrow.classList.add('custom-dropdown-arrow');
+
+        // Ví
+        setupDropdown({
+            btnId: 'wallet-btn',
+            menuId: 'wallet-menu',
+            labelId: 'wallet-label',
+            selectId: 'real-wallet-select',
+            arrowId: 'wallet-arrow',
+            itemClass: 'wallet-item'
+        });
+        const walletMenu = document.getElementById('wallet-menu');
+        const walletArrow = document.getElementById('wallet-arrow');
+        if (walletMenu) walletMenu.classList.add('custom-dropdown-menu');
+        if (walletArrow) walletArrow.classList.add('custom-dropdown-arrow');
+
+        // ==========================================
+        // 4. ĐÓNG MENU KHI CLICK RA NGOÀI
+        // ==========================================
+        document.addEventListener('click', (e) => {
+            const typeWrapper = document.getElementById('type-selector-wrapper');
+            const categoryWrapper = document.getElementById('category-selector-wrapper');
+            const walletWrapper = document.getElementById('wallet-selector-wrapper');
+
+            if (typeWrapper && !typeWrapper.contains(e.target)) {
+                const menu = document.getElementById('type-menu');
+                const arrow = document.getElementById('type-arrow');
+                if (menu && menu.classList.contains('opacity-100')) closeDropdown(menu, arrow);
+            }
+            
+            if (categoryWrapper && !categoryWrapper.contains(e.target)) {
+                const menu = document.getElementById('category-menu');
+                const arrow = document.getElementById('category-arrow');
+                if (menu && menu.classList.contains('opacity-100')) closeDropdown(menu, arrow);
+            }
+
+            if (walletWrapper && !walletWrapper.contains(e.target)) {
+                const menu = document.getElementById('wallet-menu');
+                const arrow = document.getElementById('wallet-arrow');
+                if (menu && menu.classList.contains('opacity-100')) closeDropdown(menu, arrow);
+            }
+        });
+
+    })();
+</script>
+{% endblock %}

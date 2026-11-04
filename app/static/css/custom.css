@@ -1,0 +1,31 @@
+/* =========================================================
+ * custom.css — Chỉ chứa các CSS thực sự cần custom.
+ * 
+ * TƯ DUY TỐI ƯU: Tailwind CLI đã được cấu hình quét qua các file .py, .html, .js 
+ * để tự động sinh ra các class utility (như gap-3, top-5, shadow-2xl...).
+ * Việc copy-paste các class này vào đây là hoàn toàn dư thừa và làm tăng kích thước file.
+ * Do đó, file này chỉ nên chứa:
+ * 1. Các keyframes animation tự viết.
+ * 2. Các class custom hoàn toàn không có trong Tailwind.
+ * ========================================================= */
+
+/* Custom Scrollbar (Ví dụ minh họa nếu bạn cần) */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background-color: #cbd5e1;
+    /* slate-300 */
+    border-radius: 4px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+    background-color: #475569;
+    /* slate-600 */
+}

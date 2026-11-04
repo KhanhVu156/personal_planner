@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+    <h2 class="text-2xl font-bold text-gray-800 dark:text-slate-100">Quản lý Công việc</h2>
+    <a href="{{ url_for('tasks.add_task') }}" class="bg-blue-600 text-white px-4 py-2 rounded shadow hover:bg-blue-700 transition duration-200 flex items-center font-semibold">
+        <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+        Thêm Công việc
+    </a>
+</div>
+
+<!-- TƯ DUY FIX UI: Thêm min-w-[800px] để ép bảng có chiều rộng tối thiểu, kích hoạt thanh cuộn ngang thay vì bóp méo nội dung trên mobile -->
+<div class="overflow-x-auto bg-white dark:bg-slate-800 rounded shadow transition-colors duration-300">
+    <table class="w-full min-w-[800px]">
+        <!-- TƯ DUY FIX UI: Thêm whitespace-nowrap cho các tiêu đề để tránh vỡ chữ trên mobile -->
+        <thead>
+            <tr class="bg-gray-50 dark:bg-slate-700 border-b border-gray-200 dark:border-slate-600">
+                <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600 dark:text-slate-300 uppercase tracking-wider whitespace-nowrap">Công việc</th>
+                <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600 dark:text-slate-300 uppercase tracking-wider whitespace-nowrap">Hạn chót</th>
+                <th class="py-3 px-4 text-center text-sm font-semibold text-gray-600 dark:text-slate-300 uppercase tracking-wider whitespace-nowrap">Trạng thái</th>
+                <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600 dark:text-slate-300 uppercase tracking-wider whitespace-nowrap">Tiến độ</th>
+                <th class="py-3 px-4 text-center text-sm font-semibold text-gray-600 dark:text-slate-300 uppercase tracking-wider whitespace-nowrap">Hành động</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200 dark:divide-slate-700">
+            {% for task in tasks %}
+            <tr class="hover:bg-gray-50 dark:hover:bg-slate-700 transition duration-150">
+                <!-- TƯ DUY FIX UI: Giới hạn chiều rộng và dùng break-words để tên công việc/mô tả dài tự xuống dòng gọn gàng -->
+                <td class="py-4 px-4 max-w-[300px]">
+                    <div class="flex items-start">
+                        {% if task.milestone %}
+                            <svg class="w-5 h-5 text-yellow-500 mr-2 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20" aria-label="Cột mốc quan trọng"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path></svg>
+                        {% endif %}
+                        <div class="min-w-0">
+                            <div class="font-semibold text-gray-800 dark:text-slate-100 break-words">{{ task.title }}</div>
+                            <div class="text-sm text-gray-500 dark:text-slate-400 truncate w-full" title="{{ task.description }}">{{ task.description or 'Không có mô tả' }}</div>
+                        </div>
+                    </div>
+                </td>
+                <td class="py-4 px-4 text-sm text-gray-700 dark:text-slate-300 whitespace-nowrap">
+                    {{ task.deadline.strftime('%d/%m/%Y') }}
+                </td>
+                <!-- Gắn ID để JS cập nhật DOM khi kéo thanh trượt -->
+                <td class="py-4 px-4 text-center whitespace-nowrap" id="task-status-{{ task.id }}">
+                    {% if task.status == 'pending' %}
+                        <span class="px-2 py-1 bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300 text-xs font-semibold rounded-full whitespace-nowrap">Chờ xử lý</span>
+                    {% elif task.status == 'in_progress' %}
+                        <span class="px-2 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 text-xs font-semibold rounded-full whitespace-nowrap">Đang làm</span>
+                    {% elif task.status == 'done' %}
+                        <span class="px-2 py-1 bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300 text-xs font-semibold rounded-full whitespace-nowrap">Đã xong</span>
+                    {% else %}
+                        <span class="px-2 py-1 bg-gray-100 text-gray-800 dark:bg-slate-600 dark:text-slate-200 text-xs font-semibold rounded-full whitespace-nowrap">{{ task.status }}</span>
+                    {% endif %}
+                </td>
+                <td class="py-4 px-4">
+                    <!-- TƯ DUY FIX UI: Thêm whitespace-nowrap vào flex container để thanh trượt và text không bị rớt dòng -->
+                    <div class="flex items-center space-x-3 whitespace-nowrap">
+                        <input type="range" aria-label="Cập nhật tiến độ công việc" class="task-progress-slider w-24 h-2 bg-gray-200 dark:bg-slate-600 rounded-lg appearance-none cursor-pointer" data-id="{{ task.id }}" value="{{ task.progress }}" min="0" max="100">
+                        <span id="task-progress-{{ task.id }}" class="text-sm font-semibold text-gray-700 dark:text-slate-300 w-10 text-right">{{ task.progress }}%</span>
+                    </div>
+                </td>
+                <td class="py-4 px-4 text-center space-x-3 whitespace-nowrap">
+                    <a href="{{ url_for('tasks.edit_task', id=task.id) }}" class="text-blue-600 dark:text-blue-400 hover:text-blue-800 font-medium text-sm">Sửa</a>
+                    
+                    <form action="{{ url_for('tasks.delete_task', id=task.id) }}" method="POST" class="inline delete-form">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <button type="button" class="delete-confirm text-red-600 dark:text-red-400 hover:text-red-800 font-medium text-sm">
+                            Xóa
+                        </button>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="5" class="py-12 text-center text-gray-500 dark:text-slate-400">
+                    <div class="flex flex-col items-center justify-center">
+                        <p class="text-lg">Chưa có công việc nào.</p>
+                        <a href="{{ url_for('tasks.add_task') }}" class="text-blue-600 mt-2 hover:underline">Tạo công việc đầu tiên</a>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

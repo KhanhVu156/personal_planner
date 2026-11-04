@@ -1,0 +1,155 @@
+{% extends "base_public.html" %}
+
+{% block title %}Liên hệ Hỗ trợ - Personal Planner{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto px-4 py-12 md:py-20 w-full">
+    
+    <!-- 
+        TƯ DUY UX: Thêm nút điều hướng thông minh ở đầu nội dung.
+        - Nếu đã đăng nhập: Trở về Dashboard (không gian làm việc).
+        - Nếu chưa đăng nhập/dùng thử: Trở về Trang chủ (Landing Page).
+        Không đặt trên Navbar để giữ nguyên cấu trúc thanh điều hướng chung.
+    -->
+    <div class="mb-6">
+        {% if current_user.is_authenticated %}
+            <a href="{{ url_for('dashboard.index') }}" class="inline-flex items-center text-sm font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                Trở về không gian làm việc
+            </a>
+        {% else %}
+            <a href="{{ url_for('main.index') }}" class="inline-flex items-center text-sm font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                Trở về trang chủ
+            </a>
+        {% endif %}
+    </div>
+
+    <h1 class="text-3xl md:text-4xl font-extrabold text-slate-900 dark:text-white mb-8 text-center">Liên hệ Hỗ trợ</h1>
+    
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+        
+        <!-- Cột trái: Thông tin liên hệ -->
+        <div class="space-y-6">
+            <div class="bg-white dark:bg-slate-800 p-6 md:p-8 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700">
+                <h2 class="text-xl font-bold text-slate-900 dark:text-white mb-4">Thông tin liên lạc</h2>
+                <p class="text-slate-600 dark:text-slate-400 mb-6">Nếu bạn gặp sự cố kỹ thuật hoặc có câu hỏi về sản phẩm, vui lòng liên hệ với tôi qua các kênh sau:</p>
+                
+                <div class="space-y-4">
+                    <div class="flex items-start gap-4">
+                        <div class="bg-blue-100 dark:bg-blue-900/50 p-2 rounded-full text-blue-600 dark:text-blue-400">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                        </div>
+                        <div>
+                            <h3 class="font-semibold text-slate-900 dark:text-white">Email</h3>
+                            <p class="text-slate-600 dark:text-slate-400">dk1562006@gmail.com</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-4">
+                        <div class="bg-green-100 dark:bg-green-900/50 p-2 rounded-full text-green-600 dark:text-green-400">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path></svg>
+                        </div>
+                        <div>
+                            <h3 class="font-semibold text-slate-900 dark:text-white">Hotline</h3>
+                            <p class="text-slate-600 dark:text-slate-400">0793249871 (Giờ hành chính)</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cột phải: Form liên hệ thực tế -->
+        <div class="bg-white dark:bg-slate-800 p-6 md:p-8 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700">
+            <h2 class="text-xl font-bold text-slate-900 dark:text-white mb-4">Gửi tin nhắn</h2>
+            
+            <!-- Thêm id cho form và thẻ div thông báo kết quả -->
+            <div id="contactAlert" class="hidden mb-4 p-4 rounded-md text-sm font-medium"></div>
+
+            <form id="contactForm" method="POST" action="{{ url_for('main.contact') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                
+                <div class="mb-4">
+                    <label class="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-1">Họ và tên</label>
+                    <input type="text" name="name" class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white" placeholder="Nguyễn Văn A" required>
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-1">Email của bạn</label>
+                    <input type="email" name="email" class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white" placeholder="you@example.com" required>
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-1">Nội dung cần hỗ trợ</label>
+                    <textarea name="message" rows="4" class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white" placeholder="Mô tả chi tiết vấn đề bạn gặp phải..." required></textarea>
+                </div>
+                
+                <button type="submit" id="contactSubmitBtn" class="w-full bg-blue-600 text-white font-semibold py-2 rounded hover:bg-blue-700 transition duration-200 flex justify-center items-center gap-2">
+                    Gửi yêu cầu
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Tư duy tối ưu UX: Xử lý submit form bằng AJAX (Fetch API).
+    // Ngăn reload trang, hiển thị trạng thái loading trên nút, và hiện thông báo kết quả ngay lập tức.
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.getElementById('contactForm');
+        if (!form) return;
+
+        form.addEventListener('submit', async function(e) {
+            e.preventDefault(); // Chặn reload trang truyền thống
+
+            const btn = document.getElementById('contactSubmitBtn');
+            const alertBox = document.getElementById('contactAlert');
+            const originalBtnText = btn.innerHTML;
+
+            // 1. Hiển thị trạng thái Loading
+            btn.disabled = true;
+            btn.innerHTML = `
+                <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Đang gửi...
+            `;
+            alertBox.classList.add('hidden');
+
+            try {
+                const formData = new FormData(form);
+                const response = await fetch(form.action, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest' // Đánh dấu đây là request AJAX
+                    }
+                });
+
+                const data = await response.json();
+
+                // 2. Hiển thị kết quả
+                alertBox.classList.remove('hidden', 'bg-green-100', 'text-green-800', 'bg-red-100', 'text-red-800');
+                
+                if (data.success) {
+                    alertBox.classList.add('bg-green-100', 'text-green-800', 'border', 'border-green-200');
+                    alertBox.innerHTML = `<i class="fas fa-check-circle mr-2"></i> ${data.message}`;
+                    form.reset(); // Xóa sạch form sau khi gửi thành công
+                } else {
+                    alertBox.classList.add('bg-red-100', 'text-red-800', 'border', 'border-red-200');
+                    alertBox.innerHTML = `<i class="fas fa-exclamation-circle mr-2"></i> ${data.message}`;
+                }
+            } catch (error) {
+                // Xử lý lỗi mạng
+                alertBox.classList.remove('hidden', 'bg-green-100', 'text-green-800');
+                alertBox.classList.add('bg-red-100', 'text-red-800', 'border', 'border-red-200');
+                alertBox.innerHTML = `<i class="fas fa-exclamation-triangle mr-2"></i> Có lỗi kết nối. Vui lòng thử lại.`;
+            } finally {
+                // 3. Khôi phục trạng thái nút
+                btn.disabled = false;
+                btn.innerHTML = originalBtnText;
+            }
+        });
+    });
+</script>
+{% endblock %}

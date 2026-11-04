@@ -1,0 +1,67 @@
+{% extends "base_public.html" %}
+
+{% block title %}Chính sách dữ liệu - Personal Planner{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto px-4 py-12 md:py-20 w-full">
+    
+    <!-- 
+        TƯ DUY UX: Thêm nút điều hướng thông minh ở đầu nội dung.
+        - Nếu đã đăng nhập: Trở về Dashboard (không gian làm việc).
+        - Nếu chưa đăng nhập/dùng thử: Trở về Trang chủ (Landing Page).
+    -->
+    <div class="mb-6">
+        {% if current_user.is_authenticated %}
+            <a href="{{ url_for('dashboard.index') }}" class="inline-flex items-center text-sm font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                Trở về không gian làm việc
+            </a>
+        {% else %}
+            <a href="{{ url_for('main.index') }}" class="inline-flex items-center text-sm font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                Trở về trang chủ
+            </a>
+        {% endif %}
+    </div>
+
+    <h1 class="text-3xl md:text-4xl font-extrabold text-slate-900 dark:text-white mb-8 text-center">Chính sách Dữ liệu</h1>
+    
+    <div class="bg-white dark:bg-slate-800 p-6 md:p-10 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 space-y-6 text-slate-700 dark:text-slate-300 leading-relaxed">
+        <p class="italic text-sm text-slate-500 dark:text-slate-400">Cập nhật lần cuối: Tháng 11 năm 2026</p>
+
+        <section>
+            <h2 class="text-xl font-bold text-slate-900 dark:text-white mb-3">1. Dữ liệu chúng tôi thu thập</h2>
+            <p>Khi bạn sử dụng Personal Planner, chúng tôi thu thập các thông tin sau:</p>
+            <ul class="list-disc pl-6 mt-2 space-y-1">
+                <li><strong>Thông tin tài khoản:</strong> Tên đăng nhập, địa chỉ Email.</li>
+                <li><strong>Dữ liệu tài chính:</strong> Các giao dịch (số tiền, danh mục, ngày tháng), thông tin ví và ngân sách do bạn tự nhập.</li>
+                <li><strong>Dữ liệu công việc:</strong> Danh sách các task, hạn chót và tiến độ.</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2 class="text-xl font-bold text-slate-900 dark:text-white mb-3">2. Mục đích sử dụng dữ liệu</h2>
+            <p>Dữ liệu của bạn được sử dụng duy nhất cho các mục đích sau:</p>
+            <ul class="list-disc pl-6 mt-2 space-y-1">
+                <li>Hiển thị bảng điều khiển (Dashboard) và các biểu đồ thống kê cá nhân.</li>
+                <li>Tính toán dự báo chi tiêu và đưa ra các gợi ý lập ngân sách.</li>
+                <li>Gửi email khôi phục mật khẩu (nếu bạn yêu cầu).</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2 class="text-xl font-bold text-slate-900 dark:text-white mb-3">3. Cam kết bảo mật</h2>
+            <p>Chúng tôi áp dụng các tiêu chuẩn bảo mật khắt khe nhất:</p>
+            <ul class="list-disc pl-6 mt-2 space-y-1">
+                <li>Mật khẩu của bạn được mã hóa một chiều (Hashing) bằng thuật toán mạnh mẽ trước khi lưu vào cơ sở dữ liệu. Ngay cả quản trị viên cũng không thể xem mật khẩu của bạn.</li>
+                <li>Chúng tôi <strong>tuyệt đối không bán, trao đổi hoặc chia sẻ</strong> dữ liệu cá nhân của bạn cho bất kỳ bên thứ ba nào vì mục đích thương mại.</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2 class="text-xl font-bold text-slate-900 dark:text-white mb-3">4. Quyền của bạn</h2>
+            <p>Bạn có toàn quyền kiểm soát dữ liệu của mình. Bạn có thể xóa từng giao dịch, hoặc liên hệ với chúng tôi để yêu cầu xóa hoàn toàn tài khoản và dữ liệu cá nhân khỏi hệ thống.</p>
+        </section>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+    <h2 class="text-2xl font-bold text-gray-800 dark:text-slate-100">Quản lý Ngân sách</h2>
+    <a href="{{ url_for('budgets.add_budget') }}" class="bg-blue-600 text-white px-4 py-2 rounded shadow hover:bg-blue-700 transition duration-200 flex items-center font-semibold">
+        <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+        Thiết lập Ngân sách
+    </a>
+</div>
+
+<!-- Bộ lọc -->
+<div class="bg-white dark:bg-slate-800 p-4 rounded shadow mb-6 transition-colors duration-300">
+    <form method="GET" class="flex flex-wrap items-end gap-4">
+        <div>
+            <label class="block text-sm font-semibold text-gray-600 dark:text-slate-400 mb-1">Tháng</label>
+            <input type="number" name="month" aria-label="Lọc theo tháng (để trống nếu muốn xem tất cả)" value="{{ month or '' }}" min="1" max="12" class="w-24 px-3 py-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Tất cả">
+        </div>
+        <div>
+            <label class="block text-sm font-semibold text-gray-600 dark:text-slate-400 mb-1">Năm</label>
+            <input type="number" name="year" aria-label="Lọc theo năm (để trống nếu muốn xem tất cả)" value="{{ year or '' }}" min="2000" max="2100" class="w-28 px-3 py-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Tất cả">
+        </div>
+        <button type="submit" class="bg-gray-800 text-white px-4 py-2 rounded hover:bg-gray-900 transition duration-200 h-10 dark:bg-slate-600 dark:hover:bg-slate-500">
+            Lọc
+        </button>
+        
+        <!-- Nút Xem tất cả chỉ hiện khi đang có bộ lọc (dù là tháng hay năm) -->
+        {% if month or year %}
+        <a href="{{ url_for('budgets.list_budgets') }}" class="bg-blue-100 text-blue-700 dark:bg-slate-700 dark:text-blue-300 px-4 py-2 rounded hover:bg-blue-200 dark:hover:bg-slate-600 transition duration-200 h-10 flex items-center font-medium">
+            Xóa bộ lọc
+        </a>
+        {% endif %}
+    </form>
+</div>
+
+<!-- Bảng dữ liệu -->
+<!-- TƯ DUY FIX UI: Thêm min-w-[600px] để ép bảng có chiều rộng tối thiểu, kích hoạt thanh cuộn ngang thay vì bóp méo nội dung trên mobile -->
+<div class="overflow-x-auto bg-white dark:bg-slate-800 rounded shadow transition-colors duration-300">
+    <table class="w-full min-w-[600px]">
+        <!-- TƯ DUY FIX UI: Thêm whitespace-nowrap cho tiêu đề để tránh vỡ chữ -->
+        <thead>
+            <tr class="bg-gray-50 dark:bg-slate-700 border-b border-gray-200 dark:border-slate-600">
+                <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600 dark:text-slate-300 uppercase tracking-wider whitespace-nowrap">Danh mục</th>
+                <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600 dark:text-slate-300 uppercase tracking-wider whitespace-nowrap">Tháng/Năm</th>
+                <th class="py-3 px-4 text-right text-sm font-semibold text-gray-600 dark:text-slate-300 uppercase tracking-wider whitespace-nowrap">Số tiền</th>
+                <th class="py-3 px-4 text-center text-sm font-semibold text-gray-600 dark:text-slate-300 uppercase tracking-wider whitespace-nowrap">Thao tác</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200 dark:divide-slate-700">
+            {% for budget in budgets %}
+            <tr class="hover:bg-gray-50 dark:hover:bg-slate-700 transition duration-150">
+                <td class="py-3 px-4 whitespace-nowrap">
+                    <span class="px-2 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300 text-xs font-semibold rounded-full whitespace-nowrap">
+                        {% set cat_names = {
+                            'food': 'Ăn uống', 'transport': 'Di chuyển', 'education': 'Học tập',
+                            'entertainment': 'Giải trí', 'shopping': 'Mua sắm', 'bills': 'Hóa đơn',
+                            'other': 'Khác'
+                        } %}
+                        {{ cat_names.get(budget.category, budget.category) }}
+                    </span>
+                </td>
+                <td class="py-3 px-4 text-gray-700 dark:text-slate-300 whitespace-nowrap">{{ budget.month }}/{{ budget.year }}</td>
+                
+                <td class="py-3 px-4 text-right font-bold text-gray-800 dark:text-slate-100 whitespace-nowrap">
+                    {{ "{:,.0f}".format(budget.amount).replace(',', '.') }} VND
+                </td>
+                
+                <td class="py-3 px-4 text-center space-x-3 whitespace-nowrap">
+                    <!-- TƯ DUY: Sửa URL Edit, dùng chính tháng/năm của budget đó để fill vào form -->
+                    <a href="{{ url_for('budgets.add_budget', month=budget.month, year=budget.year, category=budget.category) }}" class="text-blue-600 dark:text-blue-400 hover:text-blue-800 font-medium text-sm">Sửa</a>
+                    
+                    <!-- 
+                        TƯ DUY FIX: Bọc nút Xóa trong form POST để chống CSRF.
+                        Truyền kèm filter hiện tại (month, year) qua URL để backend có thể redirect 
+                        user quay lại đúng trang đang lọc sau khi xóa thành công.
+                    -->
+                    <form action="{{ url_for('budgets.delete_budget', id=budget.id, month=month, year=year) }}" method="POST" class="inline delete-form">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <button type="button" class="delete-confirm text-red-600 dark:text-red-400 hover:text-red-800 font-medium text-sm">
+                            Xóa
+                        </button>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="4" class="py-12 text-center text-gray-500 dark:text-slate-400">
+                    <div class="flex flex-col items-center justify-center">
+                        <!-- TƯ DUY FIX: Tách biệt logic Empty State cho từng trường hợp lọc độc lập -->
+                        {% if month and year %}
+                            <p class="text-lg">Không có ngân sách nào cho tháng {{ month }}/{{ year }}.</p>
+                            <a href="{{ url_for('budgets.list_budgets') }}" class="text-blue-600 mt-2 hover:underline">Xem tất cả ngân sách</a>
+                        {% elif month %}
+                            <p class="text-lg">Không có ngân sách nào trong tháng {{ month }} (của bất kỳ năm nào).</p>
+                            <a href="{{ url_for('budgets.list_budgets') }}" class="text-blue-600 mt-2 hover:underline">Xem tất cả ngân sách</a>
+                        {% elif year %}
+                            <p class="text-lg">Không có ngân sách nào trong năm {{ year }} (của bất kỳ tháng nào).</p>
+                            <a href="{{ url_for('budgets.list_budgets') }}" class="text-blue-600 mt-2 hover:underline">Xem tất cả ngân sách</a>
+                        {% else %}
+                            <p class="text-lg">Chưa có ngân sách nào được thiết lập.</p>
+                            <a href="{{ url_for('budgets.add_budget') }}" class="text-blue-600 mt-2 hover:underline">Thiết lập ngân sách ngay</a>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

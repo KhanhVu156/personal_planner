@@ -1,0 +1,109 @@
+{% extends "base_public.html" %}
+
+{% block title %}Personal Planner - Quản lý Tài chính & Công việc{% endblock %}
+
+{% block content %}
+<!-- Banner cảnh báo Dùng thử -->
+{% if current_user.is_authenticated and current_user.email == 'demo@personalplanner.com' %}
+<div class="bg-yellow-50 dark:bg-yellow-900/30 border-b border-yellow-200 dark:border-yellow-700 transition-colors duration-300 w-full">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-col md:flex-row items-center justify-between gap-4 md:gap-0">
+        <div class="flex items-center space-x-3 text-center md:text-left">
+            <span class="text-2xl">⚠️</span>
+            <p class="text-sm md:text-base text-yellow-800 dark:text-yellow-200">
+                <strong class="font-bold">Chế độ Dùng thử:</strong> Bạn đang trải nghiệm ứng dụng với dữ liệu mẫu. Mọi thay đổi sẽ không được lưu vĩnh viễn.
+            </p>
+        </div>
+        
+        <!-- 
+            Tư duy tối ưu UX: Gắn sự kiện smoothNavigate cho nút "Đăng ký ngay" 
+            để tạo hiệu ứng chuyển cảnh mượt mà khi chuyển sang trang Đăng ký.
+        -->
+        <a href="{{ url_for('auth.upgrade') }}" onclick="smoothNavigate(event, '{{ url_for('auth.upgrade') }}')" class="inline-block bg-yellow-500 text-white font-bold px-5 py-2.5 rounded-lg hover:bg-yellow-600 transition text-sm whitespace-nowrap shadow-sm">
+            Đăng ký ngay
+        </a>
+    </div>
+</div>
+{% endif %}
+
+<!-- Hero Section -->
+<div class="flex-grow flex items-center justify-center py-12 md:py-20 w-full">
+    <div class="max-w-7xl mx-auto px-4 text-center">
+        <!-- Tinh chỉnh lại font size trên mobile để chữ không bị quá to, dễ đọc hơn -->
+        <h1 class="text-4xl md:text-6xl font-extrabold text-slate-900 dark:text-white leading-tight mb-6 transition-colors duration-300">
+            Quản lý Tài chính & Công việc <br>
+            <span class="text-blue-600 dark:text-blue-400">Thông minh và Hiệu quả</span>
+        </h1>
+        <p class="text-base md:text-xl text-slate-600 dark:text-slate-300 mb-10 max-w-2xl mx-auto transition-colors duration-300">
+            Personal Planner giúp bạn kiểm soát dòng tiền, lập ngân sách, và sắp xếp công việc hàng ngày một cách khoa học. Trải nghiệm ngay hôm nay!
+        </p>
+        
+        <!-- 
+            Tư duy FIX UI: 
+            - Sử dụng flex-col trên mobile để 2 nút xếp chồng lên nhau.
+            - Thêm w-full để 2 nút kéo dài hết chiều ngang màn hình mobile.
+            - Gắn sự kiện onclick gọi hàm smoothNavigate để tạo hiệu ứng chuyển cảnh.
+        -->
+        <div class="flex flex-col sm:flex-row justify-center gap-4 w-full max-w-sm mx-auto sm:max-w-none">
+            {% if current_user.is_authenticated %}
+                <a href="{{ url_for('dashboard.index') }}" class="w-full sm:w-auto bg-blue-600 text-white text-lg font-semibold px-8 py-3 rounded-lg shadow-lg hover:bg-blue-700 transition duration-300 transform hover:-translate-y-1">
+                    Tiếp tục vào không gian làm việc
+                </a>
+                
+                {% if current_user.email == 'demo@personalplanner.com' %}
+                    <a href="{{ url_for('auth.upgrade') }}" class="w-full sm:w-auto bg-green-500 text-white text-lg font-semibold px-8 py-3 rounded-lg shadow-lg hover:bg-green-600 transition duration-300 transform hover:-translate-y-1">
+                        Tạo tài khoản chính thức
+                    </a>
+                {% endif %}
+            {% else %}
+                <!-- Gắn sự kiện smoothNavigate cho nút Dùng thử -->
+                <a href="{{ url_for('auth.demo') }}" onclick="smoothNavigate(event, '{{ url_for('auth.demo') }}')" class="w-full sm:w-auto bg-green-500 text-white text-lg font-semibold px-8 py-3 rounded-lg shadow-lg hover:bg-green-600 transition duration-300 transform hover:-translate-y-1">
+                    Dùng thử ngay (Không cần Đăng ký)
+                </a>
+                <!-- Gắn sự kiện smoothNavigate cho nút Tạo tài khoản mới -->
+                <a href="{{ url_for('auth.register') }}" onclick="smoothNavigate(event, '{{ url_for('auth.register') }}')" class="w-full sm:w-auto bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 border-2 border-blue-600 dark:border-blue-400 text-lg font-semibold px-8 py-3 rounded-lg hover:bg-blue-50 dark:hover:bg-slate-700 transition duration-300">
+                    Tạo tài khoản mới
+                </a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Features Section -->
+<section class="bg-white dark:bg-slate-800 py-16 transition-colors duration-300 w-full">
+    <div class="max-w-7xl mx-auto px-4">
+        <h2 class="text-3xl font-bold text-center text-slate-900 dark:text-white mb-12 transition-colors duration-300">Tính năng nổi bật</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
+            <div class="p-6 rounded-xl bg-slate-50 dark:bg-slate-700 shadow-sm hover:shadow-md transition duration-300">
+                <!-- TƯ DUY FIX UI: Giảm kích thước icon xuống w-10 h-10 để cân đối hơn với thẻ (Card) -->
+                <div class="flex justify-center mb-4">
+                    <svg class="w-10 h-10 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path>
+                    </svg>
+                </div>
+                <h3 class="text-xl font-semibold mb-2 text-slate-900 dark:text-white transition-colors duration-300">Quản lý Chi tiêu</h3>
+                <p class="text-slate-600 dark:text-slate-300 transition-colors duration-300">Theo dõi thu nhập, chi tiêu và phân loại giao dịch một cách trực quan.</p>
+            </div>
+            <div class="p-6 rounded-xl bg-slate-50 dark:bg-slate-700 shadow-sm hover:shadow-md transition duration-300">
+                <!-- TƯ DUY FIX UI: Giảm kích thước icon xuống w-10 h-10 -->
+                <div class="flex justify-center mb-4">
+                    <svg class="w-10 h-10 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                    </svg>
+                </div>
+                <h3 class="text-xl font-semibold mb-2 text-slate-900 dark:text-white transition-colors duration-300">Lập Ngân sách</h3>
+                <p class="text-slate-600 dark:text-slate-300 transition-colors duration-300">Đặt ra giới hạn chi tiêu cho từng hạng mục và nhận cảnh báo khi vượt mức.</p>
+            </div>
+            <div class="p-6 rounded-xl bg-slate-50 dark:bg-slate-700 shadow-sm hover:shadow-md transition duration-300">
+                <!-- TƯ DUY FIX UI: Giảm kích thước icon xuống w-10 h-10 -->
+                <div class="flex justify-center mb-4">
+                    <svg class="w-10 h-10 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+                    </svg>
+                </div>
+                <h3 class="text-xl font-semibold mb-2 text-slate-900 dark:text-white transition-colors duration-300">Quản lý Công việc</h3>
+                <p class="text-slate-600 dark:text-slate-300 transition-colors duration-300">Sắp xếp công việc theo độ ưu tiên và hạn chót để không bao giờ bỏ lỡ.</p>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
